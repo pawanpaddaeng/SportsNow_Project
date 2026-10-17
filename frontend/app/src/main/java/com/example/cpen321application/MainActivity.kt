@@ -235,17 +235,17 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onCreate = { form ->
                     isSubmitting = true
                     scope.launch {
-                        // TODO: send the form once the create game api accepts it, the server
-                        // still creates its placeholder game and a debug notification 5 seconds later
-                        val game = createDebugGame()
+                        val result = createGame(form)
                         isSubmitting = false
-                        if (game != null) {
-                            // show the new game right away, at the top of Organized Games
-                            organizedGames.add(0, game.toGameSummary())
-                            Toast.makeText(context, "Game created", Toast.LENGTH_SHORT).show()
-                            navController.popBackStack()
-                        } else {
-                            Toast.makeText(context, "Could not create game, try again", Toast.LENGTH_SHORT).show()
+                        when (result) {
+                            is CreateGameResult.Created -> {
+                                // show the new game right away, at the top of Organized Games
+                                organizedGames.add(0, result.game.toGameSummary())
+                                Toast.makeText(context, "Game created", Toast.LENGTH_SHORT).show()
+                                navController.popBackStack()
+                            }
+                            is CreateGameResult.Failed ->
+                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
                         }
                     }
                 },

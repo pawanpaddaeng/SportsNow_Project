@@ -7,6 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.POST
 import retrofit2.http.Header
 import com.google.gson.annotations.SerializedName
+import com.example.cpen321application.ui.screens.NewGameForm
 
 /*  retrofit for server connection and auto parsing to objects
     using gson
@@ -84,6 +85,22 @@ data class GameDto(
     @SerializedName("created_at") val createdAt: String
 )
 
+/*  body for POST api/games. starts_at is a UTC ISO 8601 time, e.g. "2026-10-18T02:00:00Z".
+    A null description is left out of the json
+ */
+data class CreateGameRequest(
+    val title: String,
+    val sport: String,
+    val description: String?,
+    @SerializedName("starts_at") val startsAt: String,
+    @SerializedName("location_name") val locationName: String,
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+    @SerializedName("max_players") val maxPlayers: Int,
+    @SerializedName("skill_level") val skillLevel: String
+)
+
 // reply from POST api/games: msg "success" with the created game, or an error
 data class CreateGameResponse(
     val msg: String?,
@@ -108,9 +125,12 @@ interface NetworkConnection {
         @Body request: RegisterNotifRequest
     ) : Response<AuthTokenResponse>
 
-    // create game skeleton: the server always creates the same game for now
+    // creates the game in the body, the signed in user is its organizer
     @POST("api/games")
-    suspend fun createGame(@Header("Authorization") authorization: String) : Response<CreateGameResponse>
+    suspend fun createGame(
+        @Header("Authorization") authorization: String,
+        @Body request: CreateGameRequest
+    ) : Response<CreateGameResponse>
 }
 
 /*  reads the json reply of the auth style endpoints, error responses (4xx/5xx)
@@ -131,16 +151,46 @@ object ServerApi {
     }
 }
 
-/*  create game skeleton: asks the server to create its placeholder game for the
-    signed in user. Returns the created game, or null if it failed. The server
-    sends a debug push notification about it a few seconds later
+// outcome of creating a game, message explains a failure to the user
+sealed interface CreateGameResult {
+    data class Created(val game: GameDto) : CreateGameResult
+    data class Failed(val message: String) : CreateGameResult
+}
+
+/*  sends the Create Game form to the server. On invalid_request the server's
+    description of the problem is shown, other failures get a general message
  */
-suspend fun createDebugGame(): GameDto? {
-    val jwt = jwtToken ?: return null
+suspend fun createGame(form: NewGameForm): CreateGameResult {
+    val jwt = jwtToken ?: return CreateGameResult.Failed("You're signed out, sign in again")
+    val request = CreateGameRequest(
+        title = form.title,
+        sport = form.sport,
+        description = form.description,
+        startsAt = form.startsAt.toString(),
+        locationName = form.location.name,
+        address = form.location.address,
+        latitude = form.location.latitude,
+        longitude = form.location.longitude,
+        maxPlayers = form.maxPlayers,
+        skillLevel = form.skillLevel
+    )
+
     return try {
-        val body = ServerApi.retrofitService.createGame(authorization = "Bearer $jwt").body()
-        body?.game?.takeIf { body.msg == "success" }
+        val response = ServerApi.retrofitService.createGame(authorization = "Bearer $jwt", request = request)
+        // error responses (4xx/5xx) carry the same json shape in the error body
+        val reply = response.body() ?: try {
+            com.google.gson.Gson().fromJson(response.errorBody()?.string(), CreateGameResponse::class.java)
+        } catch (e: Exception) {
+            null
+        }
+
+        val game = reply?.game
+        when {
+            reply?.msg == "success" && game != null -> CreateGameResult.Created(game)
+            reply?.msg == "invalid_request" && reply.error != null -> CreateGameResult.Failed(reply.error)
+            else -> CreateGameResult.Failed("Could not create game, try again")
+        }
     } catch (e: Exception) {
-        null
+        CreateGameResult.Failed("Cannot reach the server, try again")
     }
 }

@@ -4,7 +4,8 @@ import WebSocket from 'ws'
 import { createAuthToken } from './auth/jwt';
 import { getAuthUser, requireAuth } from './auth/middleware';
 import { MAX_FCM_TOKEN_LENGTH, saveDeviceToken } from './db/deviceTokens';
-import { createGame, gameJson, getGameById, type NewGame } from './db/games';
+import { createGame, gameJson, getGameById } from './db/games';
+import { parseNewGame, type CreateGameBody } from './validation/newGame';
 import { sendPushToUser } from './notifications/push';
 
 // how long after creating a game the debug notification is sent
@@ -245,27 +246,18 @@ export function createApp(): Express {
     }
   });
 
-  /*  create game skeleton: always creates the same game for the signed in user,
-      then sends them a push notification after a few seconds to test notifications.
-      TODO: take the game details from the request body (Create Game form)
+  /*  create game: makes the game described in the body for the signed in user, who
+      becomes its organizer and first player. Responds with the stored game, or
+      400 invalid_request with the problem if a field is missing or invalid.
+      Also sends the organizer a push notification after a few seconds to test notifications
    */
-  app.post('/api/games', requireAuth, async (_req: Request, res: Response) => {
+  app.post('/api/games', requireAuth, async (req: Request<{}, {}, CreateGameBody>, res: Response) => {
     const user = getAuthUser(res);
-    const startsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const game: NewGame = {
-      organizerId: user.userId,
-      title: 'Pickup Basketball',
-      sport: 'basketball',
-      description: 'Placeholder game created by the create game skeleton.',
-      startsAt,
-      endsAt: new Date(startsAt.getTime() + 2 * 60 * 60 * 1000),
-      locationName: 'UBC Rec Centre',
-      address: '6000 Student Union Blvd, Vancouver, BC',
-      latitude: 49.2681,
-      longitude: -123.2493,
-      maxPlayers: 10,
-      skillLevel: 'any',
-    };
+    const parsed = parseNewGame(req.body, user.userId);
+    if (!parsed.ok) {
+      return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
+    }
+    const game = parsed.value;
 
     try {
       const gameId = await createGame(game);
