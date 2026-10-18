@@ -80,16 +80,17 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     
 **Main success scenario**:
 1. User selects “Sign up”.
-2. System displays a pop-up to verify with Google.
-3. User verifies with Google.
-4. System asks the user for their first name, last name, and birth year, and optionally their favourite sports, skill level, and a photo.
+2. System displays the sign-up screen with a field at the top to verify with Google, and fields below for first name, last name, and birth year, and optionally favourite sports, skill level, and a photo.
+3. User clicks the field to verify with Google.
+4. System verifies the user’s identity with Google.
 5. User enters their details and submits.
-6. System registers the user’s account and logs the user into the new account
+6. System registers the user’s account and logs the user into the new account.
+
 
 
 **Failure scenario(s)**:
-- 2a. Google verification cannot be reached.
-    -  2a1. System displays an error message and returns to the first screen so the user can try again.
+- 4a. Google verification cannot be reached.
+    -  4a1. System displays an error message and returns to the first screen so the user can try again.
 - 5a. User entered illegal characters in at least one field.
     -  5a1. System displays an error message identifying the erroneous field and characters.
 - 5b. User did not enter text in the name fields and/or birth year.
