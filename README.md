@@ -33,7 +33,12 @@ Install the following before the frontend or backend setup steps:
    ```
    Set at least:
    - `sdk.dir`: path to your Android SDK. Android Studio usually writes this the first time you open `frontend/`. On Mac it is often `sdk.dir=/Users/<username>/Library/Android/sdk`.
-   - `API_BASE_URL`: backend URL baked into the APK. Use `http://10.0.2.2:3000` for the emulator (`10.0.2.2` is the host machine). For a physical device on the same Wi-Fi, use `http://<your-lan-ip>:3000`.
+   - `API_BASE_URL`: backend URL baked into the APK (rebuild the app after changing it).
+     - **Local backend** (plain HTTP, no Caddy): `http://10.0.2.2:3000` for the emulator (`10.0.2.2` is the host machine). For a physical device on the same Wi-Fi, use `http://<your-lan-ip>:3000`.
+     - **Server backend** (HTTPS through Caddy): `https://<SERVER_IP>.sslip.io`, e.g. `https://1.2.3.123.sslip.io`.
+   - `GOOGLE_CLIENT_ID`: Google OAuth client ID used for Google sign in.
+   - `MAPS_API_KEY`: Google Maps API key (Maps SDK for Android enabled) for the location picker.
+6. **Firebase config**: put `google-services.json` (Firebase console → Project settings → your Android app) in `frontend/app/`. Without it the app still builds, but push notifications are disabled.
 
 
 ### Build and Run
@@ -49,11 +54,7 @@ Ensure the backend server is running and update the base URL in the app configur
 ---
 ## Backend Setup
 
-You can run the backend in one of two ways:
-* Locally via Node.js 
-* Via Docker Compose
-
-Both ways use the same `backend/.env` file (see below).
+The backend runs with Docker Compose (backend + MySQL, plus Caddy for HTTPS on the server). It uses the `backend/.env` and root `.env` files (see below).
 
 ### Environment configuration
 
@@ -66,62 +67,47 @@ cp .env.example .env
 
 Set at least:
 - `JWT_SECRET`: a long random string used to sign auth tokens.
-- `MONGODB_URI`: only needed for local development (default in `.env.example` assumes MongoDB on `localhost:27017`). Ignored when running via Docker Compose.
+- `GOOGLE_CLIENT_ID`: same Google OAuth client ID as the frontend, used to verify sign ins.
+- `GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json`: Firebase service account key for sending push notifications. Download it from Firebase console → Project settings → Service accounts → Generate new private key, and save it as `backend/firebase-service-account.json` (it is a secret: never commit it).
 - `PORT` (optional): defaults to `3000` if unset.
-- `SERVER_IP`(in root .env): ip of the server.
+- In the root `.env`: `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` (database credentials), and `SERVER_IP`: public IP of the server (Caddy serves `https://<SERVER_IP>.sslip.io`). Locally `SERVER_IP` is unused but must still be set to any value.
 
 
-### Option 1: Run locally
-
-**Requirements:** 
-- [Node.js](https://nodejs.org/en/download/) 22+
-- [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) 10+
-
-**Setup:** 
-1. Install dependencies:
-
-   ```bash
-   cd backend
-   npm install
-   ```
-
-2. **Development** (TypeScript with auto-reload):
-
-   ```bash
-   npm run dev
-   ```
-
-3. **Production build** (optional):
-
-   ```bash
-   npm run build
-   npm start
-   ```
-
-### Option 2: Run with Docker Compose
+### Run with Docker Compose
 
 **Requirements:** 
 - [Docker](https://docs.docker.com/desktop/setup/install) and [Docker Compose](https://docs.docker.com/desktop/setup/install) v2.24+
 - [curl](https://curl.se/download.html)
 
-**Setup**
-1. **Start** (from the project root):
+**Local (no Caddy, plain HTTP)**, from the project root:
 
-   ```bash
-   ./scripts/run-backend.sh
-   ```
+```bash
+docker compose up --build -d backend
+```
 
-   Or run Compose directly:
+This starts the backend and MySQL only. The API is at `http://localhost:3000` (Postman) and `http://10.0.2.2:3000` (emulator), so use the HTTP `API_BASE_URL` in `local.properties`.
 
-   ```bash
-   docker compose up --build -d
-   ```
+**Server (with Caddy, HTTPS)**, from the project root on the server:
 
-2. **Stop**:
+```bash
+./scripts/run-backend.sh
+```
 
-   ```bash
-   docker compose down
-   ```
+Or run Compose directly:
+
+```bash
+docker compose up --build -d
+```
+
+This also starts Caddy, which gets an HTTPS certificate for `https://<SERVER_IP>.sslip.io` automatically. Ports 80 and 443 must be open on the server, and the frontend uses the HTTPS `API_BASE_URL`.
+
+**Stop**:
+
+```bash
+docker compose down
+```
+
+Don't add `-v` unless you mean to wipe data: it deletes the MySQL database and Caddy's certificates (Let's Encrypt only issues 5 certificates per domain per week).
 
 ## Additional Setup
 
