@@ -47,6 +47,11 @@ android {
             "\"${localProperty("GOOGLE_CLIENT_ID")}\"")
         buildConfigField("String", "API_WEB_SOCKET",
             "\"${localProperty("API_WEB_SOCKET")}\"")
+
+        // Google Maps / Places key: used by the map (AndroidManifest) and the place search
+        val mapsApiKey = localProperty("MAPS_API_KEY")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     buildTypes {
@@ -109,4 +114,9 @@ dependencies {
     //firebase cloud messaging for push notifications
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+
+    //google maps and places for picking a game's location
+    implementation(libs.maps.compose)
+    implementation(libs.play.services.maps)
+    implementation(libs.places)
 }

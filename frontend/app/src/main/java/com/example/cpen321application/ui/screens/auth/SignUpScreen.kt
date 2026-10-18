@@ -1,4 +1,4 @@
-package com.example.cpen321application.ui.screens
+package com.example.cpen321application.ui.screens.auth
 
 import android.util.Base64
 import androidx.compose.foundation.background
@@ -26,12 +26,15 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.ServerApi
-import com.example.cpen321application.SignUpRequest
-import com.example.cpen321application.AuthTokenResponse
-import com.example.cpen321application.triggerGoogleSignIn
+import com.example.cpen321application.auth.triggerGoogleSignIn
+import com.example.cpen321application.network.AuthTokenResponse
+import com.example.cpen321application.network.ServerApi
+import com.example.cpen321application.network.SignUpRequest
 import com.google.gson.Gson
 import com.example.cpen321application.ui.theme.*
+import com.example.cpen321application.ui.components.FieldLabel
+import com.example.cpen321application.ui.components.LabeledTextField
+import com.example.cpen321application.ui.components.sportsFieldColors
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.time.Year
@@ -305,31 +308,6 @@ private fun GoogleVerificationCard(
     }
 }
 
-// text field with its label above the box, as in the mockup
-@Composable
-private fun LabeledTextField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        FieldLabel(label)
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            shape = RoundedCornerShape(8.dp),
-            colors = sportsFieldColors(),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Next
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
 // read only field that opens a dropdown of birth years
 @Composable
 private fun BirthYearField(
@@ -383,23 +361,6 @@ private fun BirthYearField(
         )
     }
 }
-
-@Composable
-private fun FieldLabel(text: String) {
-    Text(
-        text = text,
-        color = SportsOnSurfaceVariant,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium
-    )
-}
-
-@Composable
-private fun sportsFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = SportsPrimary,
-    unfocusedBorderColor = SportsOutline,
-    cursorColor = SportsPrimary
-)
 
 // name and email read from the Google id token so the form can be prefilled
 private data class GoogleProfile(

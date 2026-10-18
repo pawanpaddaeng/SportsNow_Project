@@ -1,4 +1,4 @@
-package com.example.cpen321application
+package com.example.cpen321application.auth
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec

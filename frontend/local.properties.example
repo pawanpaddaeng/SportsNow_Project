@@ -7,4 +7,9 @@ API_BASE_URL=http://10.0.2.2:3000
 # Google OAuth client ID.
 GOOGLE_CLIENT_ID=
 
+# Google Maps API key (Maps SDK for Android + Places API enabled), used by the
+# location picker. Restrict it to this app's package name and SHA-1 in Google Cloud.
+MAPS_API_KEY=
+
 # Other API keys, secrets, and configurations
+API_WEB_SOCKET=

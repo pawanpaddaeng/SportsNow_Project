@@ -106,20 +106,52 @@ interface GameRow extends RowDataPacket {
 // connection's time zone can't shift them
 const ISO_UTC = "'%Y-%m-%dT%H:%i:%sZ'";
 
+// columns selected for a game, shared by every query that returns games
+const GAME_COLUMNS = `
+  g.game_id, g.organizer_id, g.title, g.sport, g.description,
+  DATE_FORMAT(g.starts_at, ${ISO_UTC}) AS starts_at,
+  DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
+  g.location_name, g.address, g.latitude, g.longitude,
+  g.max_players, g.skill_level, g.status,
+  UNIX_TIMESTAMP(g.created_at) AS created_at_unix,
+  (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count`;
+
 export async function getGameById(gameId: number): Promise<Game | null> {
   const [rows] = await pool.execute<GameRow[]>(
-    `SELECT g.game_id, g.organizer_id, g.title, g.sport, g.description,
-            DATE_FORMAT(g.starts_at, ${ISO_UTC}) AS starts_at,
-            DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
-            g.location_name, g.address, g.latitude, g.longitude,
-            g.max_players, g.skill_level, g.status,
-            UNIX_TIMESTAMP(g.created_at) AS created_at_unix,
-            (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count
-     FROM games g WHERE g.game_id = ? LIMIT 1`,
+    `SELECT ${GAME_COLUMNS} FROM games g WHERE g.game_id = ? LIMIT 1`,
     [gameId],
   );
   const row = rows[0];
-  if (!row) return null;
+  return row ? toGame(row) : null;
+}
+
+export interface UserGames {
+  // games the user created
+  organized: Game[];
+  // games the user is a player in but didn't create
+  joined: Game[];
+}
+
+/*  every game the user organized or joined, soonest first. Includes past and
+    cancelled games, each has its status and times so the app can group them
+ */
+export async function getGamesForUser(userId: number): Promise<UserGames> {
+  const [rows] = await pool.execute<GameRow[]>(
+    `SELECT ${GAME_COLUMNS}
+     FROM games g
+     WHERE g.organizer_id = ?
+        OR EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?)
+     ORDER BY g.starts_at, g.game_id`,
+    [userId, userId],
+  );
+  const games = rows.map(toGame);
+  return {
+    organized: games.filter((game) => game.organizerId === userId),
+    joined: games.filter((game) => game.organizerId !== userId),
+  };
+}
+
+function toGame(row: GameRow): Game {
   return {
     gameId: row.game_id,
     organizerId: row.organizer_id,
