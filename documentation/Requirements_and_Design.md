@@ -230,25 +230,55 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 ## 4. Designs Specification
 ### **4.1. Main Components**
-1. **[WRITE_NAME_HERE]**
-    - **Purpose**: ...
+1. **User**
+    - **Purpose**: Handles sign up, login, sign out, and user profiles, verifying identity through Google Authentication.
     - **Interfaces**: 
         1. ...
             - **Purpose**: ...
         2. ...
-2. ...
+
+2. **Game**
+    - **Purpose**: Handles creating, editing, discovering, joining, and leaving games, accepting and removing players, and invitations, using the Google Maps API for locations.
+    - **Interfaces**: 
+        1. ...
+            - **Purpose**: ...
+        2. ...
+
+3. **Player Review**
+    - **Purpose**: Handles player ratings after a game, no-shows, reputation scores, and badges.
+    - **Interfaces**: 
+        1. ...
+            - **Purpose**: ...
+        2. ...
+
+4. **Message**
+    - **Purpose**: Handles chat messages for both game chat and friend chat.
+    - **Interfaces**: 
+        1. ...
+            - **Purpose**: ...
+        2. ...
+
+5. **Social**
+    - **Purpose**: Handles friend search, friend requests, removing friends, and friend recommendations.
+    - **Interfaces**: 
+        1. ...
+            - **Purpose**: ...
+        2. ...
 
 
 ### **4.2. Databases**
-1. **[WRITE_NAME_HERE]**
+1. **Relational Database (MySQL)**
     - **Purpose**: ...
-2. ...
+2. **Chat Database (MongoDB)**
+    - **Purpose**: Stores chat messages for the Message component.
+
 
 
 ### **4.3. External Modules**
-1. **[WRITE_NAME_HERE]** 
-- **Purpose**: ...
-2. ...
+1. **Google Authentication** 
+    - **Purpose**: Verifies users’ identity when they sign up and log in.
+2. **Google Maps API** 
+    - **Purpose**: Provides the map for selecting a game location and determines addresses, and gives the location for nearby game search.
 
 
 ### **4.4. Frameworks and Libraries**
@@ -259,6 +289,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 ### **4.5. Dependencies Diagram**
+
 
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
