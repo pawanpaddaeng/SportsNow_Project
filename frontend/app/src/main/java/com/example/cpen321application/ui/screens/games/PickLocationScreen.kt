@@ -1,4 +1,4 @@
-package com.example.cpen321application.ui.screens
+package com.example.cpen321application.ui.screens.games
 
 import android.Manifest
 import android.content.Context

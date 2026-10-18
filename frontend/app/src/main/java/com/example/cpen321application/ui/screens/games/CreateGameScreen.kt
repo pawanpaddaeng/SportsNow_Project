@@ -1,4 +1,4 @@
-package com.example.cpen321application.ui.screens
+package com.example.cpen321application.ui.screens.games
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

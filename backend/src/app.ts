@@ -4,7 +4,7 @@ import WebSocket from 'ws'
 import { createAuthToken } from './auth/jwt';
 import { getAuthUser, requireAuth } from './auth/middleware';
 import { MAX_FCM_TOKEN_LENGTH, saveDeviceToken } from './db/deviceTokens';
-import { createGame, gameJson, getGameById } from './db/games';
+import { createGame, gameJson, getGameById, getGamesForUser } from './db/games';
 import { parseNewGame, type CreateGameBody } from './validation/newGame';
 import { sendPushToUser } from './notifications/push';
 
@@ -281,6 +281,27 @@ export function createApp(): Express {
     } catch (error) {
       console.error('Creating game failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not create game, try again later' });
+    }
+  });
+
+  /*  the signed in user's games, split into the ones they organized and the ones
+      they joined, soonest first. Responds msg "no_games" if they have none yet
+   */
+  app.get('/api/games/mine', requireAuth, async (_req: Request, res: Response) => {
+    const user = getAuthUser(res);
+    try {
+      const { organized, joined } = await getGamesForUser(user.userId);
+      if (organized.length === 0 && joined.length === 0) {
+        return res.status(200).json({ msg: 'no_games' });
+      }
+      return res.status(200).json({
+        msg: 'success',
+        organized_games: organized.map(gameJson),
+        joined_games: joined.map(gameJson),
+      });
+    } catch (error) {
+      console.error('Loading games failed:', error);
+      return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
     }
   });
 

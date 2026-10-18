@@ -1,4 +1,4 @@
-package com.example.cpen321application.ui.screens
+package com.example.cpen321application.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.GameDto
+import com.example.cpen321application.network.GameDto
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.theme.*
@@ -73,18 +73,11 @@ fun GameDto.toGameSummary(): GameSummary {
     )
 }
 
-// placeholder games shown until the backend provides real ones
-val sampleJoinedGames = listOf(
-    GameSummary("1", "Basketball", "Pickup Basketball", "Sat, Oct 18 · 3:00 PM", "UBC Rec Centre", 6, 10),
-    GameSummary("2", "Soccer", "Sunday Soccer", "Sun, Oct 19 · 10:00 AM", "Jericho Park", 14, 22)
-)
-val sampleOrganizedGames = listOf(
-    GameSummary("3", "Volleyball", "Volleyball Night", "Fri, Oct 17 · 7:00 PM", "Osborne Gym", 8, 12, pendingRequests = 3)
-)
-
 /*
     Home screen for SportsNow:
     Shows the games the user joined and organized with the bottom navigation bar.
+    isRefreshing shows a loading bar while the list updates, errorMessage is shown
+    above the games when an update failed (the last loaded games stay visible).
     The callbacks connect it to other screens through AppNavigation
  */
 @Composable
@@ -92,6 +85,8 @@ fun HomeScreen(
     joinedGames: List<GameSummary>,
     organizedGames: List<GameSummary>,
     modifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
+    errorMessage: String? = null,
     onCreateGame: () -> Unit = {},
     onRefresh: () -> Unit = {},
     onGameClick: (GameSummary) -> Unit = {},
@@ -127,13 +122,34 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = onRefresh) {
+                    IconButton(onClick = onRefresh, enabled = !isRefreshing) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,
                             contentDescription = "Refresh",
-                            tint = SportsOnSurface
+                            tint = if (isRefreshing) SportsOutlineVariant else SportsOnSurface
                         )
                     }
+                }
+            }
+
+            // thin loading bar while the games update, the current list stays visible
+            if (isRefreshing) {
+                item(key = "refreshing") {
+                    LinearProgressIndicator(
+                        color = SportsPrimary,
+                        trackColor = SportsPrimaryContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            if (errorMessage != null) {
+                item(key = "error") {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 

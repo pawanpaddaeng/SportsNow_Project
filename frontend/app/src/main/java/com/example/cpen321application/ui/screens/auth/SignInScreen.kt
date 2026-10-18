@@ -1,4 +1,4 @@
-package com.example.cpen321application.ui.screens
+package com.example.cpen321application.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -14,10 +14,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import com.example.cpen321application.AuthTokenResponse
-import com.example.cpen321application.LoginRequest
-import com.example.cpen321application.ServerApi
-import com.example.cpen321application.triggerGoogleSignIn
+import com.example.cpen321application.auth.triggerGoogleSignIn
+import com.example.cpen321application.network.AuthTokenResponse
+import com.example.cpen321application.network.LoginRequest
+import com.example.cpen321application.network.ServerApi
 import com.google.gson.Gson
 
 /*
