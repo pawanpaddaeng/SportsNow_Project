@@ -152,6 +152,60 @@ export async function getGamesForUser(userId: number): Promise<UserGames> {
   };
 }
 
+// how far Discover looks for games around the user
+export const MAX_DISCOVER_DISTANCE_M = 50_000;
+// most games sent to Discover at once, the closest ones
+const MAX_DISCOVER_GAMES = 50;
+
+// a game on the Discover screen, with how far it is and the user's request for it
+export interface DiscoverGame {
+  game: Game;
+  distanceMeters: number;
+  joinRequestStatus: JoinRequestStatus | null;
+}
+
+interface DiscoverGameRow extends GameRow {
+  distance_m: number;
+  join_request_status: JoinRequestStatus | null;
+}
+
+/*  upcoming scheduled games within MAX_DISCOVER_DISTANCE_M of the point that the
+    user could ask to join (not organized or already joined by them), closest first.
+    Full games are included so the app can show them as full
+ */
+export async function getDiscoverGames(userId: number, latitude: number, longitude: number): Promise<DiscoverGame[]> {
+  // ST_Distance_Sphere takes POINT(longitude, latitude) and returns metres
+  const [rows] = await pool.execute<DiscoverGameRow[]>(
+    `SELECT ${GAME_COLUMNS},
+            ROUND(ST_Distance_Sphere(POINT(g.longitude, g.latitude), POINT(?, ?))) AS distance_m,
+            (SELECT r.status FROM join_requests r
+             WHERE r.game_id = g.game_id AND r.user_id = ?) AS join_request_status
+     FROM games g
+     WHERE g.status = 'scheduled'
+       AND g.starts_at > UTC_TIMESTAMP()
+       AND g.organizer_id <> ?
+       AND NOT EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?)
+     HAVING distance_m <= ${MAX_DISCOVER_DISTANCE_M}
+     ORDER BY distance_m, g.starts_at, g.game_id
+     LIMIT ${MAX_DISCOVER_GAMES}`,
+    [longitude, latitude, userId, userId, userId],
+  );
+  return rows.map((row) => ({
+    game: toGame(row),
+    distanceMeters: Number(row.distance_m),
+    joinRequestStatus: row.join_request_status,
+  }));
+}
+
+// JSON shape of a Discover game sent to the app
+export function discoverGameJson(entry: DiscoverGame) {
+  return {
+    game: gameJson(entry.game),
+    distance_m: entry.distanceMeters,
+    join_request_status: entry.joinRequestStatus,
+  };
+}
+
 function toGame(row: GameRow): Game {
   return {
     gameId: row.game_id,
@@ -218,7 +272,7 @@ async function lockGameForChange(
 }
 
 // runs work in a transaction on its own connection, rolling back if it throws
-async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+export async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();

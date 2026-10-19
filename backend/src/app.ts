@@ -8,10 +8,12 @@ import {
   cancelGame, 
   countPendingJoinRequests,
   createGame,
+  discoverGameJson,
   type Game,
   type GameChangeProblem,
   gameJson,
   gamePlayerJson,
+  getDiscoverGames,
   getGameById,
   getGamePlayers,
   getGamesForUser,
@@ -19,6 +21,9 @@ import {
   getUsersToNotify,
   updateGame,
 } from './db/games';
+import { createJoinRequest, type JoinRequestProblem } from './db/joinRequests';
+import { parseCoordinates } from './validation/coordinates';
+import { parseJoinRequest, type JoinRequestBody } from './validation/joinRequest';
 import { parseNewGame, type CreateGameBody } from './validation/newGame';
 import { sendPushToUser, sendPushToUsers } from './notifications/push';
 
@@ -46,6 +51,29 @@ function gameChangeError(problem: GameChangeProblem): { status: number; body: { 
       return { status: 409, body: { msg: 'game_cancelled', error: 'This game was cancelled' } };
     case 'started':
       return { status: 409, body: { msg: 'game_started', error: 'This game has already started' } };
+  }
+}
+
+// response for a join request that can't be made
+function joinRequestError(problem: JoinRequestProblem): { status: number; body: { msg: string; error: string } } {
+  switch (problem) {
+    case 'not_found':
+      return { status: 404, body: { msg: 'not_found', error: 'This game does not exist' } };
+    case 'own_game':
+      return { status: 409, body: { msg: 'own_game', error: 'You organize this game' } };
+    case 'cancelled':
+      return { status: 409, body: { msg: 'game_cancelled', error: 'This game was cancelled' } };
+    case 'started':
+      return { status: 409, body: { msg: 'game_started', error: 'This game has already started' } };
+    case 'already_player':
+      return { status: 409, body: { msg: 'already_player', error: "You're already in this game" } };
+    case 'game_full':
+      return { status: 409, body: { msg: 'game_full', error: 'This game is full' } };
+    case 'already_requested':
+      return {
+        status: 409,
+        body: { msg: 'already_requested', error: 'You already asked to join this game, wait for the organizer to respond' },
+      };
   }
 }
 
@@ -358,6 +386,34 @@ export function createApp(): Express {
     }
   });
 
+  /*  discover: upcoming games near ?lat=&lng= (within MAX_DISCOVER_DISTANCE_M) that the
+      signed in user can ask to join, closest first. Each has distance_m and the user's
+      join_request_status (null if they never asked). Responds msg "no_games" when none
+      are nearby, 400 invalid_request for missing or out of range coordinates.
+      Registered before /api/games/:gameId so "discover" isn't read as an id
+   */
+  app.get('/api/games/discover', requireAuth, async (req: Request, res: Response) => {
+    const user = getAuthUser(res);
+    const point = parseCoordinates(req.query.lat, req.query.lng);
+    if (!point) {
+      return res.status(400).json({
+        msg: 'invalid_request',
+        error: 'lat (-90 to 90) and lng (-180 to 180) are required numbers',
+      });
+    }
+
+    try {
+      const games = await getDiscoverGames(user.userId, point.latitude, point.longitude);
+      if (games.length === 0) {
+        return res.status(200).json({ msg: 'no_games' });
+      }
+      return res.status(200).json({ msg: 'success', games: games.map(discoverGameJson) });
+    } catch (error) {
+      console.error('Loading discover games failed:', error);
+      return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
+    }
+  });
+
   /*  game details: the game with its organizer, players and what the signed in user
       can do with it. viewer_role is "organizer", "player" (joined) or "viewer".
       pending_requests is only sent to the organizer and join_request_status
@@ -516,6 +572,48 @@ export function createApp(): Express {
       return res.status(500).json({ msg: 'server_error', error: 'Could not cancel game, try again later' });
     }
   });
+
+  /*  join request: the signed in user asks the organizer to let them join, with the
+      answers from the join request popup. Responds 201 with the pending request and
+      notifies the organizer. Errors: 400 invalid_request, 404 not_found,
+      409 own_game / already_player / already_requested / game_full / game_cancelled / game_started
+   */
+  app.post('/api/games/:gameId/join-requests', requireAuth,
+    async (req: Request<{ gameId: string }, {}, JoinRequestBody>, res: Response) => {
+      const user = getAuthUser(res);
+      const gameId = readGameId(req.params.gameId);
+      if (gameId === null) {
+        return res.status(400).json({ msg: 'invalid_request', error: 'gameId must be a positive whole number' });
+      }
+      const parsed = parseJoinRequest(req.body);
+      if (!parsed.ok) {
+        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
+      }
+
+      try {
+        const result = await createJoinRequest(gameId, user.userId, parsed.value);
+        if (!result.ok) {
+          const { status, body } = joinRequestError(result.problem);
+          return res.status(status).json(body);
+        }
+        console.log(`Join request ${result.requestId} sent for game id:`, gameId);
+
+        // best effort, the app gets its reply without waiting for the notification
+        void sendPushToUser(result.organizerId, {
+          title: 'New join request',
+          body: `${user.firstName} wants to join ${result.title}`,
+          data: { type: 'join_request', gameId: String(gameId) },
+        }).then((devices) => console.log(`Join request notification sent to ${devices} device(s)`));
+
+        return res.status(201).json({
+          msg: 'success',
+          request: { request_id: result.requestId, game_id: gameId, status: 'pending' },
+        });
+      } catch (error) {
+        console.error('Sending join request failed:', error);
+        return res.status(500).json({ msg: 'server_error', error: 'Could not send your request, try again later' });
+      }
+    });
 
   //simple api to test connection health
   app.get('/health', (_req, res) => {
