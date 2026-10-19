@@ -79,3 +79,37 @@ data class CreateGameResponse(
     val game: GameDto?,
     val error: String?
 )
+
+/*  a game on the Discover screen: the game, how far it is from the user in metres
+    and the user's join request for it ("pending", "declined", ... or null if they never asked)
+ */
+data class DiscoverGameDto(
+    val game: GameDto,
+    @SerializedName("distance_m") val distanceMeters: Int,
+    @SerializedName("join_request_status") val joinRequestStatus: String?
+)
+
+/*  reply from GET api/games/discover: msg "success" with the games closest first,
+    "no_games" when there are none nearby, otherwise an error code
+ */
+data class DiscoverGamesResponse(
+    val msg: String?,
+    val games: List<DiscoverGameDto>?,
+    val error: String?
+)
+
+/*  body for POST api/games/{gameId}/join-requests, the answers from the join request popup.
+    skill_level is "beginner", "intermediate", "advanced" or "competitive", play_frequency
+    "rarely", "monthly", "weekly" or "several_per_week". Null fields are left out of the json
+ */
+data class JoinRequestBody(
+    @SerializedName("skill_level") val skillLevel: String,
+    @SerializedName("play_frequency") val playFrequency: String?,
+    val message: String?
+)
+
+// reply from POST api/games/{gameId}/join-requests: msg "success", or an error code with error
+data class JoinRequestResponse(
+    val msg: String?,
+    val error: String?
+)

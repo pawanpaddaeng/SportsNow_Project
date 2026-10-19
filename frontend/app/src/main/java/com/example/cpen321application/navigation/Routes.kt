@@ -7,6 +7,7 @@ object Routes {
     const val HOME = "home"
     const val CREATE_GAME = "create_game"
     const val PICK_LOCATION = "pick_location"
+    const val DISCOVER = "discover"
 
     // game details takes the game's id, build it with gameDetails(id)
     const val GAME_ID_ARG = "gameId"

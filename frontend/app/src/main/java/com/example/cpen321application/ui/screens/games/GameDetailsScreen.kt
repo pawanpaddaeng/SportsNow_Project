@@ -157,6 +157,8 @@ fun GameDetailsScreen(
     onCancelGame: () -> Unit = {},
     onLeaveGame: () -> Unit = {},
     onRequestToJoin: () -> Unit = {},
+    // highlighted in the bottom bar: Discover when opened from there, otherwise Home
+    selectedTab: BottomTab = BottomTab.Home,
     onTabSelected: (BottomTab) -> Unit = {}
 ) {
     var showPlayers by remember { mutableStateOf(false) }
@@ -167,7 +169,7 @@ fun GameDetailsScreen(
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = selectedTab, onTabSelected = onTabSelected)
         }
     ) { innerPadding ->
         Column(

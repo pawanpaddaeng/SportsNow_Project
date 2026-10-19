@@ -1,10 +1,13 @@
 package com.example.cpen321application.navigation
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,23 +34,34 @@ import com.example.cpen321application.auth.Session
 import com.example.cpen321application.auth.firstName
 import com.example.cpen321application.auth.jwtToken
 import com.example.cpen321application.auth.lastName
+import com.example.cpen321application.games.DiscoverGamesResult
 import com.example.cpen321application.games.GameChangeResult
 import com.example.cpen321application.games.GameDetailsResult
+import com.example.cpen321application.games.JoinRequestResult
 import com.example.cpen321application.games.MyGamesResult
 import com.example.cpen321application.games.cancelGame
 import com.example.cpen321application.games.createGame
 import com.example.cpen321application.games.updateGame
+import com.example.cpen321application.games.fetchDiscoverGames
 import com.example.cpen321application.games.fetchGameDetails
 import com.example.cpen321application.games.fetchMyGames
+import com.example.cpen321application.games.sendJoinRequest
+import com.example.cpen321application.location.DeviceLocation
+import com.example.cpen321application.location.currentDeviceLocation
+import com.example.cpen321application.location.hasLocationPermission
 import com.example.cpen321application.notifications.NotificationRegistration
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.screens.auth.SignInScreen
 import com.example.cpen321application.ui.screens.auth.SignUpScreen
+import com.example.cpen321application.ui.screens.discover.DiscoverGame
+import com.example.cpen321application.ui.screens.discover.DiscoverScreen
+import com.example.cpen321application.ui.screens.discover.toDiscoverGame
 import com.example.cpen321application.ui.screens.games.GameDetails
 import com.example.cpen321application.ui.screens.games.GameDetailsScreen
 import com.example.cpen321application.ui.screens.games.GameInfoForm
 import com.example.cpen321application.ui.screens.games.InputGameInfoScreen
 import com.example.cpen321application.ui.screens.games.GameLocation
+import com.example.cpen321application.ui.screens.games.JoinRequestSheet
 import com.example.cpen321application.ui.screens.games.toGameDetails
 import com.example.cpen321application.ui.screens.games.toGameInfoForm
 import com.example.cpen321application.ui.screens.games.PickLocationScreen
@@ -105,6 +119,55 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
     }
 
+    // games shown on Discover and the location they were loaded for. Kept here like the
+    // Home games so they stay visible while a refresh loads and after opening a game
+    val discoverGames = remember { mutableStateListOf<DiscoverGame>() }
+    var discoverLocation by remember { mutableStateOf<DeviceLocation?>(null) }
+    var hasLoadedDiscover by remember { mutableStateOf(false) }
+    var isLoadingDiscover by remember { mutableStateOf(false) }
+    var discoverError by remember { mutableStateOf<String?>(null) }
+
+    /*  loads the games near the user. The location is only looked up again when
+        refreshLocation is set (or none is known yet), to save battery. On failure
+        the last loaded games stay
+     */
+    fun loadDiscover(refreshLocation: Boolean) {
+        if (isLoadingDiscover) return
+        isLoadingDiscover = true
+        scope.launch {
+            val location = discoverLocation.takeUnless { refreshLocation } ?: currentDeviceLocation(context)
+            if (location == null) {
+                discoverError = "Couldn't get your location. Check that location is turned on, then try again."
+                isLoadingDiscover = false
+                return@launch
+            }
+            discoverLocation = location
+            when (val result = fetchDiscoverGames(context, location.latitude, location.longitude)) {
+                is DiscoverGamesResult.Loaded -> {
+                    discoverGames.clear()
+                    discoverGames.addAll(result.games.map { it.toDiscoverGame() })
+                    hasLoadedDiscover = true
+                    discoverError = null
+                }
+                is DiscoverGamesResult.Failed -> discoverError = result.message
+            }
+            isLoadingDiscover = false
+        }
+    }
+
+    // bottom bar: Home and Discover are built, the other tabs aren't yet
+    fun openTab(tab: BottomTab) {
+        when (tab) {
+            BottomTab.Home -> navController.popBackStack(Routes.HOME, inclusive = false)
+            // Home stays underneath so back from Discover returns to it
+            BottomTab.Discover -> navController.navigate(Routes.DISCOVER) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+            else -> Toast.makeText(context, "${tab.label} isn't available yet", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // forget the session and show sign in with a message, clearing every other screen
     fun returnToSignIn() {
         jwtToken = null
@@ -113,6 +176,10 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         organizedGames.clear()
         joinedGames.clear()
         gamesError = null
+        discoverGames.clear()
+        discoverLocation = null
+        hasLoadedDiscover = false
+        discoverError = null
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
@@ -216,7 +283,61 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onCreateGame = { navController.navigate(Routes.CREATE_GAME) },
                 onGameClick = { game ->
                     game.id.toIntOrNull()?.let { navController.navigate(Routes.gameDetails(it)) }
+                },
+                onTabSelected = { tab -> openTab(tab) }
+            )
+        }
+
+        composable(Routes.DISCOVER) { backStackEntry ->
+            // only ask once per visit, the system dialog pauses and resumes this screen
+            var askedForPermission by remember { mutableStateOf(false) }
+            val permissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) { results ->
+                if (results.values.any { it }) {
+                    loadDiscover(refreshLocation = true)
+                } else {
+                    discoverError = "SportsNow needs your location to find games near you. " +
+                        "Allow location access, then try again."
                 }
+            }
+
+            fun askForPermission() {
+                askedForPermission = true
+                permissionLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                )
+            }
+
+            // reload whenever the screen is shown, e.g. coming back after sending a join request
+            DisposableEffect(backStackEntry) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+                    when {
+                        hasLocationPermission(context) -> loadDiscover(refreshLocation = false)
+                        !askedForPermission -> askForPermission()
+                    }
+                }
+                backStackEntry.lifecycle.addObserver(observer)
+                onDispose { backStackEntry.lifecycle.removeObserver(observer) }
+            }
+
+            // a new location only when the user asks for it, otherwise the last one is reused
+            fun reloadWithNewLocation() {
+                if (hasLocationPermission(context)) loadDiscover(refreshLocation = true) else askForPermission()
+            }
+
+            DiscoverScreen(
+                games = discoverGames,
+                location = discoverLocation,
+                hasLoaded = hasLoadedDiscover,
+                isLoading = isLoadingDiscover,
+                errorMessage = discoverError,
+                onRetry = { reloadWithNewLocation() },
+                onRefresh = { reloadWithNewLocation() },
+                onGameClick = { game -> navController.navigate(Routes.gameDetails(game.gameId)) },
+                onTabSelected = { tab -> openTab(tab) },
+                modifier = modifier
             )
         }
 
@@ -230,6 +351,13 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             var error by remember { mutableStateOf<String?>(null) }
             var notFound by remember { mutableStateOf(false) }
             var isCancelling by remember { mutableStateOf(false) }
+            var showJoinSheet by remember { mutableStateOf(false) }
+            var isSendingRequest by remember { mutableStateOf(false) }
+            var joinRequestError by remember { mutableStateOf<String?>(null) }
+            // opened from a Discover card: highlight Discover and go back there after a join request
+            val openedFromDiscover = remember {
+                navController.previousBackStackEntry?.destination?.route == Routes.DISCOVER
+            }
 
             // on failure the last loaded details stay visible with the error above them
             fun loadDetails() {
@@ -294,12 +422,47 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                     }
                 },
                 onLeaveGame = { notAvailableYet("Leaving a game") },
-                onRequestToJoin = { notAvailableYet("Requesting to join") },
-                onTabSelected = { tab ->
-                    if (tab == BottomTab.Home) navController.popBackStack(Routes.HOME, inclusive = false)
+                onRequestToJoin = {
+                    joinRequestError = null
+                    showJoinSheet = true
                 },
+                selectedTab = if (openedFromDiscover) BottomTab.Discover else BottomTab.Home,
+                onTabSelected = { tab -> openTab(tab) },
                 modifier = modifier
             )
+
+            val shownDetails = details
+            if (showJoinSheet && shownDetails != null) {
+                JoinRequestSheet(
+                    details = shownDetails,
+                    isSending = isSendingRequest,
+                    errorMessage = joinRequestError,
+                    onDismiss = { showJoinSheet = false },
+                    onSend = { answers ->
+                        isSendingRequest = true
+                        joinRequestError = null
+                        scope.launch {
+                            val result = sendJoinRequest(
+                                context = context,
+                                gameId = gameId,
+                                skillLevel = answers.skillLevel,
+                                playFrequency = answers.playFrequency,
+                                message = answers.message
+                            )
+                            isSendingRequest = false
+                            when (result) {
+                                is JoinRequestResult.Sent -> {
+                                    showJoinSheet = false
+                                    Toast.makeText(context, "Request sent", Toast.LENGTH_SHORT).show()
+                                    // Discover reloads when shown, so the card says "Request pending"
+                                    if (openedFromDiscover) navController.popBackStack() else loadDetails()
+                                }
+                                is JoinRequestResult.Failed -> joinRequestError = result.message
+                            }
+                        }
+                    }
+                )
+            }
         }
 
         composable(Routes.CREATE_GAME) { backStackEntry ->

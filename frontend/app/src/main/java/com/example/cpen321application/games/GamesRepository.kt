@@ -4,8 +4,11 @@ import android.content.Context
 import com.example.cpen321application.auth.Session
 import com.example.cpen321application.network.CreateGameRequest
 import com.example.cpen321application.network.CreateGameResponse
+import com.example.cpen321application.network.DiscoverGameDto
 import com.example.cpen321application.network.GameDetailsResponse
 import com.example.cpen321application.network.GameDto
+import com.example.cpen321application.network.JoinRequestBody
+import com.example.cpen321application.network.JoinRequestResponse
 import com.example.cpen321application.network.ServerApi
 import com.example.cpen321application.ui.screens.games.GameInfoForm
 
@@ -111,6 +114,81 @@ suspend fun fetchGameDetails(context: Context, gameId: Int): GameDetailsResult {
         }
     } catch (e: Exception) {
         GameDetailsResult.Failed("Cannot reach the server, try again")
+    }
+}
+
+// outcome of loading the Discover screen's games, message explains a failure to the user
+sealed interface DiscoverGamesResult {
+    // closest first, empty when there are no games nearby
+    data class Loaded(val games: List<DiscoverGameDto>) : DiscoverGamesResult
+    data class Failed(val message: String) : DiscoverGamesResult
+}
+
+/*  loads the upcoming games near the user's location that they can ask to join.
+    context is needed to renew an expired session (silent Google sign in)
+ */
+suspend fun fetchDiscoverGames(context: Context, latitude: Double, longitude: Double): DiscoverGamesResult {
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.retrofitService.getDiscoverGames(
+                authorization = authorization,
+                latitude = latitude,
+                longitude = longitude
+            )
+        } ?: return DiscoverGamesResult.Failed(SESSION_ENDED_MESSAGE)
+        // error replies (e.g. server_error) have no body here and fall to the else case
+        val reply = response.body()
+        when (reply?.msg) {
+            "success" -> DiscoverGamesResult.Loaded(reply.games.orEmpty())
+            "no_games" -> DiscoverGamesResult.Loaded(emptyList())
+            else -> DiscoverGamesResult.Failed("Couldn't load games near you, try again")
+        }
+    } catch (e: Exception) {
+        DiscoverGamesResult.Failed("Cannot reach the server, try again")
+    }
+}
+
+// outcome of sending a join request, message explains a failure to the user
+sealed interface JoinRequestResult {
+    data object Sent : JoinRequestResult
+    data class Failed(val message: String) : JoinRequestResult
+}
+
+/*  sends the join request popup's answers to the game's organizer. The server's
+    description is shown for problems the user can act on (game full, already asked, ...),
+    server errors get a general message. Blank messages are left out
+ */
+suspend fun sendJoinRequest(
+    context: Context,
+    gameId: Int,
+    skillLevel: String,
+    playFrequency: String?,
+    message: String?
+): JoinRequestResult {
+    val request = JoinRequestBody(
+        skillLevel = skillLevel,
+        playFrequency = playFrequency,
+        message = message?.trim()?.takeIf { it.isNotEmpty() }
+    )
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.retrofitService.sendJoinRequest(authorization = authorization, gameId = gameId, request = request)
+        } ?: return JoinRequestResult.Failed(SESSION_ENDED_MESSAGE)
+        // error responses (4xx/5xx) carry the same json shape in the error body
+        val reply = response.body() ?: try {
+            com.google.gson.Gson().fromJson(response.errorBody()?.string(), JoinRequestResponse::class.java)
+        } catch (e: Exception) {
+            null
+        }
+
+        when {
+            reply?.msg == "success" -> JoinRequestResult.Sent
+            reply?.msg != null && reply.msg != "server_error" && reply.error != null ->
+                JoinRequestResult.Failed(reply.error)
+            else -> JoinRequestResult.Failed("Could not send your request, try again")
+        }
+    } catch (e: Exception) {
+        JoinRequestResult.Failed("Cannot reach the server, try again")
     }
 }
 

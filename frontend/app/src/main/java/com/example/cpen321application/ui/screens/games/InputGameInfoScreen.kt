@@ -55,8 +55,8 @@ private const val DEFAULT_PLAYERS = 10
 private const val MAX_TITLE_LENGTH = 100
 private const val MAX_DESCRIPTION_LENGTH = 1000
 
-// label shown on the chip and the value sent to the server
-private val SPORTS = listOf(
+// label shown on the chip and the value sent to the server, also the Discover filter
+internal val SPORTS = listOf(
     "Basketball" to "basketball",
     "Soccer" to "soccer",
     "Volleyball" to "volleyball",
@@ -360,10 +360,10 @@ private fun TopBar(title: String, onBack: () -> Unit) {
     }
 }
 
-// row of selectable chips with a label above, exactly one option is selected
+// row of selectable chips with a label above, at most one option is selected
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChipGroup(
+internal fun ChipGroup(
     label: String,
     options: List<Pair<String, String>>,
     selected: String?,
@@ -373,33 +373,38 @@ private fun ChipGroup(
         FieldLabel(label)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (text, value) ->
-                val isSelected = value == selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onSelect(value) },
-                    label = { Text(text) },
-                    leadingIcon = if (isSelected) {
-                        { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else {
-                        null
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SportsPrimaryContainer,
-                        selectedLabelColor = SportsOnPrimaryContainer,
-                        selectedLeadingIconColor = SportsOnPrimaryContainer,
-                        labelColor = SportsOnSurfaceVariant
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        borderColor = SportsOutlineVariant,
-                        selectedBorderColor = SportsPrimaryContainer
-                    )
-                )
+                SelectableChip(text = text, selected = value == selected, onClick = { onSelect(value) })
             }
         }
     }
+}
+
+// chip from the mockups, a check mark and blue fill when selected
+@Composable
+internal fun SelectableChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(text) },
+        leadingIcon = if (selected) {
+            { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        } else {
+            null
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = SportsPrimaryContainer,
+            selectedLabelColor = SportsOnPrimaryContainer,
+            selectedLeadingIconColor = SportsOnPrimaryContainer,
+            labelColor = SportsOnSurfaceVariant
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = SportsOutlineVariant,
+            selectedBorderColor = SportsPrimaryContainer
+        )
+    )
 }
 
 /*  shows the picked place with a small map preview, tapping it opens the

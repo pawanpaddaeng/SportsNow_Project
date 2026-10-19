@@ -10,6 +10,7 @@ import retrofit2.http.PUT
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /*  retrofit for server connection and auto parsing to objects
     using gson
@@ -68,6 +69,22 @@ interface NetworkConnection {
         @Header("Authorization") authorization: String,
         @Path("gameId") gameId: Int
     ) : Response<GameDetailsResponse>
+
+    // upcoming games near the point that the signed in user can ask to join, closest first
+    @GET("api/games/discover")
+    suspend fun getDiscoverGames(
+        @Header("Authorization") authorization: String,
+        @Query("lat") latitude: Double,
+        @Query("lng") longitude: Double
+    ) : Response<DiscoverGamesResponse>
+
+    // asks the game's organizer to let the signed in user join
+    @POST("api/games/{gameId}/join-requests")
+    suspend fun sendJoinRequest(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int,
+        @Body request: JoinRequestBody
+    ) : Response<JoinRequestResponse>
 }
 
 // main object instance with retrofit service used to connect to server
