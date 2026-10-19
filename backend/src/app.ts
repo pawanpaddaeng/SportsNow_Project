@@ -21,7 +21,14 @@ import {
   getUsersToNotify,
   updateGame,
 } from './db/games';
-import { createJoinRequest, type JoinRequestProblem } from './db/joinRequests';
+import {
+  createJoinRequest,
+  decideJoinRequest,
+  getPendingJoinRequests,
+  type JoinRequestDecisionProblem,
+  type JoinRequestProblem,
+  pendingJoinRequestJson,
+} from './db/joinRequests';
 import { parseCoordinates } from './validation/coordinates';
 import { parseJoinRequest, type JoinRequestBody } from './validation/joinRequest';
 import { parseNewGame, type CreateGameBody } from './validation/newGame';
@@ -74,6 +81,23 @@ function joinRequestError(problem: JoinRequestProblem): { status: number; body: 
         status: 409,
         body: { msg: 'already_requested', error: 'You already asked to join this game, wait for the organizer to respond' },
       };
+  }
+}
+
+// response for an approval or decline the organizer can't make
+function decisionError(problem: JoinRequestDecisionProblem): { status: number; body: { msg: string; error: string } } {
+  switch (problem) {
+    case 'request_not_found':
+      return { status: 404, body: { msg: 'request_not_found', error: 'This join request does not exist' } };
+    case 'already_responded':
+      return {
+        status: 409,
+        body: { msg: 'already_responded', error: 'This request was already answered or withdrawn' },
+      };
+    case 'game_full':
+      return { status: 409, body: { msg: 'game_full', error: 'This game is full, add spots before approving more players' } };
+    default:
+      return gameChangeError(problem);
   }
 }
 
@@ -612,6 +636,95 @@ export function createApp(): Express {
       } catch (error) {
         console.error('Sending join request failed:', error);
         return res.status(500).json({ msg: 'server_error', error: 'Could not send your request, try again later' });
+      }
+    });
+
+  /*  the organizer's view of who asked to join: the game and its pending requests,
+      newest first (an empty list when there are none).
+      Errors: 400 invalid_request, 403 forbidden (not the organizer), 404 not_found
+   */
+  app.get('/api/games/:gameId/join-requests', requireAuth, async (req: Request<{ gameId: string }>, res: Response) => {
+    const user = getAuthUser(res);
+    const gameId = readGameId(req.params.gameId);
+    if (gameId === null) {
+      return res.status(400).json({ msg: 'invalid_request', error: 'gameId must be a positive whole number' });
+    }
+
+    try {
+      const game = await getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ msg: 'not_found', error: 'This game does not exist' });
+      }
+      if (game.organizerId !== user.userId) {
+        return res.status(403).json({ msg: 'forbidden', error: 'Only the organizer can see join requests' });
+      }
+
+      const requests = await getPendingJoinRequests(gameId);
+      return res.status(200).json({
+        msg: 'success',
+        game: gameJson(game),
+        requests: requests.map(pendingJoinRequestJson),
+      });
+    } catch (error) {
+      console.error('Loading join requests failed:', error);
+      return res.status(500).json({ msg: 'server_error', error: 'Could not load join requests, try again later' });
+    }
+  });
+
+  /*  the organizer approves or declines a pending request ({ decision: "approve" | "decline" }).
+      Approving adds the requester to the game. Responds with the game after the decision
+      and notifies the requester. Errors: 400 invalid_request, 403 forbidden,
+      404 not_found / request_not_found, 409 game_cancelled / game_started / game_full / already_responded
+   */
+  app.patch('/api/games/:gameId/join-requests/:requestId', requireAuth,
+    async (req: Request<{ gameId: string; requestId: string }, {}, { decision?: unknown }>, res: Response) => {
+      const user = getAuthUser(res);
+      const gameId = readGameId(req.params.gameId);
+      // request ids are INT UNSIGNED like game ids, so they're read the same way
+      const requestId = readGameId(req.params.requestId);
+      if (gameId === null || requestId === null) {
+        return res.status(400).json({ msg: 'invalid_request', error: 'gameId and requestId must be positive whole numbers' });
+      }
+      const decision = req.body?.decision;
+      if (decision !== 'approve' && decision !== 'decline') {
+        return res.status(400).json({ msg: 'invalid_request', error: 'decision must be "approve" or "decline"' });
+      }
+      const approve = decision === 'approve';
+
+      try {
+        const result = await decideJoinRequest(gameId, requestId, user.userId, approve);
+        if (!result.ok) {
+          const { status, body } = decisionError(result.problem);
+          return res.status(status).json(body);
+        }
+
+        const game = await getGameById(gameId);
+        if (!game) {
+          throw new Error(`Game ${gameId} not found after answering request ${requestId}`);
+        }
+        console.log(`Join request ${requestId} ${approve ? 'approved' : 'declined'} for game id:`, gameId);
+
+        // best effort, the app gets its reply without waiting for the notification
+        void sendPushToUser(result.requesterId, approve
+          ? {
+            title: 'Request approved',
+            body: `You're in! You joined ${result.title}`,
+            data: { type: 'join_request_approved', gameId: String(gameId) },
+          }
+          : {
+            title: 'Request declined',
+            body: `The organizer declined your request to join ${result.title}`,
+            data: { type: 'join_request_declined', gameId: String(gameId) },
+          }).then((devices) => console.log(`Join request answer sent to ${devices} device(s)`));
+
+        return res.status(200).json({
+          msg: 'success',
+          request: { request_id: requestId, status: approve ? 'approved' : 'declined' },
+          game: gameJson(game),
+        });
+      } catch (error) {
+        console.error('Answering join request failed:', error);
+        return res.status(500).json({ msg: 'server_error', error: 'Could not save your answer, try again later' });
       }
     });
 

@@ -241,22 +241,24 @@ export type UpdateGameResult =
 
 interface LockedGameRow extends RowDataPacket {
   organizer_id: number;
+  title: string;
   status: GameStatus;
   ends_at: string | null;
   has_started: number;
+  max_players: number;
   player_count: number;
 }
 
 /*  locks the game's row until the transaction ends so a concurrent edit, cancel or
     join can't change it in between, and checks the user may still change it
  */
-async function lockGameForChange(
+export async function lockGameForChange(
   connection: PoolConnection,
   gameId: number,
   userId: number,
 ): Promise<{ ok: true; game: LockedGameRow } | { ok: false; problem: GameChangeProblem }> {
   const [rows] = await connection.execute<LockedGameRow[]>(
-    `SELECT g.organizer_id, g.status,
+    `SELECT g.organizer_id, g.title, g.status, g.max_players,
             DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
             g.starts_at <= UTC_TIMESTAMP() AS has_started,
             (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count
