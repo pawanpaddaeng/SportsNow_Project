@@ -18,6 +18,10 @@ object Routes {
     // CREATE_GAME shows the same screen empty
     const val EDIT_GAME = "edit_game/{$GAME_ID_ARG}"
     fun editGame(gameId: Int) = "edit_game/$gameId"
+
+    // the organizer's pending join requests for a game, build it with joinRequests(id)
+    const val JOIN_REQUESTS = "join_requests/{$GAME_ID_ARG}"
+    fun joinRequests(gameId: Int) = "join_requests/$gameId"
 }
 
 // savedStateHandle key for a message shown on the sign in screen

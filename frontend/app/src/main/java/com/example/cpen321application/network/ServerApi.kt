@@ -5,6 +5,7 @@ import retrofit2.Retrofit
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.GET
@@ -85,6 +86,22 @@ interface NetworkConnection {
         @Path("gameId") gameId: Int,
         @Body request: JoinRequestBody
     ) : Response<JoinRequestResponse>
+
+    // the organizer's game with the join requests waiting for them, newest first
+    @GET("api/games/{gameId}/join-requests")
+    suspend fun getPendingJoinRequests(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int
+    ) : Response<PendingJoinRequestsResponse>
+
+    // the organizer approves or declines a join request, the requester is notified
+    @PATCH("api/games/{gameId}/join-requests/{requestId}")
+    suspend fun decideJoinRequest(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int,
+        @Path("requestId") requestId: Int,
+        @Body request: JoinRequestDecisionBody
+    ) : Response<JoinRequestDecisionResponse>
 }
 
 // main object instance with retrofit service used to connect to server

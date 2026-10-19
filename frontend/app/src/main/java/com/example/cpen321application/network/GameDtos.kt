@@ -113,3 +113,38 @@ data class JoinRequestResponse(
     val msg: String?,
     val error: String?
 )
+
+/*  a pending join request as the organizer sees it: who asked, the popup's answers
+    (playFrequency and message can be null) and when they asked (UTC ISO 8601)
+ */
+data class PendingJoinRequestDto(
+    @SerializedName("request_id") val requestId: Int,
+    val user: GamePlayerDto,
+    @SerializedName("skill_level") val skillLevel: String,
+    @SerializedName("play_frequency") val playFrequency: String?,
+    val message: String?,
+    @SerializedName("created_at") val createdAt: String
+)
+
+/*  reply from GET api/games/{gameId}/join-requests: msg "success" with the game and its
+    pending requests (newest first, can be empty), otherwise "not_found", "forbidden"
+    (not the organizer) or an error code
+ */
+data class PendingJoinRequestsResponse(
+    val msg: String?,
+    val game: GameDto?,
+    val requests: List<PendingJoinRequestDto>?,
+    val error: String?
+)
+
+// body for PATCH api/games/{gameId}/join-requests/{requestId}, decision is "approve" or "decline"
+data class JoinRequestDecisionBody(val decision: String)
+
+/*  reply from PATCH api/games/{gameId}/join-requests/{requestId}: msg "success" with the
+    game after the decision (an approval adds a player), otherwise an error code with error
+ */
+data class JoinRequestDecisionResponse(
+    val msg: String?,
+    val game: GameDto?,
+    val error: String?
+)

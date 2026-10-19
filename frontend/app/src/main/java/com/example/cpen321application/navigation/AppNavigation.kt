@@ -37,10 +37,14 @@ import com.example.cpen321application.auth.lastName
 import com.example.cpen321application.games.DiscoverGamesResult
 import com.example.cpen321application.games.GameChangeResult
 import com.example.cpen321application.games.GameDetailsResult
+import com.example.cpen321application.games.JoinRequestDecisionResult
 import com.example.cpen321application.games.JoinRequestResult
 import com.example.cpen321application.games.MyGamesResult
+import com.example.cpen321application.games.PendingJoinRequestsResult
 import com.example.cpen321application.games.cancelGame
 import com.example.cpen321application.games.createGame
+import com.example.cpen321application.games.decideJoinRequest
+import com.example.cpen321application.games.fetchPendingJoinRequests
 import com.example.cpen321application.games.updateGame
 import com.example.cpen321application.games.fetchDiscoverGames
 import com.example.cpen321application.games.fetchGameDetails
@@ -49,6 +53,7 @@ import com.example.cpen321application.games.sendJoinRequest
 import com.example.cpen321application.location.DeviceLocation
 import com.example.cpen321application.location.currentDeviceLocation
 import com.example.cpen321application.location.hasLocationPermission
+import com.example.cpen321application.notifications.GameEvents
 import com.example.cpen321application.notifications.NotificationRegistration
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.screens.auth.SignInScreen
@@ -61,7 +66,12 @@ import com.example.cpen321application.ui.screens.games.GameDetailsScreen
 import com.example.cpen321application.ui.screens.games.GameInfoForm
 import com.example.cpen321application.ui.screens.games.InputGameInfoScreen
 import com.example.cpen321application.ui.screens.games.GameLocation
+import com.example.cpen321application.ui.screens.games.JoinRequestItem
 import com.example.cpen321application.ui.screens.games.JoinRequestSheet
+import com.example.cpen321application.ui.screens.games.JoinRequestsHeader
+import com.example.cpen321application.ui.screens.games.JoinRequestsScreen
+import com.example.cpen321application.ui.screens.games.toJoinRequestItem
+import com.example.cpen321application.ui.screens.games.toJoinRequestsHeader
 import com.example.cpen321application.ui.screens.games.toGameDetails
 import com.example.cpen321application.ui.screens.games.toGameInfoForm
 import com.example.cpen321application.ui.screens.games.PickLocationScreen
@@ -200,6 +210,13 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     // any API call whose session can't be used or renewed asks for sign in through Session
     LaunchedEffect(Unit) {
         Session.signInRequired.collect { returnToSignIn() }
+    }
+
+    // a join request was approved while the app is open: the game now belongs on Home
+    LaunchedEffect(Unit) {
+        GameEvents.events.collect { event ->
+            if (event.type == "join_request_approved") refreshGames()
+        }
     }
 
     // keep the token for this session and future launches, then go home
@@ -390,6 +407,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onDispose { backStackEntry.lifecycle.removeObserver(observer) }
             }
 
+            // a notification about this game arrived (new request, approval, edit, ...)
+            LaunchedEffect(gameId) {
+                GameEvents.events.collect { event -> if (event.gameId == gameId) loadDetails() }
+            }
+
             // placeholder for actions whose screens and APIs aren't built yet
             fun notAvailableYet(action: String) {
                 Toast.makeText(context, "$action isn't available yet", Toast.LENGTH_SHORT).show()
@@ -404,7 +426,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onBack = { navController.popBackStack() },
                 onEdit = { navController.navigate(Routes.editGame(gameId)) },
                 onDirections = { location -> openDirections(context, location) },
-                onJoinRequests = { notAvailableYet("Reviewing join requests") },
+                onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
                 // the screen asks the organizer to confirm before calling this
                 onCancelGame = {
                     isCancelling = true
@@ -463,6 +485,97 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                     }
                 )
             }
+        }
+
+        // the organizer reviews who asked to join, opened from the Game Details banner
+        composable(
+            route = Routes.JOIN_REQUESTS,
+            arguments = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
+        ) { backStackEntry ->
+            val gameId = backStackEntry.arguments?.getInt(Routes.GAME_ID_ARG) ?: 0
+            var header by remember { mutableStateOf<JoinRequestsHeader?>(null) }
+            val requests = remember { mutableStateListOf<JoinRequestItem>() }
+            var isLoading by remember { mutableStateOf(false) }
+            var error by remember { mutableStateOf<String?>(null) }
+            // the game is gone or the user isn't its organizer, retrying won't help
+            var unavailable by remember { mutableStateOf(false) }
+            var busyRequestIds by remember { mutableStateOf(emptySet<Int>()) }
+
+            // on failure the last loaded requests stay visible with the error above them
+            fun loadRequests() {
+                if (isLoading) return
+                isLoading = true
+                scope.launch {
+                    when (val result = fetchPendingJoinRequests(context, gameId)) {
+                        is PendingJoinRequestsResult.Loaded -> {
+                            header = result.game.toJoinRequestsHeader()
+                            requests.clear()
+                            requests.addAll(result.requests.map { it.toJoinRequestItem() })
+                            error = null
+                        }
+                        is PendingJoinRequestsResult.Unavailable -> {
+                            header = null
+                            requests.clear()
+                            error = result.message
+                            unavailable = true
+                        }
+                        is PendingJoinRequestsResult.Failed -> error = result.message
+                    }
+                    isLoading = false
+                }
+            }
+
+            // sends the organizer's answer, the card goes away once the server saved it
+            fun decide(request: JoinRequestItem, approve: Boolean) {
+                busyRequestIds = busyRequestIds + request.requestId
+                scope.launch {
+                    val result = decideJoinRequest(context, gameId, request.requestId, approve)
+                    busyRequestIds = busyRequestIds - request.requestId
+                    when (result) {
+                        is JoinRequestDecisionResult.Done -> {
+                            requests.removeAll { it.requestId == request.requestId }
+                            header = result.game.toJoinRequestsHeader()
+                            val text = if (approve) "${request.name} was added to the game" else "Request declined"
+                            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+                        }
+                        is JoinRequestDecisionResult.Failed -> {
+                            Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                            // e.g. the requester cancelled or the game filled up meanwhile
+                            loadRequests()
+                        }
+                    }
+                }
+            }
+
+            // reload whenever the screen is shown, e.g. coming back from the app's background
+            DisposableEffect(backStackEntry) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) loadRequests()
+                }
+                backStackEntry.lifecycle.addObserver(observer)
+                onDispose { backStackEntry.lifecycle.removeObserver(observer) }
+            }
+
+            // live updates: someone asked to join this game while the list is open
+            LaunchedEffect(gameId) {
+                GameEvents.events.collect { event ->
+                    if (event.gameId == gameId && event.type == "join_request") loadRequests()
+                }
+            }
+
+            JoinRequestsScreen(
+                header = header,
+                requests = requests,
+                isLoading = isLoading,
+                errorMessage = error,
+                busyRequestIds = busyRequestIds,
+                onRetry = if (unavailable) null else ({ loadRequests() }),
+                onBack = { navController.popBackStack() },
+                onApprove = { request -> decide(request, approve = true) },
+                onDecline = { request -> decide(request, approve = false) },
+                onTabSelected = { tab -> openTab(tab) },
+                modifier = modifier
+            )
         }
 
         composable(Routes.CREATE_GAME) { backStackEntry ->

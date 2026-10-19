@@ -8,7 +8,10 @@ import com.example.cpen321application.network.DiscoverGameDto
 import com.example.cpen321application.network.GameDetailsResponse
 import com.example.cpen321application.network.GameDto
 import com.example.cpen321application.network.JoinRequestBody
+import com.example.cpen321application.network.JoinRequestDecisionBody
+import com.example.cpen321application.network.JoinRequestDecisionResponse
 import com.example.cpen321application.network.JoinRequestResponse
+import com.example.cpen321application.network.PendingJoinRequestDto
 import com.example.cpen321application.network.ServerApi
 import com.example.cpen321application.ui.screens.games.GameInfoForm
 
@@ -189,6 +192,85 @@ suspend fun sendJoinRequest(
         }
     } catch (e: Exception) {
         JoinRequestResult.Failed("Cannot reach the server, try again")
+    }
+}
+
+// outcome of loading the organizer's join requests, message explains a failure to the user
+sealed interface PendingJoinRequestsResult {
+    data class Loaded(val game: GameDto, val requests: List<PendingJoinRequestDto>) : PendingJoinRequestsResult
+    // retrying won't help: the game is gone or the user isn't its organizer
+    data class Unavailable(val message: String) : PendingJoinRequestsResult
+    data class Failed(val message: String) : PendingJoinRequestsResult
+}
+
+/*  loads the join requests waiting for the organizer of the game.
+    context is needed to renew an expired session (silent Google sign in)
+ */
+suspend fun fetchPendingJoinRequests(context: Context, gameId: Int): PendingJoinRequestsResult {
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.retrofitService.getPendingJoinRequests(authorization = authorization, gameId = gameId)
+        } ?: return PendingJoinRequestsResult.Failed(SESSION_ENDED_MESSAGE)
+        when (response.code()) {
+            404 -> return PendingJoinRequestsResult.Unavailable("This game no longer exists.")
+            403 -> return PendingJoinRequestsResult.Unavailable("Only the organizer can see join requests.")
+        }
+
+        val reply = response.body()
+        val game = reply?.game
+        if (reply?.msg == "success" && game != null) {
+            PendingJoinRequestsResult.Loaded(game = game, requests = reply.requests.orEmpty())
+        } else {
+            PendingJoinRequestsResult.Failed("Couldn't load join requests, try again")
+        }
+    } catch (e: Exception) {
+        PendingJoinRequestsResult.Failed("Cannot reach the server, try again")
+    }
+}
+
+// outcome of approving or declining a join request
+sealed interface JoinRequestDecisionResult {
+    // the game after the decision, with its new player count
+    data class Done(val game: GameDto) : JoinRequestDecisionResult
+    data class Failed(val message: String) : JoinRequestDecisionResult
+}
+
+/*  approves or declines a join request for the organizer's game. The server's description
+    is shown for problems the user can act on (game full, already answered, ...),
+    server errors get a general message
+ */
+suspend fun decideJoinRequest(
+    context: Context,
+    gameId: Int,
+    requestId: Int,
+    approve: Boolean
+): JoinRequestDecisionResult {
+    val request = JoinRequestDecisionBody(decision = if (approve) "approve" else "decline")
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.retrofitService.decideJoinRequest(
+                authorization = authorization,
+                gameId = gameId,
+                requestId = requestId,
+                request = request
+            )
+        } ?: return JoinRequestDecisionResult.Failed(SESSION_ENDED_MESSAGE)
+        // error responses (4xx/5xx) carry the same json shape in the error body
+        val reply = response.body() ?: try {
+            com.google.gson.Gson().fromJson(response.errorBody()?.string(), JoinRequestDecisionResponse::class.java)
+        } catch (e: Exception) {
+            null
+        }
+
+        val game = reply?.game
+        when {
+            reply?.msg == "success" && game != null -> JoinRequestDecisionResult.Done(game)
+            reply?.msg != null && reply.msg != "server_error" && reply.error != null ->
+                JoinRequestDecisionResult.Failed(reply.error)
+            else -> JoinRequestDecisionResult.Failed("Could not save your answer, try again")
+        }
+    } catch (e: Exception) {
+        JoinRequestDecisionResult.Failed("Cannot reach the server, try again")
     }
 }
 
