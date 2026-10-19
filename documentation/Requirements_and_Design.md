@@ -39,12 +39,12 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 3. Game Organiser: A game organiser is a user who creates games. A game organiser creates and manages games, reviews join requests using each player’s stats, and invites friends to a game.
 
 ### **3.4. Use Case Description**
-- Use cases for Feature 1 Authentication: 
+#### - Use cases for Feature 1 Authentication: 
 1. Login: A returning user opens the app and signs in by verifying their identity with Google.
 2. Sign out: A logged-in user signs out of their account and is returned to the first screen. 
 3. Account Creation: A new user opens the app and signs up. The user verifies their identity with Google, then provides their personal details and, optionally, their favourite sports, skill level, and a photo.
 
-- Use cases for Feature 2 Game Planning: 
+#### - Use cases for Feature 2 Game Planning: 
 4. Create Game: A game organiser creates a new game by entering its details, choosing whether to require approval for join requests, and selecting a location on the map.
 5. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
 6. Accept players to join: A game organiser reviews the join requests for their game, using each player’s rating, history, and badges, and accepts or rejects each one. 
@@ -52,31 +52,33 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 8. Invite Friend: A user invites one or more of their friends to a game they created. 
 9. Game Chat: Players who have joined a game chat with the other participants in a temporary chat room, which is closed after the game ends. 
 
-- Use cases for Feature 3 Game Discovery: 
+#### - Use cases for Feature 3 Game Discovery: 
 10. Discover Game: A player finds games happening nearby. The system uses the player’s location to show nearby games and their information, and the player can filter the list by sport.
 11. Join Game: A player views the details of a game and sends a request to join it, stating their skill level. 
 12. Leave Game: A player who has joined a game withdraws from it before it starts. 
 
-- Use cases for Feature 4 Friend System: 
+#### - Use cases for Feature 4 Friend System: 
 13. Add Friend: A user searches for another user and sends them a friend request, which the other user can accept or decline. 
 14. Remove Friend: A user removes someone from their list of friends. 
 15. Friend Chat: A user chats with one of their friends. The user selects a friend from their friend list, opens the chat, and sends a message.
 
-- Use cases for Feature 5 Player Reputation and Statistics: 
+#### - Use cases for Feature 5 Player Reputation and Statistics: 
 16. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on sportsmanship, skill, honesty, and reliability, along with an overall rating.
 17. Player Statistics: A user views their player’s statistics, including their reputation score and the badges they have earned. 
 
 
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
-<a name="uc1"></a>
-#### Use Case 1: Account Creation
+<a id="uc1r"></a>
+#### **Use Case 1: Account Creation**
 
 **Description**: A new user opens the app and signs up. The user verifies their identity with Google, then provides their personal details and, optionally, their favourite sports, skill level, and a photo.
 
 **Primary actor(s)**: User
 
 **Preconditions**: None
+
+[**[Sequence Diagram]**](#seq-uc1)
     
 **Main success scenario**:
 1. User selects “Sign up”.
@@ -99,14 +101,16 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     -  6a1. System displays a message saying the account could not be registered, along with the reason.
 
 
-<a name="uc2"></a>
-#### Use Case 2: Create Game
+<a id="uc2r"></a>
+#### **Use Case 2: Create Game**
 
 **Description**: A Game Organiser creates a new game by entering its details, choosing whether to require approval for join requests, and selecting a location on the map.
 
 **Primary actor(s)**: Game Organiser
 
 **Preconditions**: Game Organiser is logged in
+
+[**[Sequence Diagram]**](#seq-uc2)
     
 **Main success scenario**:
 1. Game Organiser selects “Create game”.
@@ -132,16 +136,17 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     - 8a1. System displays a message saying the game could not be created, along with the reason.
 
 
-<a name="uc3"></a>
-#### Use Case 3: Discover Game
+<a id="uc3r"></a>
+#### **Use Case 3: Discover Game**
 
 **Description**: A player finds games happening nearby. The system uses the player’s location to show nearby games and their information, and the player can filter the list by sport.
-
 
 **Primary actor(s)**: Player 
 
 **Preconditions**: Player is logged in
-    
+
+[**[Sequence Diagram]**](#seq-uc3)
+
 **Main success scenario**: 
 1. Player selects the compass in the navigation bar 
 2. System uses the Map API to get the Player’s location.
@@ -159,15 +164,17 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     - 5a1. System displays a message saying no games were found of the selected sport.
 
 
-<a name="uc4"></a>
-#### Use Case 4: Friend Chat
+<a id="uc4r"></a>
+#### **Use Case 4: Friend Chat**
 
 **Description**:  A user chats with one of their friends. The user selects a friend from their friend list, opens the chat, and sends a message.
 
 **Primary actor(s)**: User
 
 **Preconditions**: User is logged in and has at least one friend
-    
+
+[**[Sequence Diagram]**](#seq-uc4)
+
 **Main success scenario**:
 1. User selects “Chat”.
 2. System displays the list of the user’s friends.
@@ -184,8 +191,8 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     - 6a1. System displays a message saying the message could not be sent and lets the user try again.
 
 
-<a name="uc5"></a>
-#### Use Case 5: Rate Players
+<a id="uc5r"></a>
+#### **Use Case 5: Rate Players**
 
 **Description**: After a game has finished, a user rates the other players. The user selects a player and rates them on sportsmanship, skill, honesty, and reliability, along with an overall rating.
 
@@ -193,6 +200,8 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 **Preconditions**: User is logged in and has finished a game
     
+[**[Sequence Diagram]**](#seq-uc5)
+
 **Main success scenario**:
 1. User selects the finished game from the home menu.
 2. System opens the game details.
@@ -216,7 +225,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 ### **3.7. Non-Functional Requirements**
-<a name="nfr1"></a>
+<a id="nfr1"></a>
 
 1. **Performance**
     - **Description**: Discover Game should finish loading and display the nearby games in under 5 seconds from when the user selects the compass.
@@ -294,12 +303,28 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
-1. [**[WRITE_NAME_HERE]**](#uc1)\
-[SEQUENCE_DIAGRAM_HERE]
-2. ...
+1. <a id="seq-uc1"></a> [**Use Case 1: Account Creation**](#uc1r)\
+![Sequence Diagram UC1](images/UC1-%20Auth.png)
+<br><br>
 
+2. <a id="seq-uc2"></a> [**Use Case 2: Create Game**](#uc2r)\
+![Sequence Diagram UC2](images/UC2%20-%20Create.png)
+<br><br>
+
+3. <a id="seq-uc3"></a> [**Use Case 3: Discover Game**](#uc3r)\
+![Sequence Diagram UC3](images/UC3%20-%20Discover.png)
+<br><br>
+
+4. <a id="seq-uc4"></a> [**Use Case 4: Friend Chat**](#uc4r)\
+![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat.png)
+<br><br>
+
+5. <a id="seq-uc5"></a> [**Use Case 5: Rate Players**](#uc5r)\
+![Sequence Diagram UC5](images/UC5%20-%20Rating.png)
+<br><br>
 
 ### **4.7. Design of Non-Functional Requirements**
-1. [**[WRITE_NAME_HERE]**](#nfr1)
-    - **Implementation**: ...
-2. ...
+1. [**Performance**](#nfr1)
+    - **Implementation**: The front-end sends a single request to the Game component, which gets the nearby games with one MySQL query filtered by location and, if a sport is chosen, by sport. The query reads from indexed columns and returns a limited number of games, and the front-end shows a loading indicator while it waits.
+2. [**Energy Efficiency**](#nfr2)
+    - **Implementation**: The app requests the user’s location once when Discover Game opens, not continuously, and it doesn’t poll the server in the background. Updates such as join request results arrive as push notifications through Firebase, and chat uses a connection that is open only while the chat screen is shown.
