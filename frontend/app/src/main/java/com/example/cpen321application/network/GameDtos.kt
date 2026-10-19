@@ -50,6 +50,29 @@ data class MyGamesResponse(
     val error: String?
 )
 
+// a player in a game as the server sends it
+data class GamePlayerDto(
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("first_name") val firstName: String,
+    @SerializedName("last_name") val lastName: String
+)
+
+/*  reply from GET api/games/{gameId}: msg "success" with the game, its organizer and
+    players (organizer included, in join order), otherwise "not_found" or an error code.
+    viewerRole is "organizer", "player" or "viewer". pendingRequests is only set for
+    the organizer, joinRequestStatus only for viewers (null if they never asked)
+ */
+data class GameDetailsResponse(
+    val msg: String?,
+    val game: GameDto?,
+    val organizer: GamePlayerDto?,
+    val players: List<GamePlayerDto>?,
+    @SerializedName("viewer_role") val viewerRole: String?,
+    @SerializedName("pending_requests") val pendingRequests: Int?,
+    @SerializedName("join_request_status") val joinRequestStatus: String?,
+    val error: String?
+)
+
 // reply from POST api/games: msg "success" with the created game, or an error
 data class CreateGameResponse(
     val msg: String?,

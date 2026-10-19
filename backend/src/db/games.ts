@@ -1,4 +1,5 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
+import type { PoolConnection } from 'mysql2/promise';
 import { pool } from './mysql';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
@@ -170,6 +171,206 @@ function toGame(row: GameRow): Game {
     status: row.status,
     // same format as the other times, without milliseconds
     createdAt: new Date(Number(row.created_at_unix) * 1000).toISOString().replace('.000Z', 'Z'),
+  };
+}
+
+// why the organizer can't change a game: it's gone, someone else's, cancelled or already started
+export type GameChangeProblem = 'not_found' | 'not_organizer' | 'cancelled' | 'started';
+
+export type UpdateGameResult =
+  | { ok: true; changed: boolean }
+  | { ok: false; problem: GameChangeProblem }
+  // fewer spots than players already in the game
+  | { ok: false; problem: 'too_few_players'; playerCount: number }
+  // the new start is not before the game's existing end time
+  | { ok: false; problem: 'ends_before_start' };
+
+interface LockedGameRow extends RowDataPacket {
+  organizer_id: number;
+  status: GameStatus;
+  ends_at: string | null;
+  has_started: number;
+  player_count: number;
+}
+
+/*  locks the game's row until the transaction ends so a concurrent edit, cancel or
+    join can't change it in between, and checks the user may still change it
+ */
+async function lockGameForChange(
+  connection: PoolConnection,
+  gameId: number,
+  userId: number,
+): Promise<{ ok: true; game: LockedGameRow } | { ok: false; problem: GameChangeProblem }> {
+  const [rows] = await connection.execute<LockedGameRow[]>(
+    `SELECT g.organizer_id, g.status,
+            DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
+            g.starts_at <= UTC_TIMESTAMP() AS has_started,
+            (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count
+     FROM games g WHERE g.game_id = ? FOR UPDATE`,
+    [gameId],
+  );
+  const game = rows[0];
+  if (!game) return { ok: false, problem: 'not_found' };
+  if (game.organizer_id !== userId) return { ok: false, problem: 'not_organizer' };
+  if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
+  if (Number(game.has_started) === 1) return { ok: false, problem: 'started' };
+  return { ok: true, game };
+}
+
+// runs work in a transaction on its own connection, rolling back if it throws
+async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/*  replaces the organizer's game details with changes (organizerId is ignored, the
+    organizer stays the same). endsAt is only changed when keepEndsAt is false, the
+    app has no end time field so edits from it keep the existing one.
+    max_players can't go below the players already in the game
+ */
+export async function updateGame(
+  gameId: number,
+  userId: number,
+  changes: NewGame,
+  keepEndsAt: boolean,
+): Promise<UpdateGameResult> {
+  return inTransaction(async (connection) => {
+    const locked = await lockGameForChange(connection, gameId, userId);
+    if (!locked.ok) return locked;
+
+    const playerCount = Number(locked.game.player_count);
+    if (changes.maxPlayers < playerCount) {
+      return { ok: false, problem: 'too_few_players', playerCount };
+    }
+
+    const endsAt = keepEndsAt
+      ? (locked.game.ends_at ? new Date(locked.game.ends_at) : null)
+      : changes.endsAt;
+    if (endsAt && endsAt.getTime() <= changes.startsAt.getTime()) {
+      return { ok: false, problem: 'ends_before_start' };
+    }
+
+    const [result] = await connection.execute<ResultSetHeader>(
+      `UPDATE games
+       SET title = ?, sport = ?, description = ?, starts_at = ?, ends_at = ?,
+           location_name = ?, address = ?, latitude = ?, longitude = ?,
+           max_players = ?, skill_level = ?
+       WHERE game_id = ?`,
+      [
+        changes.title, changes.sport, changes.description,
+        toUtcDatetime(changes.startsAt), endsAt ? toUtcDatetime(endsAt) : null,
+        changes.locationName, changes.address, changes.latitude, changes.longitude,
+        changes.maxPlayers, changes.skillLevel, gameId,
+      ],
+    );
+    // changedRows is 0 when every value was already the same
+    return { ok: true, changed: result.changedRows > 0 };
+  });
+}
+
+export type CancelGameResult = { ok: true } | { ok: false; problem: GameChangeProblem };
+
+// marks the organizer's game cancelled, it stays so players can see what happened
+export async function cancelGame(gameId: number, userId: number): Promise<CancelGameResult> {
+  return inTransaction(async (connection) => {
+    const locked = await lockGameForChange(connection, gameId, userId);
+    if (!locked.ok) return locked;
+
+    await connection.execute<ResultSetHeader>(
+      "UPDATE games SET status = 'cancelled' WHERE game_id = ?",
+      [gameId],
+    );
+    return { ok: true };
+  });
+}
+
+interface UserIdRow extends RowDataPacket {
+  user_id: number;
+}
+
+/*  everyone a change to the game should be told about: its players and anyone
+    waiting on a join request, except the organizer who made the change
+ */
+export async function getUsersToNotify(gameId: number, organizerId: number): Promise<number[]> {
+  const [rows] = await pool.execute<UserIdRow[]>(
+    `SELECT user_id FROM game_players WHERE game_id = ? AND user_id <> ?
+     UNION
+     SELECT user_id FROM join_requests WHERE game_id = ? AND status = 'pending' AND user_id <> ?`,
+    [gameId, organizerId, gameId, organizerId],
+  );
+  return rows.map((row) => row.user_id);
+}
+
+// a player in a game, with the name shown on the Game Details screen
+export interface GamePlayer {
+  userId: number;
+  firstName: string;
+  lastName: string;
+}
+
+interface GamePlayerRow extends RowDataPacket {
+  user_id: number;
+  first_name: string;
+  last_name: string;
+}
+
+// everyone in the game (organizer included), in the order they joined
+export async function getGamePlayers(gameId: number): Promise<GamePlayer[]> {
+  const [rows] = await pool.execute<GamePlayerRow[]>(
+    `SELECT u.user_id, u.first_name, u.last_name
+     FROM game_players p
+     JOIN users u ON u.user_id = p.user_id
+     WHERE p.game_id = ?
+     ORDER BY p.joined_at, u.user_id`,
+    [gameId],
+  );
+  return rows.map((row) => ({ userId: row.user_id, firstName: row.first_name, lastName: row.last_name }));
+}
+
+interface CountRow extends RowDataPacket {
+  count: number;
+}
+
+// join requests still waiting for the organizer, for the badge on Game Details
+export async function countPendingJoinRequests(gameId: number): Promise<number> {
+  const [rows] = await pool.execute<CountRow[]>(
+    "SELECT COUNT(*) AS count FROM join_requests WHERE game_id = ? AND status = 'pending'",
+    [gameId],
+  );
+  return Number(rows[0]?.count ?? 0);
+}
+
+export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
+
+interface JoinRequestStatusRow extends RowDataPacket {
+  status: JoinRequestStatus;
+}
+
+// status of the user's request to join the game, or null if they never asked
+export async function getJoinRequestStatus(gameId: number, userId: number): Promise<JoinRequestStatus | null> {
+  const [rows] = await pool.execute<JoinRequestStatusRow[]>(
+    'SELECT status FROM join_requests WHERE game_id = ? AND user_id = ? LIMIT 1',
+    [gameId, userId],
+  );
+  return rows[0]?.status ?? null;
+}
+
+// JSON shape of a player sent to the app
+export function gamePlayerJson(player: GamePlayer) {
+  return {
+    user_id: player.userId,
+    first_name: player.firstName,
+    last_name: player.lastName,
   };
 }
 
