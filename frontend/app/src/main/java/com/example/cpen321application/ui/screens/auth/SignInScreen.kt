@@ -15,10 +15,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.example.cpen321application.auth.triggerGoogleSignIn
-import com.example.cpen321application.network.AuthTokenResponse
+import com.example.cpen321application.rememberSafeCoroutineScope
 import com.example.cpen321application.network.LoginRequest
 import com.example.cpen321application.network.ServerApi
-import com.google.gson.Gson
+import com.example.cpen321application.network.readAuthResponse
+import com.google.gson.JsonParseException
+import java.io.IOException
 
 /*
     Sign in screen for SportsNow:
@@ -34,10 +36,35 @@ fun SignInScreen(
     infoMessage: String? = null
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
     var statusText by remember { mutableStateOf<String?>(null) }
     var noticeText by remember { mutableStateOf<String?>(null) }
     var isSigningIn by remember { mutableStateOf(false) }
+
+    // verifies with Google, then logs in with the server
+    fun signIn() {
+        isSigningIn = true
+        statusText = null
+        noticeText = null
+        scope.launch {
+            try {
+                val googleToken = triggerGoogleSignIn(context)
+                if (googleToken == null) {
+                    statusText = "Google sign in failed. Make sure a Google account " +
+                            "is added to this device"
+                } else {
+                    when (val result = submitLogin(googleToken)) {
+                        is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
+                        LoginResult.NoUser -> noticeText =
+                            "No account found for this Google account. Please sign up first."
+                        LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
+                    }
+                }
+            } finally {
+                isSigningIn = false
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -56,95 +83,18 @@ fun SignInScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // shows loading and any sign in messages above the sign in heading,
-        // min height keeps the heading from jumping when a message appears
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .padding(bottom = 16.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            if (isSigningIn) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            } else if (statusText != null) {
-                Text(
-                    text = statusText!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center
-                )
-            } else if (noticeText != null || infoMessage != null) {
-                // e.g. no account yet, or sent back from sign up because the account already exists
-                Text(
-                    text = noticeText ?: infoMessage!!,
-                    color = Color.Black,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        Text(
-            text = "Sign Into the SportsNow Account",
-            color = Color.Black,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Verify with Google to log into Account",
-            color = Color.Black,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center
-        )
+        // e.g. no account yet, or sent back from sign up because the account already exists
+        SignInMessage(isSigningIn = isSigningIn, errorText = statusText, noticeText = noticeText ?: infoMessage)
+        SignInHeading()
 
         Spacer(modifier = Modifier.height(24.dp))
         SignInPillButton(
             text = "Sign In",
             enabled = !isSigningIn,
-            onClick = {
-                isSigningIn = true
-                statusText = null
-                noticeText = null
-                scope.launch {
-                    val googleToken = triggerGoogleSignIn(context)
-                    if (googleToken == null) {
-                        statusText = "Google sign in failed. Make sure a Google account " +
-                                "is added to this device"
-                        isSigningIn = false
-                        return@launch
-                    }
-
-                    // valid token, log in with the server
-                    when (val result = submitLogin(googleToken)) {
-                        is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
-                        LoginResult.NoUser -> noticeText =
-                            "No account found for this Google account. Please sign up first."
-                        LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
-                    }
-                    isSigningIn = false
-                }
-            }
+            onClick = { signIn() }
         )
 
-        // divider with "or Create a New Account" in the middle
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp)
-        ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFD9D9D9))
-            Text(
-                text = "or Create a New Account",
-                color = Color(0xFF757575),
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFD9D9D9))
-        }
+        OrDivider()
 
         SignInPillButton(
             text = "Sign Up",
@@ -153,6 +103,77 @@ fun SignInScreen(
         )
 
         Spacer(modifier = Modifier.weight(1.4f))
+    }
+}
+
+/*  shows loading and any sign in messages above the sign in heading: errorText in red,
+    otherwise noticeText. The min height keeps the heading from jumping when a message appears
+ */
+@Composable
+private fun SignInMessage(isSigningIn: Boolean, errorText: String?, noticeText: String?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(bottom = 16.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        if (isSigningIn) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        } else if (errorText != null) {
+            Text(
+                text = errorText,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
+        } else if (noticeText != null) {
+            Text(
+                text = noticeText,
+                color = Color.Black,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// "Sign Into the SportsNow Account" with the line under it
+@Composable
+private fun SignInHeading() {
+    Text(
+        text = "Sign Into the SportsNow Account",
+        color = Color.Black,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = "Verify with Google to log into Account",
+        color = Color.Black,
+        fontSize = 14.sp,
+        textAlign = TextAlign.Center
+    )
+}
+
+// divider with "or Create a New Account" in the middle
+@Composable
+private fun OrDivider() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp)
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFD9D9D9))
+        Text(
+            text = "or Create a New Account",
+            color = Color(0xFF757575),
+            fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFD9D9D9))
     }
 }
 
@@ -191,19 +212,16 @@ private sealed interface LoginResult {
 private suspend fun submitLogin(googleToken: String): LoginResult {
     return try {
         val response = ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val body = response.body() ?: try {
-            Gson().fromJson(response.errorBody()?.string(), AuthTokenResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val body = readAuthResponse(response)
 
         when {
             body?.msg == "signedIn" && body.jwtToken != null -> LoginResult.SignedIn(body.jwtToken)
             body?.msg == "no_user" -> LoginResult.NoUser
             else -> LoginResult.Failed
         }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
+        LoginResult.Failed
+    } catch (e: JsonParseException) {
         LoginResult.Failed
     }
 }

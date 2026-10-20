@@ -54,7 +54,7 @@ fun sportsFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = SportsPrimary
 )
 
-// text field with its label above the box
+// text field with its label above the box, a single line unless minLines is more than 1
 @Composable
 fun LabeledTextField(
     label: String,
@@ -62,10 +62,10 @@ fun LabeledTextField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
-    singleLine: Boolean = true,
     minLines: Int = 1,
     capitalization: KeyboardCapitalization = KeyboardCapitalization.Words
 ) {
+    val singleLine = minLines == 1
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         FieldLabel(label)
         OutlinedTextField(

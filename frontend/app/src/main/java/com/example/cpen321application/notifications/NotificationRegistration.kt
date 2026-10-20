@@ -9,7 +9,9 @@ import com.example.cpen321application.network.RegisterNotifRequest
 import com.example.cpen321application.network.ServerApi
 import com.example.cpen321application.network.readAuthResponse
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.gson.JsonParseException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.IOException
 import kotlin.coroutines.resume
 
 // result of trying to register this device for push notifications
@@ -49,8 +51,11 @@ object NotificationRegistration {
                 Session.requireSignIn()
                 NotifRegistrationResult.FAILED
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             Log.w(TAG, "Could not reach the server to register notifications", e)
+            NotifRegistrationResult.SKIPPED
+        } catch (e: JsonParseException) {
+            Log.w(TAG, "Could not read the server's reply to registering notifications", e)
             NotifRegistrationResult.SKIPPED
         }
     }
@@ -68,8 +73,10 @@ object NotificationRegistration {
                 request = RegisterNotifRequest(fcmToken = fcmToken)
             )
             Log.d(TAG, "Sent new Firebase token, server reply: ${readAuthResponse(response)?.msg}")
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             Log.w(TAG, "Could not send the new Firebase token", e)
+        } catch (e: JsonParseException) {
+            Log.w(TAG, "Could not read the server's reply to the new Firebase token", e)
         }
     }
 
@@ -81,7 +88,8 @@ object NotificationRegistration {
                     continuation.resume(if (task.isSuccessful) task.result else null)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: IllegalStateException) {
+            // FirebaseMessaging.getInstance() throws this when no FirebaseApp was set up
             Log.w(TAG, "Firebase is not set up, skipping notification registration", e)
             null
         }

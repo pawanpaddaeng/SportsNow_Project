@@ -1,6 +1,5 @@
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { type GameChangeProblem, inTransaction, type JoinRequestStatus, lockGameForChange } from './games';
-import { pool } from './mysql';
+import { executeWrite, selectRows } from './mysql';
 
 export type RequestSkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'competitive';
 export type PlayFrequency = 'rarely' | 'monthly' | 'weekly' | 'several_per_week';
@@ -27,7 +26,7 @@ export type CreateJoinRequestResult =
   | { ok: true; requestId: number; organizerId: number; title: string }
   | { ok: false; problem: JoinRequestProblem };
 
-interface JoinableGameRow extends RowDataPacket {
+interface JoinableGameRow {
   organizer_id: number;
   title: string;
   status: 'scheduled' | 'cancelled';
@@ -37,7 +36,7 @@ interface JoinableGameRow extends RowDataPacket {
   is_player: number;
 }
 
-interface ExistingRequestRow extends RowDataPacket {
+interface ExistingRequestRow {
   request_id: number;
   status: JoinRequestStatus;
 }
@@ -53,13 +52,14 @@ export async function createJoinRequest(
   request: NewJoinRequest,
 ): Promise<CreateJoinRequestResult> {
   return inTransaction(async (connection) => {
-    const [games] = await connection.execute<JoinableGameRow[]>(
+    const games = await selectRows<JoinableGameRow>(
       `SELECT g.organizer_id, g.title, g.status, g.max_players,
               g.starts_at <= UTC_TIMESTAMP() AS has_started,
               (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count,
               EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?) AS is_player
        FROM games g WHERE g.game_id = ? FOR UPDATE`,
       [userId, gameId],
+      connection,
     );
     const game = games[0];
     if (!game) return { ok: false, problem: 'not_found' };
@@ -69,28 +69,31 @@ export async function createJoinRequest(
     if (Number(game.is_player) === 1) return { ok: false, problem: 'already_player' };
     if (Number(game.player_count) >= game.max_players) return { ok: false, problem: 'game_full' };
 
-    const [existing] = await connection.execute<ExistingRequestRow[]>(
+    const existing = await selectRows<ExistingRequestRow>(
       'SELECT request_id, status FROM join_requests WHERE game_id = ? AND user_id = ? FOR UPDATE',
       [gameId, userId],
+      connection,
     );
     const previous = existing[0];
     if (previous?.status === 'pending') return { ok: false, problem: 'already_requested' };
 
     let requestId: number;
     if (previous) {
-      await connection.execute<ResultSetHeader>(
+      await executeWrite(
         `UPDATE join_requests
          SET skill_level = ?, play_frequency = ?, message = ?, status = 'pending',
              created_at = CURRENT_TIMESTAMP, responded_at = NULL
          WHERE request_id = ?`,
         [request.skillLevel, request.playFrequency, request.message, previous.request_id],
+        connection,
       );
       requestId = previous.request_id;
     } else {
-      const [result] = await connection.execute<ResultSetHeader>(
+      const result = await executeWrite(
         `INSERT INTO join_requests (game_id, user_id, skill_level, play_frequency, message)
          VALUES (?, ?, ?, ?, ?)`,
         [gameId, userId, request.skillLevel, request.playFrequency, request.message],
+        connection,
       );
       requestId = result.insertId;
     }
@@ -112,7 +115,7 @@ export interface PendingJoinRequest {
   createdAt: string;
 }
 
-interface PendingJoinRequestRow extends RowDataPacket {
+interface PendingJoinRequestRow {
   request_id: number;
   user_id: number;
   first_name: string;
@@ -126,7 +129,7 @@ interface PendingJoinRequestRow extends RowDataPacket {
 
 // the game's requests still waiting for the organizer, newest first
 export async function getPendingJoinRequests(gameId: number): Promise<PendingJoinRequest[]> {
-  const [rows] = await pool.execute<PendingJoinRequestRow[]>(
+  const rows = await selectRows<PendingJoinRequestRow>(
     `SELECT r.request_id, r.skill_level, r.play_frequency, r.message,
             UNIX_TIMESTAMP(r.created_at) AS created_at_unix,
             u.user_id, u.first_name, u.last_name
@@ -168,7 +171,7 @@ export type DecideJoinRequestResult =
   | { ok: true; requesterId: number; title: string }
   | { ok: false; problem: JoinRequestDecisionProblem };
 
-interface LockedRequestRow extends RowDataPacket {
+interface LockedRequestRow {
   user_id: number;
   status: JoinRequestStatus;
 }
@@ -188,9 +191,10 @@ export async function decideJoinRequest(
     const locked = await lockGameForChange(connection, gameId, organizerId);
     if (!locked.ok) return locked;
 
-    const [requests] = await connection.execute<LockedRequestRow[]>(
+    const requests = await selectRows<LockedRequestRow>(
       'SELECT user_id, status FROM join_requests WHERE request_id = ? AND game_id = ? FOR UPDATE',
       [requestId, gameId],
+      connection,
     );
     const request = requests[0];
     if (!request) return { ok: false, problem: 'request_not_found' };
@@ -201,15 +205,17 @@ export async function decideJoinRequest(
         return { ok: false, problem: 'game_full' };
       }
       // IGNORE: if they somehow joined already, approving just closes the request
-      await connection.execute<ResultSetHeader>(
+      await executeWrite(
         'INSERT IGNORE INTO game_players (game_id, user_id) VALUES (?, ?)',
         [gameId, request.user_id],
+        connection,
       );
     }
 
-    await connection.execute<ResultSetHeader>(
+    await executeWrite(
       'UPDATE join_requests SET status = ?, responded_at = CURRENT_TIMESTAMP WHERE request_id = ?',
       [approve ? 'approved' : 'declined', requestId],
+      connection,
     );
     return { ok: true, requesterId: request.user_id, title: locked.game.title };
   });

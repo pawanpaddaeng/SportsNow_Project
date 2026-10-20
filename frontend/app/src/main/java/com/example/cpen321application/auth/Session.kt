@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.google.gson.JsonParseException
+import org.json.JSONException
 import org.json.JSONObject
 import retrofit2.Response
+import java.io.IOException
 
 //variables to store a logged-in user's name as returned by backend
 var firstName: String? = "Not"
@@ -75,30 +78,37 @@ object Session {
         otherwise a different Google account was picked and it is rejected.
         Returns null if the user has to sign in themselves
      */
-    suspend fun renew(context: Context, expiredJwt: String): String? = renewLock.withLock {
+    suspend fun renew(context: Context, expiredJwt: String): String? =
+        renewLock.withLock { renewWhileLocked(context, expiredJwt) }
+
+    // renew's work, renewLock makes sure only one call runs it at a time
+    private suspend fun renewWhileLocked(context: Context, expiredJwt: String): String? {
         // another call already renewed the session while this one waited
         val current = jwtToken
-        if (current != null && current != expiredJwt) return@withLock current
+        if (current != null && current != expiredJwt) return current
 
-        val googleToken = triggerSilentGoogleSignIn(context) ?: return@withLock null
+        val googleToken = triggerSilentGoogleSignIn(context) ?: return null
         val newJwt = try {
             val reply = readAuthResponse(
                 ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
             )
             reply?.jwtToken?.takeIf { reply.msg == "signedIn" }
-        } catch (e: Exception) {
-            Log.w(TAG, "Silent sign in failed", e)
+        } catch (e: IOException) {
+            Log.w(TAG, "Silent sign in failed, server unreachable", e)
             null
-        } ?: return@withLock null
+        } catch (e: JsonParseException) {
+            Log.w(TAG, "Silent sign in failed, unreadable reply", e)
+            null
+        } ?: return null
 
         val previousUser = AuthTokenStore.userIdOf(expiredJwt)
         if (previousUser == null || AuthTokenStore.userIdOf(newJwt) != previousUser) {
-            return@withLock null
+            return null
         }
 
         jwtToken = newJwt
         AuthTokenStore.save(context, newJwt)
-        newJwt
+        return newJwt
     }
 
     /*  the JWT middleware answers 401 with msg expired_token, invalid_token or
@@ -112,7 +122,9 @@ object Session {
             source.request(Long.MAX_VALUE)
             val text = source.buffer.clone().readUtf8()
             JSONObject(text).optString("msg").ifBlank { "unauthorized" }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            "unauthorized"
+        } catch (e: JSONException) {
             "unauthorized"
         }
     }

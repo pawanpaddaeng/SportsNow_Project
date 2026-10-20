@@ -119,8 +119,9 @@ fun JoinRequestSheet(
                 isSending = isSending,
                 onCancel = onDismiss,
                 onSend = {
-                    val skill = skillLevel ?: return@Buttons
-                    onSend(JoinRequestAnswers(skillLevel = skill, playFrequency = playFrequency, message = message))
+                    skillLevel?.let { skill ->
+                        onSend(JoinRequestAnswers(skillLevel = skill, playFrequency = playFrequency, message = message))
+                    }
                 }
             )
         }

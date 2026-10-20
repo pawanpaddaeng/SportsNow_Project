@@ -6,7 +6,7 @@ import com.example.cpen321application.network.ProfileResponse
 import com.example.cpen321application.network.ServerApi
 import com.example.cpen321application.network.UpdateProfileRequest
 import com.example.cpen321application.network.UserProfileDto
-import com.google.gson.Gson
+import com.example.cpen321application.network.serverGson
 import com.google.gson.JsonParseException
 import retrofit2.Response
 import java.io.IOException
@@ -87,7 +87,7 @@ private fun toProfileResult(reply: ProfileResponse?, failureMessage: String): Pr
 
 private fun readProfileReply(response: Response<ProfileResponse>): ProfileResponse? =
     response.body() ?: try {
-        Gson().fromJson(response.errorBody()?.string(), ProfileResponse::class.java)
+        serverGson.fromJson(response.errorBody()?.string(), ProfileResponse::class.java)
     } catch (e: JsonParseException) {
         null
     } catch (e: IOException) {

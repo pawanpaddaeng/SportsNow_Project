@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.network.GameDto
+import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.PickerField
@@ -107,96 +108,107 @@ fun GameDto.toGameInfoForm() = GameInfoForm(
     description = description?.takeIf { it.isNotBlank() }
 )
 
+/*  what the Input Game Info screen shows. initial fills in the form (null for a new
+    game) and minPlayers stops max players going below the players already in the game.
+    isSubmitting is set while the caller sends the form. location is the place picked on
+    the map. While the game to edit loads, isLoading shows a spinner and loadError a
+    problem instead of the form
+ */
+data class InputGameInfoUiState(
+    val screenTitle: String = "Create Game",
+    val submitLabel: String = "Create Game",
+    val initial: GameInfoForm? = null,
+    val minPlayers: Int = MIN_PLAYERS,
+    val isSubmitting: Boolean = false,
+    val isLoading: Boolean = false,
+    val loadError: String? = null,
+    val location: GameLocation? = null
+)
+
+/*  what the Input Game Info screen's controls do. onSubmit gets the filled in form,
+    onPickLocation should open the map location picker and pass the result back
+    through the state's location
+ */
+data class InputGameInfoActions(
+    val onSubmit: (GameInfoForm) -> Unit,
+    val onBack: () -> Unit,
+    val onPickLocation: () -> Unit = {}
+)
+
+/*  the form's values while they're being edited. Serializable so rememberSaveable
+    keeps them when the screen is recreated, e.g. after going to Pick Location
+ */
+private data class GameInfoDraft(
+    val sport: String?,
+    val title: String,
+    val date: LocalDate?,
+    val time: LocalTime?,
+    val maxPlayers: Int,
+    val skillLevel: String,
+    val description: String
+) : Serializable {
+    // start time in the phone's time zone, null until both a date and a time are picked
+    val startsAt: Instant?
+        get() = if (date != null && time != null) date.atTime(time).atZone(ZoneId.systemDefault()).toInstant() else null
+
+    // the form as it would be sent, null while something required is missing or the start is in the past
+    fun toForm(location: GameLocation?): GameInfoForm? {
+        // null too when the start is in the past
+        val start = startsAt?.takeUnless { it.isBefore(Instant.now()) }
+        if (sport == null || title.isBlank() || start == null) {
+            return null
+        }
+        return location?.let {
+            GameInfoForm(
+                sport = sport,
+                title = title.trim(),
+                startsAt = start,
+                location = it,
+                maxPlayers = maxPlayers,
+                skillLevel = skillLevel,
+                description = description.trim().ifBlank { null }
+            )
+        }
+    }
+
+    companion object {
+        // starting values in the phone's time zone, empty for a new game
+        fun from(initial: GameInfoForm?, lowestMaxPlayers: Int): GameInfoDraft {
+            val start = initial?.startsAt?.atZone(ZoneId.systemDefault())
+            return GameInfoDraft(
+                sport = initial?.sport,
+                title = initial?.title ?: "",
+                date = start?.toLocalDate(),
+                time = start?.toLocalTime(),
+                maxPlayers = maxOf(initial?.maxPlayers ?: DEFAULT_PLAYERS, lowestMaxPlayers),
+                skillLevel = initial?.skillLevel ?: "any",
+                description = initial?.description ?: ""
+            )
+        }
+    }
+}
+
 /*
     Input Game Info screen from the Create Game Figma mockup, used to create and to edit
-    a game: the create and edit routes in AppNavigation both show it.
-    initial fills in the form (null for a new game) and minPlayers stops max players
-    going below the players already in the game. Every game needs the organizer's
-    approval to join, so there is no approval toggle.
-    onSubmit gets the filled in form, the caller sends it to the server and sets
-    isSubmitting while it does. When editing, the button is only enabled once
-    something changed. onPickLocation should open the map location picker and pass
-    the result back through location. While the game to edit loads, isLoading shows a
-    spinner and loadError a problem instead of the form
+    a game: the create and edit routes in AppNavigation both show it. Every game needs
+    the organizer's approval to join, so there is no approval toggle. When editing, the
+    button is only enabled once something changed
  */
 @Composable
-fun InputGameInfoScreen(
-    onSubmit: (GameInfoForm) -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    screenTitle: String = "Create Game",
-    submitLabel: String = "Create Game",
-    initial: GameInfoForm? = null,
-    minPlayers: Int = MIN_PLAYERS,
-    isSubmitting: Boolean = false,
-    isLoading: Boolean = false,
-    loadError: String? = null,
-    location: GameLocation? = null,
-    onPickLocation: () -> Unit = {}
-) {
-    if (isLoading || loadError != null) {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .background(Color.White)
-                .padding(horizontal = 16.dp)
-        ) {
-            TopBar(title = screenTitle, onBack = onBack)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 48.dp)
-            ) {
-                if (loadError != null) {
-                    Text(text = loadError, color = SportsOnSurfaceVariant, fontSize = 14.sp)
-                } else {
-                    CircularProgressIndicator(color = SportsPrimary)
-                }
-            }
-        }
+fun InputGameInfoScreen(state: InputGameInfoUiState, actions: InputGameInfoActions, modifier: Modifier = Modifier) {
+    if (state.isLoading || state.loadError != null) {
+        LoadingGame(title = state.screenTitle, loadError = state.loadError, onBack = actions.onBack, modifier = modifier)
         return
     }
 
-    // starting values in the phone's time zone, empty for a new game
-    val initialStart = initial?.startsAt?.atZone(ZoneId.systemDefault())
-    val lowestMaxPlayers = maxOf(MIN_PLAYERS, minPlayers)
-
-    var sport by rememberSaveable { mutableStateOf(initial?.sport) }
-    var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
-    var date by rememberSaveable { mutableStateOf(initialStart?.toLocalDate()) }
-    var time by rememberSaveable { mutableStateOf(initialStart?.toLocalTime()) }
-    var maxPlayers by rememberSaveable {
-        mutableIntStateOf(maxOf(initial?.maxPlayers ?: DEFAULT_PLAYERS, lowestMaxPlayers))
-    }
-    var skillLevel by rememberSaveable { mutableStateOf(initial?.skillLevel ?: "any") }
-    var description by rememberSaveable { mutableStateOf(initial?.description ?: "") }
+    val lowestMaxPlayers = maxOf(MIN_PLAYERS, state.minPlayers)
+    var draft by rememberSaveable { mutableStateOf(GameInfoDraft.from(state.initial, lowestMaxPlayers)) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    // start time in the phone's time zone, it must be in the future
-    val startsAt = if (date != null && time != null) {
-        date!!.atTime(time!!).atZone(ZoneId.systemDefault()).toInstant()
-    } else {
-        null
-    }
-    val startsInPast = startsAt != null && startsAt.isBefore(Instant.now())
-
-    // the form as it would be sent, null while something required is missing or invalid
-    val form = if (sport != null && title.isNotBlank() && startsAt != null && !startsInPast && location != null) {
-        GameInfoForm(
-            sport = sport!!,
-            title = title.trim(),
-            startsAt = startsAt,
-            location = location,
-            maxPlayers = maxPlayers,
-            skillLevel = skillLevel,
-            description = description.trim().ifBlank { null }
-        )
-    } else {
-        null
-    }
-    val canSubmit = form != null && form != initial && !isSubmitting
+    val startsInPast = draft.startsAt?.isBefore(Instant.now()) == true
+    val form = draft.toForm(state.location)
+    val canSubmit = form != null && form != state.initial && !state.isSubmitting
 
     Column(
         modifier = modifier
@@ -206,132 +218,184 @@ fun InputGameInfoScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        TopBar(title = screenTitle, onBack = onBack)
-
-        ChipGroup(
-            label = "Sport *",
-            options = SPORTS,
-            selected = sport,
-            onSelect = { sport = it }
+        TopBar(title = state.screenTitle, onBack = actions.onBack)
+        BasicsFields(
+            draft = draft,
+            onChange = { draft = it },
+            startsInPast = startsInPast,
+            onPickDate = { showDatePicker = true },
+            onPickTime = { showTimePicker = true }
         )
-
-        LabeledTextField(
-            label = "Title *",
-            value = title,
-            onValueChange = { if (it.length <= MAX_TITLE_LENGTH) title = it },
-            placeholder = "e.g. Pickup Basketball",
-            capitalization = KeyboardCapitalization.Sentences
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PickerField(
-                    label = "Date *",
-                    value = date?.format(dateFormat),
-                    placeholder = "Select date",
-                    onClick = { showDatePicker = true },
-                    modifier = Modifier.weight(1f)
-                )
-                PickerField(
-                    label = "Time *",
-                    value = time?.format(timeFormat),
-                    placeholder = "Select time",
-                    onClick = { showTimePicker = true },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            if (startsInPast) {
-                Text(
-                    text = "The game has to start in the future.",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        LocationField(location = location, onClick = onPickLocation)
-
-        MaxPlayersStepper(
-            value = maxPlayers,
-            min = lowestMaxPlayers,
-            onValueChange = { maxPlayers = it }
-        )
-
-        ChipGroup(
-            label = "Skill level",
-            options = SKILL_LEVELS,
-            selected = skillLevel,
-            onSelect = { skillLevel = it }
-        )
-
-        // replaces the mockup's approval toggle: approval is always required
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(SportsSurfaceContainer)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Info,
-                contentDescription = null,
-                tint = SportsPrimary,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                text = "Players send a join request and need your approval before they join.",
-                color = SportsOnSurfaceVariant,
-                fontSize = 13.sp
-            )
-        }
-
-        LabeledTextField(
-            label = "Description (optional)",
-            value = description,
-            onValueChange = { if (it.length <= MAX_DESCRIPTION_LENGTH) description = it },
-            placeholder = "Add details for players…",
-            singleLine = false,
-            minLines = 3,
-            capitalization = KeyboardCapitalization.Sentences
-        )
-
-        Button(
-            onClick = { form?.let(onSubmit) },
+        LocationField(location = state.location, onClick = actions.onPickLocation)
+        SettingsFields(draft = draft, onChange = { draft = it }, lowestMaxPlayers = lowestMaxPlayers)
+        SubmitButton(
+            label = state.submitLabel,
             enabled = canSubmit,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp)
-                .height(48.dp)
-        ) {
-            if (isSubmitting) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp)
-                )
-            } else {
-                Text(text = submitLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        }
+            isSubmitting = state.isSubmitting,
+            onClick = { form?.let(actions.onSubmit) }
+        )
     }
 
     if (showDatePicker) {
-        GameDatePickerDialog(
-            initialDate = date,
-            onDateSelected = { date = it },
-            onDismiss = { showDatePicker = false }
-        )
+        GameDatePickerDialog(draft.date, onDateSelected = { draft = draft.copy(date = it) }, onDismiss = { showDatePicker = false })
     }
     if (showTimePicker) {
-        GameTimePickerDialog(
-            initialTime = time,
-            onTimeSelected = { time = it },
-            onDismiss = { showTimePicker = false }
+        GameTimePickerDialog(draft.time, onTimeSelected = { draft = draft.copy(time = it) }, onDismiss = { showTimePicker = false })
+    }
+}
+
+// the screen's title and a spinner, or loadError, while the game to edit loads
+@Composable
+private fun LoadingGame(title: String, loadError: String?, onBack: () -> Unit, modifier: Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(horizontal = 16.dp)
+    ) {
+        TopBar(title = title, onBack = onBack)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 48.dp)
+        ) {
+            if (loadError != null) {
+                Text(text = loadError, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+            } else {
+                CircularProgressIndicator(color = SportsPrimary)
+            }
+        }
+    }
+}
+
+// sport, title, and the date and time fields that open their pickers
+@Composable
+private fun BasicsFields(
+    draft: GameInfoDraft,
+    onChange: (GameInfoDraft) -> Unit,
+    startsInPast: Boolean,
+    onPickDate: () -> Unit,
+    onPickTime: () -> Unit
+) {
+    ChipGroup(
+        label = "Sport *",
+        options = SPORTS,
+        selected = draft.sport,
+        onSelect = { onChange(draft.copy(sport = it)) }
+    )
+
+    LabeledTextField(
+        label = "Title *",
+        value = draft.title,
+        onValueChange = { if (it.length <= MAX_TITLE_LENGTH) onChange(draft.copy(title = it)) },
+        placeholder = "e.g. Pickup Basketball",
+        capitalization = KeyboardCapitalization.Sentences
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PickerField(
+                label = "Date *",
+                value = draft.date?.format(dateFormat),
+                placeholder = "Select date",
+                onClick = onPickDate,
+                modifier = Modifier.weight(1f)
+            )
+            PickerField(
+                label = "Time *",
+                value = draft.time?.format(timeFormat),
+                placeholder = "Select time",
+                onClick = onPickTime,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (startsInPast) {
+            Text(
+                text = "The game has to start in the future.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+// max players, skill level, the approval note and the description
+@Composable
+private fun SettingsFields(draft: GameInfoDraft, onChange: (GameInfoDraft) -> Unit, lowestMaxPlayers: Int) {
+    MaxPlayersStepper(
+        value = draft.maxPlayers,
+        min = lowestMaxPlayers,
+        onValueChange = { onChange(draft.copy(maxPlayers = it)) }
+    )
+
+    ChipGroup(
+        label = "Skill level",
+        options = SKILL_LEVELS,
+        selected = draft.skillLevel,
+        onSelect = { onChange(draft.copy(skillLevel = it)) }
+    )
+
+    ApprovalNote()
+
+    LabeledTextField(
+        label = "Description (optional)",
+        value = draft.description,
+        onValueChange = { if (it.length <= MAX_DESCRIPTION_LENGTH) onChange(draft.copy(description = it)) },
+        placeholder = "Add details for players…",
+        minLines = 3,
+        capitalization = KeyboardCapitalization.Sentences
+    )
+}
+
+// replaces the mockup's approval toggle: approval is always required
+@Composable
+private fun ApprovalNote() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SportsSurfaceContainer)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Info,
+            contentDescription = null,
+            tint = SportsPrimary,
+            modifier = Modifier.size(20.dp)
         )
+        Text(
+            text = "Players send a join request and need your approval before they join.",
+            color = SportsOnSurfaceVariant,
+            fontSize = 13.sp
+        )
+    }
+}
+
+// "Create Game" / "Save Changes" button, a spinner while the form is being sent
+@Composable
+private fun SubmitButton(label: String, enabled: Boolean, isSubmitting: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(50),
+        colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp)
+            .height(48.dp)
+    ) {
+        if (isSubmitting) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(20.dp)
+            )
+        } else {
+            Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
     }
 }
 
@@ -424,13 +488,7 @@ private fun LocationField(location: GameLocation?, onClick: () -> Unit) {
             if (location != null) {
                 LocationPreviewMap(location = location, onClick = onClick)
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
+            CardRow {
                 Icon(
                     imageVector = Icons.Filled.Place,
                     contentDescription = null,

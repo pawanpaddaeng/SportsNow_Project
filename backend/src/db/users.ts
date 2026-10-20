@@ -1,5 +1,4 @@
-import type { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { pool } from './mysql';
+import { executeWrite, selectRows } from './mysql';
 
 export interface User {
   userId: number;
@@ -16,7 +15,7 @@ export interface User {
 export type NewUser = Omit<User, 'userId' | 'createdAt'>;
 
 // a row of the users table as mysql2 returns it
-interface UserRow extends RowDataPacket {
+interface UserRow {
   user_id: number;
   google_id: string;
   email: string;
@@ -46,7 +45,7 @@ function toUser(row: UserRow): User {
  */
 export async function createUser(user: NewUser): Promise<number> {
   const createdAtSeconds = Math.floor(Date.now() / 1000);
-  const [result] = await pool.execute<ResultSetHeader>(
+  const result = await executeWrite(
     `INSERT INTO users (google_id, email, first_name, last_name, birth_year, created_at)
      VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?))`,
     [user.googleId, user.email, user.firstName, user.lastName, user.birthYear, createdAtSeconds],
@@ -55,7 +54,7 @@ export async function createUser(user: NewUser): Promise<number> {
 }
 
 export async function findUserByGoogleId(googleId: string): Promise<User | null> {
-  const [rows] = await pool.execute<UserRow[]>(
+  const rows = await selectRows<UserRow>(
     `SELECT user_id, google_id, email, first_name, last_name, birth_year,
             UNIX_TIMESTAMP(created_at) AS created_at_unix
      FROM users WHERE google_id = ? LIMIT 1`,
@@ -66,7 +65,7 @@ export async function findUserByGoogleId(googleId: string): Promise<User | null>
 }
 
 export async function findUserById(userId: number): Promise<User | null> {
-  const [rows] = await pool.execute<UserRow[]>(
+  const rows = await selectRows<UserRow>(
     `SELECT user_id, google_id, email, first_name, last_name, birth_year,
             UNIX_TIMESTAMP(created_at) AS created_at_unix
      FROM users WHERE user_id = ? LIMIT 1`,
@@ -79,7 +78,7 @@ export async function findUserById(userId: number): Promise<User | null> {
 export type ProfileUpdate = Pick<User, 'firstName' | 'lastName' | 'birthYear'>;
 
 export async function updateUserProfile(userId: number, profile: ProfileUpdate): Promise<void> {
-  await pool.execute<ResultSetHeader>(
+  await executeWrite(
     'UPDATE users SET first_name = ?, last_name = ?, birth_year = ? WHERE user_id = ?',
     [profile.firstName, profile.lastName, profile.birthYear, userId],
   );
@@ -97,8 +96,8 @@ export function userJson(user: User) {
 }
 
 export async function userExists(googleId: string): Promise<boolean> {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    'SELECT 1 FROM users WHERE google_id = ? LIMIT 1',
+  const rows = await selectRows<{ found: number }>(
+    'SELECT 1 AS found FROM users WHERE google_id = ? LIMIT 1',
     [googleId],
   );
   return rows.length > 0;

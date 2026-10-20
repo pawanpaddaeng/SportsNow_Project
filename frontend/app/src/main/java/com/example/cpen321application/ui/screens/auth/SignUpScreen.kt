@@ -27,16 +27,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.auth.triggerGoogleSignIn
-import com.example.cpen321application.network.AuthTokenResponse
+import com.example.cpen321application.rememberSafeCoroutineScope
 import com.example.cpen321application.network.ServerApi
 import com.example.cpen321application.network.SignUpRequest
-import com.google.gson.Gson
+import com.example.cpen321application.network.readAuthResponse
+import com.google.gson.JsonParseException
 import com.example.cpen321application.ui.theme.*
+import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
+import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.sportsFieldColors
 import kotlinx.coroutines.launch
+import org.json.JSONException
 import org.json.JSONObject
+import java.io.IOException
 import java.time.Year
 
 // youngest and oldest ages offered in the birth year picker
@@ -70,7 +75,7 @@ fun SignUpScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
 
     var idToken by remember { mutableStateOf<String?>(null) }
     var email by remember { mutableStateOf<String?>(null) }
@@ -84,6 +89,53 @@ fun SignUpScreen(
     val canCreate = idToken != null && firstNameText.isNotBlank() &&
             lastNameText.isNotBlank() && birthYear != null && !isSubmitting
 
+    // verifies with Google and prefills the form with the name on the Google account
+    fun verify() {
+        isVerifying = true
+        errorText = null
+        scope.launch {
+            val token = try {
+                triggerGoogleSignIn(context)
+            } finally {
+                isVerifying = false
+            }
+            if (token == null) {
+                errorText = "Google verification failed. Try again."
+            } else {
+                val profile = readGoogleProfile(token)
+                idToken = token
+                email = profile.email
+                if (firstNameText.isBlank()) firstNameText = profile.givenName ?: ""
+                if (lastNameText.isBlank()) lastNameText = profile.familyName ?: ""
+            }
+        }
+    }
+
+    // sends the form to the server, only called once canCreate is true
+    fun createAccount() {
+        val details = SignUpDetails(
+            idToken = idToken!!,
+            email = email,
+            firstName = firstNameText.trim(),
+            lastName = lastNameText.trim(),
+            birthYear = birthYear!!
+        )
+        isSubmitting = true
+        errorText = null
+        scope.launch {
+            val result = try {
+                submitSignUp(details)
+            } finally {
+                isSubmitting = false
+            }
+            when (result) {
+                is SignUpResult.Created -> onSignedUp(details, result.jwtToken)
+                SignUpResult.AlreadyExists -> onAlreadyExists()
+                is SignUpResult.Failed -> errorText = result.message
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -92,85 +144,23 @@ fun SignUpScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // top bar with back button and centered app name
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = SportsOnSurface
-                )
-            }
-            Text(
-                text = "SportsNow",
-                color = SportsOnSurface,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.size(48.dp))
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "Create your account",
-                color = SportsOnSurface,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        SignUpHeader(onBack = onBack)
 
         GoogleVerificationCard(
             email = email,
             isVerified = idToken != null,
             isVerifying = isVerifying,
-            onVerify = {
-                isVerifying = true
-                errorText = null
-                scope.launch {
-                    val token = triggerGoogleSignIn(context)
-                    if (token == null) {
-                        errorText = "Google verification failed. Try again."
-                    } else {
-                        // prefill the form with the name on the Google account
-                        val profile = readGoogleProfile(token)
-                        idToken = token
-                        email = profile.email
-                        if (firstNameText.isBlank()) firstNameText = profile.givenName ?: ""
-                        if (lastNameText.isBlank()) lastNameText = profile.familyName ?: ""
-                    }
-                    isVerifying = false
-                }
-            }
+            onVerify = { verify() }
         )
 
-        // profile fields, new fields get added to this column
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LabeledTextField(
-                    label = "First name *",
-                    value = firstNameText,
-                    onValueChange = { firstNameText = it },
-                    modifier = Modifier.weight(1f)
-                )
-                LabeledTextField(
-                    label = "Last name *",
-                    value = lastNameText,
-                    onValueChange = { lastNameText = it },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            BirthYearField(
-                birthYear = birthYear,
-                onYearSelected = { birthYear = it }
-            )
-        }
+        NameAndBirthYearFields(
+            firstName = firstNameText,
+            lastName = lastNameText,
+            birthYear = birthYear,
+            onFirstNameChange = { firstNameText = it },
+            onLastNameChange = { lastNameText = it },
+            onBirthYearChange = { birthYear = it }
+        )
 
         if (errorText != null) {
             Text(
@@ -180,62 +170,127 @@ fun SignUpScreen(
             )
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+        CreateAccountFooter(
+            enabled = canCreate,
+            isSubmitting = isSubmitting,
+            onCreate = { createAccount() },
+            onNavigateToSignIn = onNavigateToSignIn
+        )
+    }
+}
+
+// top bar with back button and centered app name, then "Create your account"
+@Composable
+private fun SignUpHeader(onBack: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = SportsOnSurface
+            )
+        }
+        Text(
+            text = "SportsNow",
+            color = SportsOnSurface,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.size(48.dp))
+    }
+
+    Text(
+        text = "Create your account",
+        color = SportsOnSurface,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+// profile fields, new fields get added to this column
+@Composable
+private fun NameAndBirthYearFields(
+    firstName: String,
+    lastName: String,
+    birthYear: Int?,
+    onFirstNameChange: (String) -> Unit,
+    onLastNameChange: (String) -> Unit,
+    onBirthYearChange: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LabeledTextField(
+                label = "First name *",
+                value = firstName,
+                onValueChange = onFirstNameChange,
+                modifier = Modifier.weight(1f)
+            )
+            LabeledTextField(
+                label = "Last name *",
+                value = lastName,
+                onValueChange = onLastNameChange,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        BirthYearField(
+            birthYear = birthYear,
+            onYearSelected = onBirthYearChange
+        )
+    }
+}
+
+// Create Account button (a spinner while sending) and the link back to sign in
+@Composable
+private fun CreateAccountFooter(
+    enabled: Boolean,
+    isSubmitting: Boolean,
+    onCreate: () -> Unit,
+    onNavigateToSignIn: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+    ) {
+        Button(
+            onClick = onCreate,
+            enabled = enabled,
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
         ) {
-            Button(
-                onClick = {
-                    val details = SignUpDetails(
-                        idToken = idToken!!,
-                        email = email,
-                        firstName = firstNameText.trim(),
-                        lastName = lastNameText.trim(),
-                        birthYear = birthYear!!
-                    )
-                    isSubmitting = true
-                    errorText = null
-                    scope.launch {
-                        when (val result = submitSignUp(details)) {
-                            is SignUpResult.Created -> onSignedUp(details, result.jwtToken)
-                            SignUpResult.AlreadyExists -> onAlreadyExists()
-                            is SignUpResult.Failed -> errorText = result.message
-                        }
-                        isSubmitting = false
-                    }
-                },
-                enabled = canCreate,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    Text(text = "Create Account", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-            Row {
-                Text(
-                    text = "Already have an account? ",
-                    color = SportsOnSurfaceVariant,
-                    fontSize = 14.sp
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp)
                 )
-                Text(
-                    text = "Sign In",
-                    color = SportsPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable(onClick = onNavigateToSignIn)
-                )
+            } else {
+                Text(text = "Create Account", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
+        }
+        Row {
+            Text(
+                text = "Already have an account? ",
+                color = SportsOnSurfaceVariant,
+                fontSize = 14.sp
+            )
+            Text(
+                text = "Sign In",
+                color = SportsPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable(onClick = onNavigateToSignIn)
+            )
         }
     }
 }
@@ -248,15 +303,7 @@ private fun GoogleVerificationCard(
     isVerifying: Boolean,
     onVerify: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
+    CardRow(modifier = Modifier.cardBackground(SportsSurfaceContainer)) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -374,8 +421,8 @@ private data class GoogleProfile(
     verifies the token itself
  */
 private fun readGoogleProfile(idToken: String): GoogleProfile {
+    val payload = idToken.split(".").getOrNull(1) ?: return GoogleProfile(null, null, null)
     return try {
-        val payload = idToken.split(".")[1]
         val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
         val json = JSONObject(String(Base64.decode(payload, flags)))
         GoogleProfile(
@@ -383,7 +430,10 @@ private fun readGoogleProfile(idToken: String): GoogleProfile {
             givenName = json.optString("given_name").ifBlank { null },
             familyName = json.optString("family_name").ifBlank { null }
         )
-    } catch (e: Exception) {
+    } catch (e: IllegalArgumentException) {
+        // not valid base64
+        GoogleProfile(null, null, null)
+    } catch (e: JSONException) {
         GoogleProfile(null, null, null)
     }
 }
@@ -413,12 +463,7 @@ private suspend fun submitSignUp(details: SignUpDetails): SignUpResult {
                 birthYear = details.birthYear
             )
         )
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val body = response.body() ?: try {
-            Gson().fromJson(response.errorBody()?.string(), AuthTokenResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val body = readAuthResponse(response)
 
         when {
             body?.msg == "signedIn" && body.jwtToken != null -> SignUpResult.Created(body.jwtToken)
@@ -427,7 +472,9 @@ private suspend fun submitSignUp(details: SignUpDetails): SignUpResult {
                 SignUpResult.Failed("Your Google verification expired, verify with Google again")
             else -> SignUpResult.Failed(body?.error ?: "Could not create account, try again")
         }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
         SignUpResult.Failed("Cannot Reach Server")
+    } catch (e: JsonParseException) {
+        SignUpResult.Failed("Could not create account, try again")
     }
 }

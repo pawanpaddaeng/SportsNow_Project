@@ -31,6 +31,10 @@ import com.example.cpen321application.location.DeviceLocation
 import com.example.cpen321application.network.DiscoverGameDto
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.CardRow
+import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.pillBackground
+import com.example.cpen321application.ui.components.spotsLeftLabel
 import com.example.cpen321application.ui.screens.games.GameLocation
 import com.example.cpen321application.ui.screens.games.SPORTS
 import com.example.cpen321application.ui.screens.games.SelectableChip
@@ -48,6 +52,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -126,7 +131,7 @@ internal fun formatStartsIn(start: Instant, now: Instant): String? {
 fun DiscoverGameDto.toDiscoverGame(now: Instant = Instant.now()): DiscoverGame {
     val start = try {
         Instant.parse(game.startsAt)
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         null
     }
     return DiscoverGame(
@@ -149,36 +154,43 @@ fun DiscoverGameDto.toDiscoverGame(now: Instant = Instant.now()): DiscoverGame {
     )
 }
 
+/*  what the Discover screen shows. location is where the games were searched around,
+    null until it is known. place is the place the user picked to search around instead
+    of their own location, null when searching near them. isLoading shows a loading bar,
+    errorMessage a problem with a Try again button: no location (2a) or the games couldn't
+    load. games are the last loaded games, they stay visible while refreshing
+ */
+data class DiscoverUiState(
+    val games: List<DiscoverGame>,
+    val location: DeviceLocation?,
+    val place: GameLocation? = null,
+    val hasLoaded: Boolean = false,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+
+/*  what the Discover screen's controls do. Tapping the map opens the map picker
+    (onChangeLocation) and onUseMyLocation goes back to searching near the user
+ */
+data class DiscoverActions(
+    val onRetry: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
+    val onChangeLocation: () -> Unit = {},
+    val onUseMyLocation: () -> Unit = {},
+    val onGameClick: (DiscoverGame) -> Unit = {},
+    val onTabSelected: (BottomTab) -> Unit = {}
+)
+
 /*
     Discover screen from the Figma mockup (Use Case 3, Discover Game): the games near
     the user on a map and as a list, closest first, with a sport filter at the top.
-    location is where the games were searched around, null until it is known. place is
-    the place the user picked to search around instead of their own location, null when
-    searching near them. Tapping the map opens the map picker (onChangeLocation) and
-    onUseMyLocation goes back to searching near the user. isLoading shows a loading bar,
-    errorMessage a problem with a Try again button (onRetry): no location (2a) or the
-    games couldn't load. games are the last loaded games, they stay visible while
-    refreshing. The callbacks connect it to other screens through AppNavigation
+    The actions connect it to other screens through AppNavigation
  */
 @Composable
-fun DiscoverScreen(
-    games: List<DiscoverGame>,
-    location: DeviceLocation?,
-    modifier: Modifier = Modifier,
-    place: GameLocation? = null,
-    hasLoaded: Boolean = false,
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
-    onRetry: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onChangeLocation: () -> Unit = {},
-    onUseMyLocation: () -> Unit = {},
-    onGameClick: (DiscoverGame) -> Unit = {},
-    onTabSelected: (BottomTab) -> Unit = {}
-) {
+fun DiscoverScreen(state: DiscoverUiState, actions: DiscoverActions, modifier: Modifier = Modifier) {
     // null shows every sport
     var selectedSport by rememberSaveable { mutableStateOf<String?>(null) }
-    val shownGames = games.filter { selectedSport == null || it.sport == selectedSport }
+    val shownGames = state.games.filter { selectedSport == null || it.sport == selectedSport }
     val sportLabel = SPORTS.firstOrNull { it.second == selectedSport }?.first
 
     Scaffold(
@@ -186,7 +198,7 @@ fun DiscoverScreen(
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Discover, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = BottomTab.Discover, onTabSelected = actions.onTabSelected)
         }
     ) { innerPadding ->
         LazyColumn(
@@ -196,16 +208,18 @@ fun DiscoverScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            item(key = "header") { Header(place = place, isLoading = isLoading, onRefresh = onRefresh) }
+            item(key = "header") {
+                Header(place = state.place, isLoading = state.isLoading, onRefresh = actions.onRefresh)
+            }
 
             item(key = "search_area") {
                 SearchArea(
-                    location = location,
-                    place = place,
+                    location = state.location,
+                    place = state.place,
                     games = shownGames,
-                    onChangeLocation = onChangeLocation,
-                    onUseMyLocation = onUseMyLocation,
-                    onGameClick = onGameClick
+                    onChangeLocation = actions.onChangeLocation,
+                    onUseMyLocation = actions.onUseMyLocation,
+                    onGameClick = actions.onGameClick
                 )
             }
 
@@ -214,7 +228,7 @@ fun DiscoverScreen(
             }
 
             // thin loading bar while the games update, the current list stays visible
-            if (isLoading) {
+            if (state.isLoading) {
                 item(key = "loading") {
                     LinearProgressIndicator(
                         color = SportsPrimary,
@@ -224,12 +238,12 @@ fun DiscoverScreen(
                 }
             }
 
-            if (errorMessage != null) {
-                item(key = "error") { ErrorMessage(message = errorMessage, onRetry = onRetry) }
+            if (state.errorMessage != null) {
+                item(key = "error") { RetryMessage(state.errorMessage, actions.onRetry, Modifier.padding(vertical = 16.dp), "Try again") }
             }
 
-            if (hasLoaded) {
-                gameList(games = shownGames, allGames = games, sportLabel = sportLabel, onGameClick = onGameClick)
+            if (state.hasLoaded) {
+                gameList(games = shownGames, allGames = state.games, sportLabel = sportLabel, onGameClick = actions.onGameClick)
             }
         }
     }
@@ -292,13 +306,7 @@ private fun SearchArea(
                 onGameClick = onGameClick
             )
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
+        CardRow {
             Icon(imageVector = Icons.Filled.Place, contentDescription = null, tint = Color(0xFFD93025))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "Showing games near", color = SportsOnSurfaceVariant, fontSize = 12.sp)
@@ -397,22 +405,6 @@ private fun SportFilter(selectedSport: String?, onSelect: (String?) -> Unit) {
     }
 }
 
-@Composable
-private fun ErrorMessage(message: String, onRetry: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp)
-    ) {
-        Text(text = message, color = SportsOnSurfaceVariant, fontSize = 14.sp, textAlign = TextAlign.Center)
-        OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(50)) {
-            Text(text = "Try again", color = SportsPrimary)
-        }
-    }
-}
-
 /*  "4 games nearby" with the cards, or a message when there are none nearby (3a)
     or none of the selected sport (5a)
  */
@@ -471,7 +463,6 @@ private fun EmptyMessage(text: String) {
 }
 
 // "1. Volleyball Drop-in" card with time, place, distance and status pills
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
@@ -515,23 +506,26 @@ private fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            when {
-                game.isFull -> Pill(text = "Full")
-                game.spotsLeft == 1 -> Pill(text = "1 spot left")
-                else -> Pill(text = "${game.spotsLeft} spots left")
-            }
-            if (game.requestPending) {
-                Pill(text = "Request pending", textColor = SportsPrimary, borderColor = SportsPrimary)
-            }
-            if (game.startsInText != null && !game.isFull) {
-                Pill(
-                    text = game.startsInText,
-                    background = SportsPrimaryContainer,
-                    textColor = SportsOnPrimaryContainer,
-                    borderColor = null
-                )
-            }
+        StatusPills(game)
+    }
+}
+
+// "3 spots left", "Request pending" and "Starts in 45 min" under a game card
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatusPills(game: DiscoverGame) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill(text = spotsLeftLabel(game.spotsLeft))
+        if (game.requestPending) {
+            Pill(text = "Request pending", textColor = SportsPrimary, borderColor = SportsPrimary)
+        }
+        if (game.startsInText != null && !game.isFull) {
+            Pill(
+                text = game.startsInText,
+                background = SportsPrimaryContainer,
+                textColor = SportsOnPrimaryContainer,
+                borderColor = null
+            )
         }
     }
 }
@@ -543,16 +537,11 @@ private fun Pill(
     textColor: Color = SportsOnSurfaceVariant,
     borderColor: Color? = SportsOutlineVariant
 ) {
-    val shape = RoundedCornerShape(50)
     Text(
         text = text,
         color = textColor,
         fontSize = 12.sp,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .clip(shape)
-            .background(background)
-            .then(if (borderColor != null) Modifier.border(1.dp, borderColor, shape) else Modifier)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+        modifier = Modifier.pillBackground(background, borderColor, horizontalPadding = 10.dp)
     )
 }

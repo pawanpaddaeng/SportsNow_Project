@@ -1,5 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { pool } from './mysql';
+import { executeWrite, selectRows } from './mysql';
 
 // longest FCM token accepted, matches the device_tokens.token column
 export const MAX_FCM_TOKEN_LENGTH = 512;
@@ -9,20 +8,20 @@ export const MAX_FCM_TOKEN_LENGTH = 512;
     by a different user (shared device) moves to that user
  */
 export async function saveDeviceToken(token: string, userId: number): Promise<void> {
-  await pool.execute<ResultSetHeader>(
+  await executeWrite(
     `INSERT INTO device_tokens (token, user_id) VALUES (?, ?) AS new
      ON DUPLICATE KEY UPDATE user_id = new.user_id, updated_at = CURRENT_TIMESTAMP`,
     [token, userId],
   );
 }
 
-interface TokenRow extends RowDataPacket {
+interface TokenRow {
   token: string;
 }
 
 // every device token registered for a user (one per device they're signed into)
 export async function getDeviceTokens(userId: number): Promise<string[]> {
-  const [rows] = await pool.execute<TokenRow[]>(
+  const rows = await selectRows<TokenRow>(
     'SELECT token FROM device_tokens WHERE user_id = ?',
     [userId],
   );
@@ -33,7 +32,7 @@ export async function getDeviceTokens(userId: number): Promise<string[]> {
 export async function deleteDeviceTokens(tokens: string[]): Promise<void> {
   if (tokens.length === 0) return;
   const placeholders = tokens.map(() => '?').join(', ');
-  await pool.execute<ResultSetHeader>(
+  await executeWrite(
     `DELETE FROM device_tokens WHERE token IN (${placeholders})`,
     tokens,
   );
