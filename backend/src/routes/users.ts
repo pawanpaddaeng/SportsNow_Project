@@ -18,14 +18,14 @@ export function usersRouter(): Router {
   /*
   Update Profile
   */
-  router.put('/api/users/me', requireAuth, asyncRoute(async (req: Request<Record<string, never>, unknown, ProfileBody | undefined>, res: Response) => {
-    const parsed = parseProfileFields(req.body);
-    if(!parsed.ok) {
-      return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
-    }
+  router.put('/api/users/me', requireAuth, asyncRoute('Could not update profile, try again later',
+    async (req: Request<Record<string, never>, unknown, ProfileBody | undefined>, res: Response) => {
+      const parsed = parseProfileFields(req.body);
+      if(!parsed.ok) {
+        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
+      }
 
-    const { userId } = getAuthUser(res);
-    try {
+      const { userId } = getAuthUser(res);
       await updateUserProfile(userId, parsed.value);
 
       const updated = await findUserById(userId);
@@ -33,11 +33,7 @@ export function usersRouter(): Router {
         return res.status(404).json({ msg: 'no_user', error: 'No account found, sign up or sign in again' });
       }
       return res.status(200).json({ msg: 'success', user: userJson(updated) });
-    } catch (error) {
-      console.error('Updating profile failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not update profile, try again later' });
-    }
-  }));
+    }));
 
   return router;
 }

@@ -1,4 +1,5 @@
 import express, { type Express } from 'express';
+import { handleRouteErrors } from './http/asyncRoute';
 import { authRouter } from './routes/auth';
 import { gamesRouter } from './routes/games';
 import { joinRequestsRouter } from './routes/joinRequests';
@@ -22,6 +23,9 @@ export function createApp(): Express {
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not Found' });
   });
+
+  // unexpected errors in the routes become 500 server_error, after every route
+  app.use(handleRouteErrors);
 
   return app;
 }

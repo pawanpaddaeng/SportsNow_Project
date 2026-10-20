@@ -43,16 +43,23 @@ export async function readBackGame(gameId: number, change: string): Promise<Game
   return game;
 }
 
-// response for a game the organizer can't change, shared by edit and cancel
+/*  the response for a problem from one of the error tables. The tables are Records
+    keyed by every problem, so the compiler makes sure each one has a response
+ */
+export function responseFor(responses: Record<string, ErrorResponse>, problem: string): ErrorResponse {
+  const response = new Map(Object.entries(responses)).get(problem);
+  if (!response) throw new Error(`No response for problem ${problem}`);
+  return response;
+}
+
+// responses for a game the organizer can't change, shared by edit and cancel
+export const GAME_CHANGE_ERRORS: Record<GameChangeProblem, ErrorResponse> = {
+  not_found: { status: 404, body: { msg: 'not_found', error: 'This game does not exist' } },
+  not_organizer: { status: 403, body: { msg: 'forbidden', error: 'Only the organizer can change this game' } },
+  cancelled: { status: 409, body: { msg: 'game_cancelled', error: 'This game was cancelled' } },
+  started: { status: 409, body: { msg: 'game_started', error: 'This game has already started' } },
+};
+
 export function gameChangeError(problem: GameChangeProblem): ErrorResponse {
-  switch (problem) {
-    case 'not_found':
-      return { status: 404, body: { msg: 'not_found', error: 'This game does not exist' } };
-    case 'not_organizer':
-      return { status: 403, body: { msg: 'forbidden', error: 'Only the organizer can change this game' } };
-    case 'cancelled':
-      return { status: 409, body: { msg: 'game_cancelled', error: 'This game was cancelled' } };
-    case 'started':
-      return { status: 409, body: { msg: 'game_started', error: 'This game has already started' } };
-  }
+  return responseFor(GAME_CHANGE_ERRORS, problem);
 }

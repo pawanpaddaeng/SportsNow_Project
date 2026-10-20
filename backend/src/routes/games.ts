@@ -62,15 +62,15 @@ export function gamesRouter(): Router {
       400 invalid_request with the problem if a field is missing or invalid.
       Also sends the organizer a push notification after a few seconds to test notifications
    */
-  router.post('/api/games', requireAuth, asyncRoute(async (req: Request<Record<string, never>, unknown, CreateGameBody | undefined>, res: Response) => {
-    const user = getAuthUser(res);
-    const parsed = parseNewGame(req.body, user.userId);
-    if (!parsed.ok) {
-      return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
-    }
-    const game = parsed.value;
+  router.post('/api/games', requireAuth, asyncRoute('Could not create game, try again later',
+    async (req: Request<Record<string, never>, unknown, CreateGameBody | undefined>, res: Response) => {
+      const user = getAuthUser(res);
+      const parsed = parseNewGame(req.body, user.userId);
+      if (!parsed.ok) {
+        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
+      }
+      const game = parsed.value;
 
-    try {
       const gameId = await createGame(game);
       logInfo(`Game created id: ${gameId}`);
       // read it back so the app gets the stored values (times, player count, status, ...)
@@ -87,18 +87,14 @@ export function gamesRouter(): Router {
       }, DEBUG_NOTIFICATION_DELAY_MS);
 
       return res.status(201).json({ msg: 'success', game: gameJson(created) });
-    } catch (error) {
-      console.error('Creating game failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not create game, try again later' });
-    }
-  }));
+    }));
 
   /*  the signed in user's games, split into the ones they organized and the ones
       they joined, soonest first. Responds msg "no_games" if they have none yet
    */
-  router.get('/api/games/mine', requireAuth, asyncRoute(async (_req: Request, res: Response) => {
-    const user = getAuthUser(res);
-    try {
+  router.get('/api/games/mine', requireAuth, asyncRoute('Could not load games, try again later',
+    async (_req: Request, res: Response) => {
+      const user = getAuthUser(res);
       const { organized, joined } = await getGamesForUser(user.userId);
       if (organized.length === 0 && joined.length === 0) {
         return res.status(200).json({ msg: 'no_games' });
@@ -108,11 +104,7 @@ export function gamesRouter(): Router {
         organized_games: organized.map(gameJson),
         joined_games: joined.map(gameJson),
       });
-    } catch (error) {
-      console.error('Loading games failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
-    }
-  }));
+    }));
 
   /*  discover: upcoming games near ?lat=&lng= (within MAX_DISCOVER_DISTANCE_M) that the
       signed in user can ask to join, closest first. Each has distance_m and the user's
@@ -120,27 +112,23 @@ export function gamesRouter(): Router {
       are nearby, 400 invalid_request for missing or out of range coordinates.
       Registered before /api/games/:gameId so "discover" isn't read as an id
    */
-  router.get('/api/games/discover', requireAuth, asyncRoute(async (req: Request, res: Response) => {
-    const user = getAuthUser(res);
-    const point = parseCoordinates(req.query.lat, req.query.lng);
-    if (!point) {
-      return res.status(400).json({
-        msg: 'invalid_request',
-        error: 'lat (-90 to 90) and lng (-180 to 180) are required numbers',
-      });
-    }
+  router.get('/api/games/discover', requireAuth, asyncRoute('Could not load games, try again later',
+    async (req: Request, res: Response) => {
+      const user = getAuthUser(res);
+      const point = parseCoordinates(req.query.lat, req.query.lng);
+      if (!point) {
+        return res.status(400).json({
+          msg: 'invalid_request',
+          error: 'lat (-90 to 90) and lng (-180 to 180) are required numbers',
+        });
+      }
 
-    try {
       const games = await getDiscoverGames(user.userId, point.latitude, point.longitude);
       if (games.length === 0) {
         return res.status(200).json({ msg: 'no_games' });
       }
       return res.status(200).json({ msg: 'success', games: games.map(discoverGameJson) });
-    } catch (error) {
-      console.error('Loading discover games failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
-    }
-  }));
+    }));
 
   /*  game details: the game with its organizer, players and what the signed in user
       can do with it. viewer_role is "organizer", "player" (joined) or "viewer".
@@ -149,12 +137,12 @@ export function gamesRouter(): Router {
       Responds 400 invalid_request for a malformed id, 404 not_found if no game has it.
       Registered after /api/games/mine so "mine" isn't read as an id
    */
-  router.get('/api/games/:gameId', requireAuth, asyncRoute(async (req: Request<{ gameId: string }>, res: Response) => {
-    const user = getAuthUser(res);
-    const gameId = requireGameId(req.params.gameId, res);
-    if (gameId === null) return;
+  router.get('/api/games/:gameId', requireAuth, asyncRoute('Could not load the game, try again later',
+    async (req: Request<{ gameId: string }>, res: Response) => {
+      const user = getAuthUser(res);
+      const gameId = requireGameId(req.params.gameId, res);
+      if (gameId === null) return;
 
-    try {
       const game = await getGameById(gameId);
       if (!game) return sendError(res, gameChangeError('not_found'));
 
@@ -183,11 +171,7 @@ export function gamesRouter(): Router {
         pending_requests: role === 'organizer' ? await countPendingJoinRequests(gameId) : null,
         join_request_status: role === 'viewer' ? await getJoinRequestStatus(gameId, user.userId) : null,
       });
-    } catch (error) {
-      console.error('Loading game details failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not load the game, try again later' });
-    }
-  }));
+    }));
 
   /*  edit game: the organizer replaces the game's details. The body has the same
       fields as create game; ends_at is kept as it is when left out. Responds with the
@@ -195,18 +179,17 @@ export function gamesRouter(): Router {
       Errors: 400 invalid_request (bad field, or max_players below the current players),
       403 forbidden (not the organizer), 404 not_found, 409 game_cancelled / game_started
    */
-  router.put('/api/games/:gameId', requireAuth,
-    asyncRoute(async (req: Request<{ gameId: string }, unknown, CreateGameBody | undefined>, res: Response) => {
-    const user = getAuthUser(res);
-    const gameId = requireGameId(req.params.gameId, res);
-    if (gameId === null) return;
-    const parsed = parseNewGame(req.body, user.userId);
-    if (!parsed.ok) {
-      return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
-    }
-    const keepEndsAt = req.body?.ends_at === undefined;
+  router.put('/api/games/:gameId', requireAuth, asyncRoute('Could not update game, try again later',
+    async (req: Request<{ gameId: string }, unknown, CreateGameBody | undefined>, res: Response) => {
+      const user = getAuthUser(res);
+      const gameId = requireGameId(req.params.gameId, res);
+      if (gameId === null) return;
+      const parsed = parseNewGame(req.body, user.userId);
+      if (!parsed.ok) {
+        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
+      }
+      const keepEndsAt = req.body?.ends_at === undefined;
 
-    try {
       const before = await getGameById(gameId);
       if (!before) return sendError(res, gameChangeError('not_found'));
 
@@ -237,23 +220,19 @@ export function gamesRouter(): Router {
       }
 
       return res.status(200).json({ msg: 'success', game: gameJson(after) });
-    } catch (error) {
-      console.error('Updating game failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not update game, try again later' });
-    }
-  }));
+    }));
 
   /*  cancel game: the organizer cancels a game that hasn't started. It stays with
       status "cancelled" so players can see what happened, and they and anyone with a
       pending join request are notified. Responds with the cancelled game.
       Errors: 400 invalid_request, 403 forbidden, 404 not_found, 409 game_cancelled / game_started
    */
-  router.post('/api/games/:gameId/cancel', requireAuth, asyncRoute(async (req: Request<{ gameId: string }>, res: Response) => {
-    const user = getAuthUser(res);
-    const gameId = requireGameId(req.params.gameId, res);
-    if (gameId === null) return;
+  router.post('/api/games/:gameId/cancel', requireAuth, asyncRoute('Could not cancel game, try again later',
+    async (req: Request<{ gameId: string }>, res: Response) => {
+      const user = getAuthUser(res);
+      const gameId = requireGameId(req.params.gameId, res);
+      if (gameId === null) return;
 
-    try {
       const result = await cancelGame(gameId, user.userId);
       if (!result.ok) return sendError(res, gameChangeError(result.problem));
 
@@ -267,11 +246,7 @@ export function gamesRouter(): Router {
       });
 
       return res.status(200).json({ msg: 'success', game: gameJson(game) });
-    } catch (error) {
-      console.error('Cancelling game failed:', error);
-      return res.status(500).json({ msg: 'server_error', error: 'Could not cancel game, try again later' });
-    }
-  }));
+    }));
 
   return router;
 }
