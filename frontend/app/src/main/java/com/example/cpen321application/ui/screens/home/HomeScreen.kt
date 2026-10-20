@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.network.GameDto
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.cardBackground
+import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -250,9 +252,7 @@ private fun GameCard(game: GameSummary, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
+            .cardBackground(SportsSurfaceContainer)
             .border(1.dp, SportsOutlineVariant, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -301,17 +301,12 @@ private fun Pill(
     textColor: Color,
     borderColor: Color? = null
 ) {
-    val shape = RoundedCornerShape(50)
     Text(
         text = text,
         color = textColor,
         fontSize = 12.sp,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .clip(shape)
-            .background(background)
-            .then(if (borderColor != null) Modifier.border(1.dp, borderColor, shape) else Modifier)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+        modifier = Modifier.pillBackground(background, borderColor)
     )
 }
 

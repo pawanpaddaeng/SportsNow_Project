@@ -33,7 +33,9 @@ import com.example.cpen321application.network.SignUpRequest
 import com.example.cpen321application.network.readAuthResponse
 import com.google.gson.JsonParseException
 import com.example.cpen321application.ui.theme.*
+import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
+import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.sportsFieldColors
 import kotlinx.coroutines.launch
@@ -301,15 +303,7 @@ private fun GoogleVerificationCard(
     isVerifying: Boolean,
     onVerify: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
+    CardRow(modifier = Modifier.cardBackground(SportsSurfaceContainer)) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier

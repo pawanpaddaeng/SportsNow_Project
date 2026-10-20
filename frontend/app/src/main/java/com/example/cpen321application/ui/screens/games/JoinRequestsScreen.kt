@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.network.GameDto
 import com.example.cpen321application.network.PendingJoinRequestDto
 import com.example.cpen321application.ui.components.AppBottomBar
+import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.spotsLeftLabel
 import com.example.cpen321application.ui.theme.*
 import java.time.Duration
 import java.time.Instant
@@ -64,14 +67,9 @@ fun GameDto.toJoinRequestsHeader(): JoinRequestsHeader {
         startsAt
     }
     val spotsLeft = (maxPlayers - playerCount).coerceAtLeast(0)
-    val spotsText = when (spotsLeft) {
-        0 -> "full"
-        1 -> "1 spot left"
-        else -> "$spotsLeft spots left"
-    }
     return JoinRequestsHeader(
         title = title,
-        subtitle = "$day · $playerCount/$maxPlayers players · $spotsText",
+        subtitle = "$day · $playerCount/$maxPlayers players · ${spotsLeftLabel(spotsLeft).lowercase()}",
         isFull = spotsLeft == 0
     )
 }
@@ -154,7 +152,7 @@ fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions,
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            item(key = "top") { TopBar(onBack = actions.onBack) }
+            item(key = "top") { BackTitleBar(title = "Join Requests", onBack = actions.onBack) }
 
             if (header != null) {
                 item(key = "game") {
@@ -211,38 +209,8 @@ private fun LazyListScope.loadStatus(isLoading: Boolean, errorMessage: String?, 
     }
 
     if (errorMessage != null) {
-        item(key = "error") { ErrorMessage(message = errorMessage, onRetry = onRetry) }
-    }
-}
-
-@Composable
-private fun TopBar(onBack: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = SportsOnSurface
-            )
-        }
-        Text(text = "Join Requests", color = SportsOnSurface, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun ErrorMessage(message: String, onRetry: (() -> Unit)?) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp)
-    ) {
-        Text(text = message, color = SportsOnSurfaceVariant, fontSize = 14.sp, textAlign = TextAlign.Center)
-        if (onRetry != null) {
-            OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(50)) {
-                Text(text = "Retry", color = SportsPrimary)
-            }
+        item(key = "error") {
+            RetryMessage(message = errorMessage, onRetry = onRetry, modifier = Modifier.padding(vertical = 16.dp))
         }
     }
 }

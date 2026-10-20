@@ -26,7 +26,15 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.network.GameDetailsResponse
 import com.example.cpen321application.network.GameDto
 import com.example.cpen321application.ui.components.AppBottomBar
+import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.CardRow
+import com.example.cpen321application.ui.components.LabelValueRow
+import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.SurfaceCard
+import com.example.cpen321application.ui.components.cardBackground
+import com.example.cpen321application.ui.components.pillBackground
+import com.example.cpen321application.ui.components.spotsLeftLabel
 import com.example.cpen321application.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -37,6 +45,9 @@ import java.util.Locale
 
 // player avatars shown before the "+N" bubble
 private const val MAX_AVATARS = 5
+
+// width of the labels in the When / Skill level card, so the values line up
+private val INFO_LABEL_WIDTH = 96.dp
 
 // the signed in user's relation to the game, decides which actions are shown
 enum class GameRole { Organizer, Player, Viewer }
@@ -94,19 +105,18 @@ internal fun formatGameTime(start: ZonedDateTime, end: ZonedDateTime?): String {
 
 private fun String.capitalized() = replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
+// a time from the server in the phone's time zone, null if it isn't an ISO 8601 time
+private fun parseZoned(text: String, zone: ZoneId): ZonedDateTime? = try {
+    Instant.parse(text).atZone(zone)
+} catch (e: DateTimeParseException) {
+    null
+}
+
 // turns the server's reply into what the screen shows
 fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
     val zone = ZoneId.systemDefault()
-    val start = try {
-        Instant.parse(game.startsAt).atZone(zone)
-    } catch (e: DateTimeParseException) {
-        null
-    }
-    val end = try {
-        game.endsAt?.let { Instant.parse(it).atZone(zone) }
-    } catch (e: DateTimeParseException) {
-        null
-    }
+    val start = parseZoned(game.startsAt, zone)
+    val end = game.endsAt?.let { parseZoned(it, zone) }
     val players = players.orEmpty().map { GamePlayer(it.firstName, it.lastName) }
 
     return GameDetails(
@@ -190,12 +200,15 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TopBar(
-                // a cancelled or started game can't be changed any more
-                showEdit = details?.role == GameRole.Organizer && !details.isCancelled && !details.hasStarted,
-                onBack = actions.onBack,
-                onEdit = actions.onEdit
-            )
+            // a cancelled or started game can't be changed any more
+            val canEdit = details?.role == GameRole.Organizer && !details.isCancelled && !details.hasStarted
+            BackTitleBar(title = "Game Details", onBack = actions.onBack) {
+                if (canEdit) {
+                    TextButton(onClick = actions.onEdit) {
+                        Text(text = "Edit", color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
 
             if (details == null) {
                 LoadingOrError(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
@@ -274,56 +287,19 @@ private fun LoadedDetails(
     )
 }
 
-@Composable
-private fun TopBar(showEdit: Boolean, onBack: () -> Unit, onEdit: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = SportsOnSurface
-            )
-        }
-        Text(
-            text = "Game Details",
-            color = SportsOnSurface,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f)
-        )
-        if (showEdit) {
-            TextButton(onClick = onEdit) {
-                Text(text = "Edit", color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-    }
-}
-
+// a spinner while the game loads, or the problem with Retry when onRetry is given
 @Composable
 private fun LoadingOrError(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 48.dp)
-    ) {
-        when {
-            isLoading -> CircularProgressIndicator(color = SportsPrimary)
-            errorMessage != null -> {
-                Text(
-                    text = errorMessage,
-                    color = SportsOnSurfaceVariant,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center
-                )
-                if (onRetry != null) {
-                    OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(50)) {
-                        Text(text = "Retry", color = SportsPrimary)
-                    }
-                }
-            }
+    when {
+        isLoading -> Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 48.dp)
+        ) {
+            CircularProgressIndicator(color = SportsPrimary)
         }
+        errorMessage != null -> RetryMessage(message = errorMessage, onRetry = onRetry, modifier = Modifier.padding(top = 48.dp))
     }
 }
 
@@ -340,11 +316,7 @@ private fun Hero(details: GameDetails) {
                 details.role == GameRole.Player ->
                     Pill(text = "You're in", background = SportsPrimary, textColor = Color.White, showCheck = true)
                 details.role == GameRole.Viewer && !details.hasStarted -> Pill(
-                    text = when (details.spotsLeft) {
-                        0 -> "Full"
-                        1 -> "1 spot left"
-                        else -> "${details.spotsLeft} spots left"
-                    },
+                    text = spotsLeftLabel(details.spotsLeft),
                     background = SportsSurfaceContainer,
                     textColor = SportsOnSurfaceVariant,
                     borderColor = SportsOutlineVariant
@@ -371,34 +343,13 @@ private fun Hero(details: GameDetails) {
 
 @Composable
 private fun InfoCard(details: GameDetails) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
-            .padding(16.dp)
-    ) {
-        InfoRow(label = "When", value = details.whenText)
-        InfoRow(label = "Skill level", value = details.skillLevel)
+    SurfaceCard {
+        LabelValueRow(label = "When", value = details.whenText, labelWidth = INFO_LABEL_WIDTH)
+        LabelValueRow(label = "Skill level", value = details.skillLevel, labelWidth = INFO_LABEL_WIDTH)
         // joined players are past the approval step
         if (details.role != GameRole.Player) {
-            InfoRow(label = "Joining", value = "Organizer approves requests")
+            LabelValueRow(label = "Joining", value = "Organizer approves requests", labelWidth = INFO_LABEL_WIDTH)
         }
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = label, color = SportsOnSurfaceVariant, fontSize = 14.sp, modifier = Modifier.width(96.dp))
-        Text(
-            text = value,
-            color = SportsOnSurface,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 
@@ -413,13 +364,7 @@ private fun LocationCard(location: GameLocation, onDirections: () -> Unit) {
             .border(1.dp, SportsOutlineVariant, shape)
     ) {
         LocationPreviewMap(location = location, onClick = onDirections, height = 140.dp)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
+        CardRow {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(text = location.name, color = SportsOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text(text = location.address, color = SportsOnSurfaceVariant, fontSize = 12.sp)
@@ -445,9 +390,7 @@ private fun JoinRequestsBanner(count: Int, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsPrimaryContainer)
+            .cardBackground(SportsPrimaryContainer)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
@@ -656,15 +599,10 @@ private fun Pill(
     borderColor: Color? = null,
     showCheck: Boolean = false
 ) {
-    val shape = RoundedCornerShape(50)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .clip(shape)
-            .background(background)
-            .then(if (borderColor != null) Modifier.border(1.dp, borderColor, shape) else Modifier)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+        modifier = Modifier.pillBackground(background, borderColor)
     ) {
         if (showCheck) {
             Icon(Icons.Filled.Check, contentDescription = null, tint = textColor, modifier = Modifier.size(14.dp))

@@ -31,6 +31,10 @@ import com.example.cpen321application.location.DeviceLocation
 import com.example.cpen321application.network.DiscoverGameDto
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.CardRow
+import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.pillBackground
+import com.example.cpen321application.ui.components.spotsLeftLabel
 import com.example.cpen321application.ui.screens.games.GameLocation
 import com.example.cpen321application.ui.screens.games.SPORTS
 import com.example.cpen321application.ui.screens.games.SelectableChip
@@ -235,7 +239,7 @@ fun DiscoverScreen(state: DiscoverUiState, actions: DiscoverActions, modifier: M
             }
 
             if (state.errorMessage != null) {
-                item(key = "error") { ErrorMessage(message = state.errorMessage, onRetry = actions.onRetry) }
+                item(key = "error") { RetryMessage(state.errorMessage, actions.onRetry, Modifier.padding(vertical = 16.dp), "Try again") }
             }
 
             if (state.hasLoaded) {
@@ -302,13 +306,7 @@ private fun SearchArea(
                 onGameClick = onGameClick
             )
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
+        CardRow {
             Icon(imageVector = Icons.Filled.Place, contentDescription = null, tint = Color(0xFFD93025))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "Showing games near", color = SportsOnSurfaceVariant, fontSize = 12.sp)
@@ -403,22 +401,6 @@ private fun SportFilter(selectedSport: String?, onSelect: (String?) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(options, key = { it.first }) { (label, sport) ->
             SelectableChip(text = label, selected = sport == selectedSport, onClick = { onSelect(sport) })
-        }
-    }
-}
-
-@Composable
-private fun ErrorMessage(message: String, onRetry: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp)
-    ) {
-        Text(text = message, color = SportsOnSurfaceVariant, fontSize = 14.sp, textAlign = TextAlign.Center)
-        OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(50)) {
-            Text(text = "Try again", color = SportsPrimary)
         }
     }
 }
@@ -533,11 +515,7 @@ private fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
 @Composable
 private fun StatusPills(game: DiscoverGame) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        when {
-            game.isFull -> Pill(text = "Full")
-            game.spotsLeft == 1 -> Pill(text = "1 spot left")
-            else -> Pill(text = "${game.spotsLeft} spots left")
-        }
+        Pill(text = spotsLeftLabel(game.spotsLeft))
         if (game.requestPending) {
             Pill(text = "Request pending", textColor = SportsPrimary, borderColor = SportsPrimary)
         }
@@ -559,16 +537,11 @@ private fun Pill(
     textColor: Color = SportsOnSurfaceVariant,
     borderColor: Color? = SportsOutlineVariant
 ) {
-    val shape = RoundedCornerShape(50)
     Text(
         text = text,
         color = textColor,
         fontSize = 12.sp,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .clip(shape)
-            .background(background)
-            .then(if (borderColor != null) Modifier.border(1.dp, borderColor, shape) else Modifier)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+        modifier = Modifier.pillBackground(background, borderColor, horizontalPadding = 10.dp)
     )
 }

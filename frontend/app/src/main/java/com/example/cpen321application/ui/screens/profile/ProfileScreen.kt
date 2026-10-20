@@ -32,13 +32,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.LabelValueRow
+import com.example.cpen321application.ui.components.SurfaceCard
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
 import com.example.cpen321application.ui.theme.SportsPrimaryContainer
-import com.example.cpen321application.ui.theme.SportsSurfaceContainer
 import com.example.cpen321application.users.UserProfile
+
+// width of the labels in the details card, so the values line up
+private val DETAIL_LABEL_WIDTH = 104.dp
 
 @Composable
 fun ProfileScreen(
@@ -144,37 +148,16 @@ private fun ProfileIdentity(profile: UserProfile) {
 @Composable
 private fun ProfileDetailsCard(profile: UserProfile) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(SportsSurfaceContainer)
-                .padding(16.dp)
-        ) {
-            DetailRow(label = "First name", value = profile.firstName)
-            DetailRow(label = "Last name", value = profile.lastName)
-            DetailRow(label = "Birth year", value = profile.birthYear.toString())
-            profile.memberSince?.let { DetailRow(label = "Member since", value = it) }
+        SurfaceCard {
+            LabelValueRow(label = "First name", value = profile.firstName, labelWidth = DETAIL_LABEL_WIDTH)
+            LabelValueRow(label = "Last name", value = profile.lastName, labelWidth = DETAIL_LABEL_WIDTH)
+            LabelValueRow(label = "Birth year", value = profile.birthYear.toString(), labelWidth = DETAIL_LABEL_WIDTH)
+            profile.memberSince?.let { LabelValueRow(label = "Member since", value = it, labelWidth = DETAIL_LABEL_WIDTH) }
         }
         Text(
             text = "Your birth year is private. Other players only see your age range.",
             color = SportsOnSurfaceVariant,
             fontSize = 12.sp
-        )
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = label, color = SportsOnSurfaceVariant, fontSize = 14.sp, modifier = Modifier.width(104.dp))
-        Text(
-            text = value,
-            color = SportsOnSurface,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
         )
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.network.GameDto
+import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.PickerField
@@ -487,13 +488,7 @@ private fun LocationField(location: GameLocation?, onClick: () -> Unit) {
             if (location != null) {
                 LocationPreviewMap(location = location, onClick = onClick)
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
+            CardRow {
                 Icon(
                     imageVector = Icons.Filled.Place,
                     contentDescription = null,
