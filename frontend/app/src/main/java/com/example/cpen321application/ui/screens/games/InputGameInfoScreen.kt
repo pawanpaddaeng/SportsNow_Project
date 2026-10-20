@@ -152,8 +152,9 @@ private data class GameInfoDraft(
 
     // the form as it would be sent, null while something required is missing or the start is in the past
     fun toForm(location: GameLocation?): GameInfoForm? {
-        val start = startsAt
-        if (sport == null || title.isBlank() || start == null || start.isBefore(Instant.now()) || location == null) {
+        // null too when the start is in the past
+        val start = startsAt?.takeUnless { it.isBefore(Instant.now()) }
+        if (sport == null || title.isBlank() || start == null || location == null) {
             return null
         }
         return GameInfoForm(

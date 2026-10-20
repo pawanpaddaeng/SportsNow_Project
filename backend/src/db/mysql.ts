@@ -24,12 +24,12 @@ export interface WriteResult {
     the queries don't depend on mysql2's result types
  */
 export async function selectRows<T>(sql: string, params: SqlValue[], db: Queryable = pool): Promise<T[]> {
-  const [rows] = (await db.execute(sql, params)) as unknown as [T[], unknown];
+  const [rows] = (await db.execute(sql, params)) as [T[], unknown];
   return rows;
 }
 
 // runs an INSERT, UPDATE or DELETE and returns what it changed
 export async function executeWrite(sql: string, params: SqlValue[], db: Queryable = pool): Promise<WriteResult> {
-  const [result] = (await db.execute(sql, params)) as unknown as [WriteResult, unknown];
+  const [result] = (await db.execute(sql, params)) as [WriteResult, unknown];
   return result;
 }

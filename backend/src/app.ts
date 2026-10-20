@@ -35,11 +35,17 @@ import { parseNewGame, type CreateGameBody } from './validation/newGame';
 import { sendPushToUser, sendPushToUsers } from './notifications/push';
 import { asyncRoute } from './http/asyncRoute';
 import { logInfo } from './logger';
+import { createUser, findUserByGoogleId, findUserById, isDuplicateEntryError,updateUserProfile, userExists, userJson } from './db/users';
+import { parseProfileFields, type ProfileBody } from './validation/profile';
 
 // how long after creating a game the debug notification is sent
 const DEBUG_NOTIFICATION_DELAY_MS = 5000;
-import { createUser, findUserByGoogleId, findUserById, isDuplicateEntryError,updateUserProfile, userExists, userJson } from './db/users';
-import { parseProfileFields, type ProfileBody } from './validation/profile';
+
+// notifications are best effort, a failure is only logged
+function logNotificationError(error: unknown): void {
+  console.error('Sending a notification failed:', error);
+}
+
 // largest games.game_id (INT UNSIGNED)
 const MAX_GAME_ID = 4294967295;
 
@@ -167,7 +173,7 @@ export function createApp(): Express {
     try {
       // Verify the token with Google
       const ticket = await googleClient.verifyIdToken({
-        idToken: idToken,
+        idToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
 
@@ -361,11 +367,12 @@ export function createApp(): Express {
 
       // debugging: notify the organizer shortly after to check push notifications work
       setTimeout(() => {
-        void sendPushToUser(user.userId, {
+        sendPushToUser(user.userId, {
           title: 'Game created',
           body: `${game.title} at ${game.locationName} was created`,
           data: { type: 'game_created', gameId: String(gameId) },
-        }).then((devices) => { logInfo(`Debug game notification sent to ${devices} device(s)`); });
+        }).then((devices) => { logInfo(`Debug game notification sent to ${devices} device(s)`); })
+          .catch(logNotificationError);
       }, DEBUG_NOTIFICATION_DELAY_MS);
 
       return res.status(201).json({ msg: 'success', game: gameJson(created) });
@@ -457,9 +464,8 @@ export function createApp(): Express {
         throw new Error(`Organizer ${game.organizerId} of game ${gameId} not found`);
       }
 
-      const role = game.organizerId === user.userId ? 'organizer'
-        : players.some((player) => player.userId === user.userId) ? 'player'
-          : 'viewer';
+      const isPlayer = players.some((player) => player.userId === user.userId);
+      const role = game.organizerId === user.userId ? 'organizer' : (isPlayer ? 'player' : 'viewer');
 
       return res.status(200).json({
         msg: 'success',
@@ -526,7 +532,7 @@ export function createApp(): Express {
       const changes = describeChanges(before, after);
       if (result.changed && changes.length > 0) {
         // notifications are best effort, the app gets its reply without waiting for them
-        void getUsersToNotify(gameId, user.userId)
+        getUsersToNotify(gameId, user.userId)
           .then((userIds) => sendPushToUsers(userIds, {
             title: 'Game updated',
             body: `${after.title}: the organizer changed the ${changes.join(', ')}`,
@@ -568,7 +574,7 @@ export function createApp(): Express {
       }
       logInfo(`Game cancelled id: ${gameId}`);
 
-      void getUsersToNotify(gameId, user.userId)
+      getUsersToNotify(gameId, user.userId)
         .then((userIds) => sendPushToUsers(userIds, {
           title: 'Game cancelled',
           body: `${game.title} at ${game.locationName} was cancelled by the organizer`,
@@ -610,11 +616,12 @@ export function createApp(): Express {
         logInfo(`Join request ${result.requestId} sent for game id: ${gameId}`);
 
         // best effort, the app gets its reply without waiting for the notification
-        void sendPushToUser(result.organizerId, {
+        sendPushToUser(result.organizerId, {
           title: 'New join request',
           body: `${user.firstName} wants to join ${result.title}`,
           data: { type: 'join_request', gameId: String(gameId) },
-        }).then((devices) => { logInfo(`Join request notification sent to ${devices} device(s)`); });
+        }).then((devices) => { logInfo(`Join request notification sent to ${devices} device(s)`); })
+          .catch(logNotificationError);
 
         return res.status(201).json({
           msg: 'success',
@@ -693,7 +700,7 @@ export function createApp(): Express {
         logInfo(`Join request ${requestId} ${approve ? 'approved' : 'declined'} for game id: ${gameId}`);
 
         // best effort, the app gets its reply without waiting for the notification
-        void sendPushToUser(result.requesterId, approve
+        sendPushToUser(result.requesterId, approve
           ? {
             title: 'Request approved',
             body: `You're in! You joined ${result.title}`,
@@ -703,7 +710,8 @@ export function createApp(): Express {
             title: 'Request declined',
             body: `The organizer declined your request to join ${result.title}`,
             data: { type: 'join_request_declined', gameId: String(gameId) },
-          }).then((devices) => { logInfo(`Join request answer sent to ${devices} device(s)`); });
+          }).then((devices) => { logInfo(`Join request answer sent to ${devices} device(s)`); })
+          .catch(logNotificationError);
 
         return res.status(200).json({
           msg: 'success',
