@@ -10,12 +10,8 @@ import { sendPushToUser } from './notifications/push';
 
 // how long after creating a game the debug notification is sent
 const DEBUG_NOTIFICATION_DELAY_MS = 5000;
-import { createUser, findUserByGoogleId, isDuplicateEntryError, userExists } from './db/users';
-
-// youngest and oldest ages allowed to sign up, matches the app's birth year picker
-const MIN_AGE = 19;
-const MAX_AGE = 100;
-const MAX_NAME_LENGTH = 100;
+import { createUser, findUserByGoogleId, findUserById, isDuplicateEntryError, updateUserProfile, userExists, userJson } from './db/users';
+import { parseProfileFields, type ProfileBody } from './validation/profile';
 
 export function createApp(): Express {
   const app = express();
@@ -104,32 +100,19 @@ export function createApp(): Express {
       Google account already has a user, they should sign in instead
    */
   app.post('/api/auth/signup', async (req: Request<{}, {}, SignUpRequestBody>, res: Response) => {
-    const { id_token, email, f_name, l_name, birthYear } = req.body ?? {};
+    const { id_token, email } = req.body ?? {};
     console.log("Received a sign up request");
-
-    // check the request fields before contacting Google
-    const firstName = typeof f_name === 'string' ? f_name.trim() : '';
-    const lastName = typeof l_name === 'string' ? l_name.trim() : '';
-    const year = typeof birthYear === 'number' || typeof birthYear === 'string'
-      ? Number(birthYear) : NaN;
-    const currentYear = new Date().getFullYear();
 
     if (typeof id_token !== 'string' || id_token === '' || typeof email !== 'string' || email === '') {
       return res.status(400).json({ msg: 'invalid_request', error: 'id_token and email are required' });
     }
-    if (!firstName || !lastName || firstName.length > MAX_NAME_LENGTH || lastName.length > MAX_NAME_LENGTH) {
-      return res.status(400).json({
-        msg: 'invalid_request',
-        error: `f_name and l_name are required (max ${MAX_NAME_LENGTH} characters)`,
-      });
-    }
-    if (!Number.isInteger(year) || year > currentYear - MIN_AGE || year < currentYear - MAX_AGE) {
-      return res.status(400).json({
-        msg: 'invalid_request',
-        error: `birthYear must be between ${currentYear - MAX_AGE} and ${currentYear - MIN_AGE}`,
-      });
+
+    const profile = parseProfileFields(req.body);
+    if(!profile.ok) {
+      return res.status(400).json({ msg: 'invalid_request', error: profile.error });
     }
 
+    const{ firstName, lastName, birthYear: year } = profile.value;
     let googleId: string;
     let verifiedEmail: string;
     try {
@@ -302,6 +285,37 @@ export function createApp(): Express {
     } catch (error) {
       console.error('Loading games failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
+    }
+  });
+
+  /*GET profile
+  */
+  app.get('/api/users/me', requireAuth, (_req: Request, res: Response) => {
+    const user = getAuthUser(res);
+    return res.status(200).json({ msg: 'success', user: userJson(user)});
+  });
+
+  /*
+  Update Profile
+  */
+  app.put('/api/users/me', requireAuth, async (req: Request<{}, {}, ProfileBody>, res: Response) => {
+    const parsed = parseProfileFields(req.body);
+    if(!parsed.ok) {
+      return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
+    }
+
+    const { userId } = getAuthUser(res);
+    try {
+      await updateUserProfile(userId, parsed.value);
+
+      const updated = await findUserById(userId);
+      if(!updated) {
+        return res.status(404).json({ msg: 'no_user', error: 'No account found, sign up or sign in again' });
+      }
+      return res.status(200).json({ msg: 'success', user: userJson(updated) });
+    } catch (error) {
+      console.error('Updating profile failed:', error);
+      return res.status(500).json({ msg: 'server_error', error: 'Could not update profile, try again later' });
     }
   });
 
