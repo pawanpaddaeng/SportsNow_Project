@@ -23,8 +23,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.network.GameDto
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.PickerField
@@ -53,8 +55,8 @@ private const val DEFAULT_PLAYERS = 10
 private const val MAX_TITLE_LENGTH = 100
 private const val MAX_DESCRIPTION_LENGTH = 1000
 
-// label shown on the chip and the value sent to the server
-private val SPORTS = listOf(
+// label shown on the chip and the value sent to the server, also the Discover filter
+internal val SPORTS = listOf(
     "Basketball" to "basketball",
     "Soccer" to "soccer",
     "Volleyball" to "volleyball",
@@ -80,10 +82,11 @@ data class GameLocation(
     val longitude: Double
 ) : Serializable
 
-/*  everything entered on the Create Game screen. sport and skillLevel use the
-    server's values (e.g. "basketball", "any"), startsAt is the start time in UTC
+/*  everything entered on the Input Game Info screen. sport and skillLevel use the
+    server's values (e.g. "basketball", "any"), startsAt is the start time in UTC.
+    Serializable so the edit route can keep the loaded game with rememberSaveable
  */
-data class NewGameForm(
+data class GameInfoForm(
     val sport: String,
     val title: String,
     val startsAt: Instant,
@@ -91,31 +94,83 @@ data class NewGameForm(
     val maxPlayers: Int,
     val skillLevel: String,
     val description: String?
+) : Serializable
+
+// a game from the server as the form's starting values, for editing it
+fun GameDto.toGameInfoForm() = GameInfoForm(
+    sport = sport,
+    title = title,
+    startsAt = Instant.parse(startsAt),
+    location = GameLocation(locationName, address, latitude, longitude),
+    maxPlayers = maxPlayers,
+    skillLevel = skillLevel,
+    description = description?.takeIf { it.isNotBlank() }
 )
 
 /*
-    Create Game screen from the Figma mockup. Every game needs the organizer's
+    Input Game Info screen from the Create Game Figma mockup, used to create and to edit
+    a game: the create and edit routes in AppNavigation both show it.
+    initial fills in the form (null for a new game) and minPlayers stops max players
+    going below the players already in the game. Every game needs the organizer's
     approval to join, so there is no approval toggle.
-    onCreate gets the filled in form, the caller sends it to the server and sets
-    isSubmitting while it does. onPickLocation should open the map location
-    picker and pass the result back through location
+    onSubmit gets the filled in form, the caller sends it to the server and sets
+    isSubmitting while it does. When editing, the button is only enabled once
+    something changed. onPickLocation should open the map location picker and pass
+    the result back through location. While the game to edit loads, isLoading shows a
+    spinner and loadError a problem instead of the form
  */
 @Composable
-fun CreateGameScreen(
-    onCreate: (NewGameForm) -> Unit,
+fun InputGameInfoScreen(
+    onSubmit: (GameInfoForm) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    screenTitle: String = "Create Game",
+    submitLabel: String = "Create Game",
+    initial: GameInfoForm? = null,
+    minPlayers: Int = MIN_PLAYERS,
     isSubmitting: Boolean = false,
+    isLoading: Boolean = false,
+    loadError: String? = null,
     location: GameLocation? = null,
     onPickLocation: () -> Unit = {}
 ) {
-    var sport by rememberSaveable { mutableStateOf<String?>(null) }
-    var title by rememberSaveable { mutableStateOf("") }
-    var date by rememberSaveable { mutableStateOf<LocalDate?>(null) }
-    var time by rememberSaveable { mutableStateOf<LocalTime?>(null) }
-    var maxPlayers by rememberSaveable { mutableIntStateOf(DEFAULT_PLAYERS) }
-    var skillLevel by rememberSaveable { mutableStateOf("any") }
-    var description by rememberSaveable { mutableStateOf("") }
+    if (isLoading || loadError != null) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(horizontal = 16.dp)
+        ) {
+            TopBar(title = screenTitle, onBack = onBack)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 48.dp)
+            ) {
+                if (loadError != null) {
+                    Text(text = loadError, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+                } else {
+                    CircularProgressIndicator(color = SportsPrimary)
+                }
+            }
+        }
+        return
+    }
+
+    // starting values in the phone's time zone, empty for a new game
+    val initialStart = initial?.startsAt?.atZone(ZoneId.systemDefault())
+    val lowestMaxPlayers = maxOf(MIN_PLAYERS, minPlayers)
+
+    var sport by rememberSaveable { mutableStateOf(initial?.sport) }
+    var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
+    var date by rememberSaveable { mutableStateOf(initialStart?.toLocalDate()) }
+    var time by rememberSaveable { mutableStateOf(initialStart?.toLocalTime()) }
+    var maxPlayers by rememberSaveable {
+        mutableIntStateOf(maxOf(initial?.maxPlayers ?: DEFAULT_PLAYERS, lowestMaxPlayers))
+    }
+    var skillLevel by rememberSaveable { mutableStateOf(initial?.skillLevel ?: "any") }
+    var description by rememberSaveable { mutableStateOf(initial?.description ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -126,8 +181,22 @@ fun CreateGameScreen(
         null
     }
     val startsInPast = startsAt != null && startsAt.isBefore(Instant.now())
-    val canCreate = sport != null && title.isNotBlank() && startsAt != null &&
-            !startsInPast && location != null && !isSubmitting
+
+    // the form as it would be sent, null while something required is missing or invalid
+    val form = if (sport != null && title.isNotBlank() && startsAt != null && !startsInPast && location != null) {
+        GameInfoForm(
+            sport = sport!!,
+            title = title.trim(),
+            startsAt = startsAt,
+            location = location,
+            maxPlayers = maxPlayers,
+            skillLevel = skillLevel,
+            description = description.trim().ifBlank { null }
+        )
+    } else {
+        null
+    }
+    val canSubmit = form != null && form != initial && !isSubmitting
 
     Column(
         modifier = modifier
@@ -137,27 +206,7 @@ fun CreateGameScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // top bar with back button and title
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = SportsOnSurface
-                )
-            }
-            Text(
-                text = "Create Game",
-                color = SportsOnSurface,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        TopBar(title = screenTitle, onBack = onBack)
 
         ChipGroup(
             label = "Sport *",
@@ -204,6 +253,7 @@ fun CreateGameScreen(
 
         MaxPlayersStepper(
             value = maxPlayers,
+            min = lowestMaxPlayers,
             onValueChange = { maxPlayers = it }
         )
 
@@ -248,20 +298,8 @@ fun CreateGameScreen(
         )
 
         Button(
-            onClick = {
-                onCreate(
-                    NewGameForm(
-                        sport = sport!!,
-                        title = title.trim(),
-                        startsAt = startsAt!!,
-                        location = location!!,
-                        maxPlayers = maxPlayers,
-                        skillLevel = skillLevel,
-                        description = description.trim().ifBlank { null }
-                    )
-                )
-            },
-            enabled = canCreate,
+            onClick = { form?.let(onSubmit) },
+            enabled = canSubmit,
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
             modifier = Modifier
@@ -276,7 +314,7 @@ fun CreateGameScreen(
                     modifier = Modifier.size(20.dp)
                 )
             } else {
-                Text(text = "Create Game", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(text = submitLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -297,10 +335,35 @@ fun CreateGameScreen(
     }
 }
 
-// row of selectable chips with a label above, exactly one option is selected
+// back button and the screen's title
+@Composable
+private fun TopBar(title: String, onBack: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = SportsOnSurface
+            )
+        }
+        Text(
+            text = title,
+            color = SportsOnSurface,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+// row of selectable chips with a label above, at most one option is selected
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChipGroup(
+internal fun ChipGroup(
     label: String,
     options: List<Pair<String, String>>,
     selected: String?,
@@ -310,33 +373,38 @@ private fun ChipGroup(
         FieldLabel(label)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (text, value) ->
-                val isSelected = value == selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onSelect(value) },
-                    label = { Text(text) },
-                    leadingIcon = if (isSelected) {
-                        { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else {
-                        null
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SportsPrimaryContainer,
-                        selectedLabelColor = SportsOnPrimaryContainer,
-                        selectedLeadingIconColor = SportsOnPrimaryContainer,
-                        labelColor = SportsOnSurfaceVariant
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        borderColor = SportsOutlineVariant,
-                        selectedBorderColor = SportsPrimaryContainer
-                    )
-                )
+                SelectableChip(text = text, selected = value == selected, onClick = { onSelect(value) })
             }
         }
     }
+}
+
+// chip from the mockups, a check mark and blue fill when selected
+@Composable
+internal fun SelectableChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(text) },
+        leadingIcon = if (selected) {
+            { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        } else {
+            null
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = SportsPrimaryContainer,
+            selectedLabelColor = SportsOnPrimaryContainer,
+            selectedLeadingIconColor = SportsOnPrimaryContainer,
+            labelColor = SportsOnSurfaceVariant
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = SportsOutlineVariant,
+            selectedBorderColor = SportsPrimaryContainer
+        )
+    )
 }
 
 /*  shows the picked place with a small map preview, tapping it opens the
@@ -391,11 +459,11 @@ private fun LocationField(location: GameLocation?, onClick: () -> Unit) {
     }
 }
 
-/*  small non-interactive map with a marker on the picked place. Lite mode draws
-    it as a still image, which is cheaper inside a scrolling form
+/*  small non-interactive map with a marker on the place. Lite mode draws it as a
+    still image, which is cheaper inside a scrolling screen. Also used by Game Details
  */
 @Composable
-private fun LocationPreviewMap(location: GameLocation, onClick: () -> Unit) {
+internal fun LocationPreviewMap(location: GameLocation, onClick: () -> Unit, height: Dp = 120.dp) {
     val point = LatLng(location.latitude, location.longitude)
     val key = "${location.latitude},${location.longitude}"
     val cameraState = rememberCameraPositionState(key = key) {
@@ -404,7 +472,7 @@ private fun LocationPreviewMap(location: GameLocation, onClick: () -> Unit) {
     GoogleMap(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp),
+            .height(height),
         cameraPositionState = cameraState,
         googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
         uiSettings = MapUiSettings(
@@ -419,9 +487,11 @@ private fun LocationPreviewMap(location: GameLocation, onClick: () -> Unit) {
     }
 }
 
-// "Max players  (−) 10 (+)" row
+/*  "Max players  (−) 10 (+)" row. min is the lowest allowed value, when editing
+    it's the number of players already in the game
+ */
 @Composable
-private fun MaxPlayersStepper(value: Int, onValueChange: (Int) -> Unit) {
+private fun MaxPlayersStepper(value: Int, min: Int, onValueChange: (Int) -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -435,7 +505,7 @@ private fun MaxPlayersStepper(value: Int, onValueChange: (Int) -> Unit) {
         )
         OutlinedIconButton(
             onClick = { onValueChange(value - 1) },
-            enabled = value > MIN_PLAYERS,
+            enabled = value > min,
             modifier = Modifier.size(36.dp)
         ) {
             // the core icon set has no minus icon

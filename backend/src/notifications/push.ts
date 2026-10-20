@@ -53,3 +53,9 @@ export async function sendPushToUser(userId: number, message: PushMessage): Prom
     return 0;
   }
 }
+
+// sends the same notification to each user, returns how many devices it reached. Never throws
+export async function sendPushToUsers(userIds: number[], message: PushMessage): Promise<number> {
+  const reached = await Promise.all(userIds.map((userId) => sendPushToUser(userId, message)));
+  return reached.reduce((total, devices) => total + devices, 0);
+}
