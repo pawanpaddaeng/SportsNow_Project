@@ -34,8 +34,8 @@ fun createNotificationChannel(context: Context) {
 /*
     Receives push notifications from Firebase. Android only shows notifications
     by itself while the app is in the background, so this shows them while the
-    app is open. message.data (e.g. type, gameId) is where handling for each
-    notification type can be added later.
+    app is open. message.data (e.g. type, gameId) is passed to GameEvents so open
+    screens about that game can reload.
     Also sends the device's token to the server when Firebase replaces it
  */
 class PushNotificationService : FirebaseMessagingService() {
@@ -51,6 +51,9 @@ class PushNotificationService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        // let open screens about this game reload, e.g. Join Requests on a new request
+        GameEvents.publish(message.data)
+
         val title = message.notification?.title ?: message.data["title"] ?: return
         val body = message.notification?.body ?: message.data["body"] ?: ""
         showNotification(title, body)

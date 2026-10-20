@@ -2,7 +2,6 @@ package com.example.cpen321application.ui.screens.games
 
 import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.location.Address
 import android.location.Geocoder
 import android.os.Build
@@ -28,8 +27,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.cpen321application.BuildConfig
+import com.example.cpen321application.location.hasLocationPermission
 import com.example.cpen321application.ui.theme.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -352,11 +351,6 @@ private fun SuggestionRow(prediction: AutocompletePrediction, onClick: () -> Uni
         }
     }
 }
-
-private fun hasLocationPermission(context: Context): Boolean =
-    listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION).any {
-        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-    }
 
 // Places client for search, null if no MAPS_API_KEY is set (search is then disabled)
 private fun createPlacesClient(context: Context): PlacesClient? {
