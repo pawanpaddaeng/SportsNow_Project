@@ -39,6 +39,7 @@ function toUser(row: UserRow): User {
   };
 }
 
+
 /*  adds a user and returns their new user_id, throws ER_DUP_ENTRY if the google_id already exists.
     created_at comes from this server's clock (the same clock that sets JWT iat) so a token
     issued right after sign up is never older than the account
@@ -73,6 +74,26 @@ export async function findUserById(userId: number): Promise<User | null> {
   );
   const row = rows[0];
   return row ? toUser(row) : null;
+}
+
+export type ProfileUpdate = Pick<User, 'firstName' | 'lastName' | 'birthYear'>;
+
+export async function updateUserProfile(userId: number, profile: ProfileUpdate): Promise<void> {
+  await pool.execute<ResultSetHeader>(
+    'UPDATE users SET first_name = ?, last_name = ?, birth_year = ? WHERE user_id = ?',
+    [profile.firstName, profile.lastName, profile.birthYear, userId],
+  );
+}
+
+export function userJson(user: User) {
+  return {
+    user_id: user.userId,
+    email: user.email,
+    f_name: user.firstName,
+    l_name: user.lastName,
+    birthYear: user.birthYear,
+    created_at: user.createdAt.toISOString(),
+  };
 }
 
 export async function userExists(googleId: string): Promise<boolean> {

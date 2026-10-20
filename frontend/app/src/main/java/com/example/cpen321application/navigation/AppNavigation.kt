@@ -80,6 +80,14 @@ import com.example.cpen321application.ui.screens.home.GameSummary
 import com.example.cpen321application.ui.screens.home.HomeScreen
 import com.example.cpen321application.ui.screens.home.toGameSummary
 import kotlinx.coroutines.launch
+import com.example.cpen321application.ui.screens.profile.ProfileScreen
+import com.example.cpen321application.users.ProfileResult
+import com.example.cpen321application.users.UserProfile
+import com.example.cpen321application.users.fetchMyProfile
+import com.example.cpen321application.ui.screens.profile.EditProfileScreen
+import com.example.cpen321application.users.ProfileForm
+import com.example.cpen321application.users.updateMyProfile
+import androidx.core.net.toUri
 
 /*
     App navigation composable:
@@ -110,6 +118,48 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     val joinedGames = remember { mutableStateListOf<GameSummary>() }
     var isRefreshingGames by remember { mutableStateOf(false) }
     var gamesError by remember { mutableStateOf<String?>(null) }
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+    var isLoadingProfile by remember { mutableStateOf(false) }
+    var profileError by remember { mutableStateOf<String?>(null) }
+
+    fun refreshProfile() {
+        if (isLoadingProfile) return
+        isLoadingProfile = true
+        scope.launch {
+            when (val result = fetchMyProfile(context)) {
+                is ProfileResult.Loaded -> {
+                    profile = result.profile
+                    profileError = null
+                }
+                is ProfileResult.Failed -> profileError = result.message
+            }
+            isLoadingProfile = false
+        }
+    }
+
+    var isSavingProfile by remember { mutableStateOf(false) }
+    var saveProfileError by remember { mutableStateOf<String?>(null) }
+
+    fun saveProfile(form: ProfileForm) {
+        if (isSavingProfile) return
+        isSavingProfile = true
+        saveProfileError = null
+        scope.launch {
+            when (val result = updateMyProfile(context, form)) {
+                is ProfileResult.Loaded -> {
+                    profile = result.profile
+                    profileError = null
+                    Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                    // the user may have left Edit Profile while it was saving
+                    if (navController.currentDestination?.route == Routes.EDIT_PROFILE) {
+                        navController.popBackStack()
+                    }
+                }
+                is ProfileResult.Failed -> saveProfileError = result.message
+            }
+            isSavingProfile = false
+        }
+    }
 
     // loads the user's games from the server, on failure the last loaded games stay
     fun refreshGames() {
@@ -176,12 +226,16 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
     }
 
-    // bottom bar: Home and Discover are built, the other tabs aren't yet
+    // bottom bar: Home, Discover and Profile are built, the other tabs aren't yet
     fun openTab(tab: BottomTab) {
         when (tab) {
             BottomTab.Home -> navController.popBackStack(Routes.HOME, inclusive = false)
-            // Home stays underneath so back from Discover returns to it
+            // Home stays underneath so back from Discover or Profile returns to it
             BottomTab.Discover -> navController.navigate(Routes.DISCOVER) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+            BottomTab.Profile -> navController.navigate(Routes.PROFILE) {
                 popUpTo(Routes.HOME)
                 launchSingleTop = true
             }
@@ -202,6 +256,9 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         discoverPlace = null
         hasLoadedDiscover = false
         discoverError = null
+        profile = null
+        profileError = null
+        saveProfileError=null
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
@@ -739,14 +796,53 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 modifier = modifier
             )
         }
+
+        composable(Routes.PROFILE) { backStackEntry ->
+            DisposableEffect(backStackEntry) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) refreshProfile()
+                }
+                backStackEntry.lifecycle.addObserver(observer)
+                onDispose { backStackEntry.lifecycle.removeObserver(observer) }
+            }
+
+            ProfileScreen(
+                profile = profile,
+                modifier = modifier,
+                isLoading = isLoadingProfile,
+                errorMessage = profileError,
+                onEdit = {
+                    saveProfileError = null
+                    navController.navigate(Routes.EDIT_PROFILE)
+                },
+                onRetry = { refreshProfile() },
+                onTabSelected = { tab -> openTab(tab) }
+            )
+        }
+
+        composable(Routes.EDIT_PROFILE) {
+            val current = profile
+            if (current == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                EditProfileScreen(
+                    profile = current,
+                    onSave = { form -> saveProfile(form) },
+                    onCancel = { navController.popBackStack() },
+                    modifier = modifier,
+                    isSaving = isSavingProfile,
+                    errorMessage = saveProfileError
+                )
+            }
+        }
     }
 }
 
+
 // opens directions to the place in Google Maps, or the browser if Maps isn't installed
 private fun openDirections(context: Context, location: GameLocation) {
-    val uri = Uri.parse(
-        "https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}"
-    )
+    val uri =
+        "https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}".toUri()
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     } catch (e: ActivityNotFoundException) {

@@ -22,6 +22,9 @@ object Routes {
     // the organizer's pending join requests for a game, build it with joinRequests(id)
     const val JOIN_REQUESTS = "join_requests/{$GAME_ID_ARG}"
     fun joinRequests(gameId: Int) = "join_requests/$gameId"
+    const val PROFILE = "profile"
+
+    const val EDIT_PROFILE = "edit_profile"
 }
 
 // savedStateHandle key for a message shown on the sign in screen

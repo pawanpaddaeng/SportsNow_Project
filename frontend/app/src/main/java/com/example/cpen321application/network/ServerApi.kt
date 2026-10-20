@@ -49,6 +49,15 @@ interface NetworkConnection {
     @GET("api/games/mine")
     suspend fun getMyGames(@Header("Authorization") authorization: String) : Response<MyGamesResponse>
 
+    @GET("api/users/me")
+    suspend fun getMyProfile(@Header("Authorization") authorization: String): Response<ProfileResponse>
+
+    @PUT("api/users/me")
+    suspend fun updateMyProfile(
+        @Header("Authorization") authorization: String,
+        @Body request: UpdateProfileRequest
+    ) : Response<ProfileResponse>
+
     // replaces the organizer's game details, same body and reply as createGame
     @PUT("api/games/{gameId}")
     suspend fun updateGame(
