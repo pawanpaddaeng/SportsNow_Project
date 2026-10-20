@@ -29,3 +29,6 @@ const val SIGN_IN_MESSAGE_KEY = "sign_in_message"
 
 // savedStateHandle key for the place chosen on the Pick Location screen
 const val PICKED_LOCATION_KEY = "picked_location"
+
+// savedStateHandle key for where the Pick Location map starts, when it isn't the picked place
+const val PICK_START_KEY = "pick_start"

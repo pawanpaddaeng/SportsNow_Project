@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +31,7 @@ import com.example.cpen321application.location.DeviceLocation
 import com.example.cpen321application.network.DiscoverGameDto
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.screens.games.GameLocation
 import com.example.cpen321application.ui.screens.games.SPORTS
 import com.example.cpen321application.ui.screens.games.SelectableChip
 import com.example.cpen321application.ui.theme.*
@@ -149,7 +152,10 @@ fun DiscoverGameDto.toDiscoverGame(now: Instant = Instant.now()): DiscoverGame {
 /*
     Discover screen from the Figma mockup (Use Case 3, Discover Game): the games near
     the user on a map and as a list, closest first, with a sport filter at the top.
-    location is null until the phone's location is known. isLoading shows a loading bar,
+    location is where the games were searched around, null until it is known. place is
+    the place the user picked to search around instead of their own location, null when
+    searching near them. Tapping the map opens the map picker (onChangeLocation) and
+    onUseMyLocation goes back to searching near the user. isLoading shows a loading bar,
     errorMessage a problem with a Try again button (onRetry): no location (2a) or the
     games couldn't load. games are the last loaded games, they stay visible while
     refreshing. The callbacks connect it to other screens through AppNavigation
@@ -159,11 +165,14 @@ fun DiscoverScreen(
     games: List<DiscoverGame>,
     location: DeviceLocation?,
     modifier: Modifier = Modifier,
+    place: GameLocation? = null,
     hasLoaded: Boolean = false,
     isLoading: Boolean = false,
     errorMessage: String? = null,
     onRetry: () -> Unit = {},
     onRefresh: () -> Unit = {},
+    onChangeLocation: () -> Unit = {},
+    onUseMyLocation: () -> Unit = {},
     onGameClick: (DiscoverGame) -> Unit = {},
     onTabSelected: (BottomTab) -> Unit = {}
 ) {
@@ -187,12 +196,17 @@ fun DiscoverScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            item(key = "header") { Header(isLoading = isLoading, onRefresh = onRefresh) }
+            item(key = "header") { Header(place = place, isLoading = isLoading, onRefresh = onRefresh) }
 
-            if (location != null) {
-                item(key = "map") {
-                    GamesMap(location = location, games = shownGames, onGameClick = onGameClick)
-                }
+            item(key = "search_area") {
+                SearchArea(
+                    location = location,
+                    place = place,
+                    games = shownGames,
+                    onChangeLocation = onChangeLocation,
+                    onUseMyLocation = onUseMyLocation,
+                    onGameClick = onGameClick
+                )
             }
 
             item(key = "sports") {
@@ -222,7 +236,7 @@ fun DiscoverScreen(
 }
 
 @Composable
-private fun Header(isLoading: Boolean, onRefresh: () -> Unit) {
+private fun Header(place: GameLocation?, isLoading: Boolean, onRefresh: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -240,29 +254,103 @@ private fun Header(isLoading: Boolean, onRefresh: () -> Unit) {
                 )
             }
         }
-        Text(text = "Open games near you, closest first", color = SportsOnSurfaceVariant, fontSize = 14.sp)
+        Text(
+            text = "Open games near ${place?.name ?: "you"}, closest first",
+            color = SportsOnSurfaceVariant,
+            fontSize = 14.sp
+        )
     }
 }
 
-/*  map around the user with a pin per game (faded when full) and an azure pin for
-    the user. Lite mode draws it as a still image, cheaper inside a scrolling list.
-    Tapping a game's pin opens it
+/*  where the games are searched around: the map with "Showing games near" and the
+    place under it, like the location field when creating a game. Tapping it opens the
+    map picker. With a picked place, "Use my location" goes back to the user's location
  */
 @Composable
-private fun GamesMap(location: DeviceLocation, games: List<DiscoverGame>, onGameClick: (DiscoverGame) -> Unit) {
+private fun SearchArea(
+    location: DeviceLocation?,
+    place: GameLocation?,
+    games: List<DiscoverGame>,
+    onChangeLocation: () -> Unit,
+    onUseMyLocation: () -> Unit,
+    onGameClick: (DiscoverGame) -> Unit
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(1.dp, SportsOutlineVariant, shape)
+            .clickable(onClick = onChangeLocation)
+    ) {
+        if (location != null) {
+            GamesMap(
+                location = location,
+                isPickedPlace = place != null,
+                games = games,
+                onMapClick = onChangeLocation,
+                onGameClick = onGameClick
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Icon(imageVector = Icons.Filled.Place, contentDescription = null, tint = Color(0xFFD93025))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Showing games near", color = SportsOnSurfaceVariant, fontSize = 12.sp)
+                Text(
+                    text = place?.name ?: if (location != null) "Your location" else "Choose a location",
+                    color = SportsOnSurface,
+                    fontSize = 16.sp
+                )
+                if (place != null && place.address.isNotBlank()) {
+                    Text(text = place.address, color = SportsOnSurfaceVariant, fontSize = 12.sp)
+                }
+            }
+            Text(text = "Change", color = SportsPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        if (place != null) {
+            TextButton(onClick = onUseMyLocation, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = SportsPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Use my location", color = SportsPrimary)
+            }
+        }
+    }
+}
+
+/*  map around the search point with a pin per game (faded when full) and a pin for
+    the search point: azure for the user, red for a picked place. Lite mode draws it as
+    a still image, cheaper inside a scrolling list. Tapping a game's pin opens it,
+    tapping elsewhere calls onMapClick
+ */
+@Composable
+private fun GamesMap(
+    location: DeviceLocation,
+    isPickedPlace: Boolean,
+    games: List<DiscoverGame>,
+    onMapClick: () -> Unit,
+    onGameClick: (DiscoverGame) -> Unit
+) {
     val userPoint = LatLng(location.latitude, location.longitude)
     val key = "${location.latitude},${location.longitude}"
     val cameraState = rememberCameraPositionState(key = key) {
         position = CameraPosition.fromLatLngZoom(userPoint, MAP_ZOOM)
     }
-    val shape = RoundedCornerShape(12.dp)
 
     GoogleMap(
         modifier = Modifier
             .fillMaxWidth()
-            .height(MAP_HEIGHT)
-            .clip(shape)
-            .border(1.dp, SportsOutlineVariant, shape),
+            .height(MAP_HEIGHT),
         cameraPositionState = cameraState,
         googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
         uiSettings = MapUiSettings(
@@ -271,13 +359,15 @@ private fun GamesMap(location: DeviceLocation, games: List<DiscoverGame>, onGame
             scrollGesturesEnabled = false,
             zoomGesturesEnabled = false
         ),
-        // stops lite mode from opening the Google Maps app on a tap
-        onMapClick = {}
+        // also stops lite mode from opening the Google Maps app on a tap
+        onMapClick = { onMapClick() }
     ) {
         Marker(
             state = rememberMarkerState(key = "you_$key", position = userPoint),
-            title = "You",
-            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+            title = if (isPickedPlace) "Search area" else "You",
+            icon = BitmapDescriptorFactory.defaultMarker(
+                if (isPickedPlace) BitmapDescriptorFactory.HUE_RED else BitmapDescriptorFactory.HUE_AZURE
+            )
         )
         games.forEach { game ->
             Marker(

@@ -28,9 +28,17 @@ fun hasLocationPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
 
+// whether location is turned on in the phone's settings
+fun isLocationEnabled(context: Context): Boolean {
+    val manager = context.getSystemService(LocationManager::class.java) ?: return false
+    return LocationManagerCompat.isLocationEnabled(manager)
+}
+
 /*  the phone's location, asked for once (not tracked) to save battery. Uses a recent
-    last known fix when there is one, otherwise waits up to 10 seconds for a new one.
-    Returns null without permission, with location turned off, or when no fix arrives
+    last known fix when there is one, otherwise waits up to 10 seconds for a new one,
+    and falls back to an older last known fix if no new one arrives (a phone that hasn't
+    moved, or an emulator, may not send one). Returns null without permission, with
+    location turned off, or when the phone has never had a fix
  */
 suspend fun currentDeviceLocation(context: Context): DeviceLocation? {
     if (!hasLocationPermission(context)) return null
@@ -41,13 +49,13 @@ suspend fun currentDeviceLocation(context: Context): DeviceLocation? {
     if (providers.isEmpty()) return null
 
     return try {
-        val recent = providers
+        val lastKnown = providers
             .mapNotNull { manager.getLastKnownLocation(it) }
-            .filter { System.currentTimeMillis() - it.time <= MAX_LAST_FIX_AGE_MS }
             .maxByOrNull { it.time }
+        val recent = lastKnown?.takeIf { System.currentTimeMillis() - it.time <= MAX_LAST_FIX_AGE_MS }
         val location = recent ?: withTimeoutOrNull(CURRENT_FIX_TIMEOUT_MS) {
             requestCurrentLocation(context, manager, providers.first())
-        }
+        } ?: lastKnown
         location?.let { DeviceLocation(it.latitude, it.longitude) }
     } catch (e: SecurityException) {
         // permission was taken away while the app was running

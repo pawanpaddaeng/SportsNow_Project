@@ -53,6 +53,7 @@ import com.example.cpen321application.games.sendJoinRequest
 import com.example.cpen321application.location.DeviceLocation
 import com.example.cpen321application.location.currentDeviceLocation
 import com.example.cpen321application.location.hasLocationPermission
+import com.example.cpen321application.location.isLocationEnabled
 import com.example.cpen321application.notifications.GameEvents
 import com.example.cpen321application.notifications.NotificationRegistration
 import com.example.cpen321application.ui.components.BottomTab
@@ -136,18 +137,28 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     var hasLoadedDiscover by remember { mutableStateOf(false) }
     var isLoadingDiscover by remember { mutableStateOf(false) }
     var discoverError by remember { mutableStateOf<String?>(null) }
+    // place the user picked on the map to search around, null searches around the phone
+    var discoverPlace by remember { mutableStateOf<GameLocation?>(null) }
 
-    /*  loads the games near the user. The location is only looked up again when
-        refreshLocation is set (or none is known yet), to save battery. On failure
-        the last loaded games stay
+    /*  loads the games near the picked place, or near the user when none is picked.
+        The phone's location is only looked up again when refreshLocation is set (or
+        none is known yet), to save battery. On failure the last loaded games stay
      */
     fun loadDiscover(refreshLocation: Boolean) {
         if (isLoadingDiscover) return
         isLoadingDiscover = true
         scope.launch {
-            val location = discoverLocation.takeUnless { refreshLocation } ?: currentDeviceLocation(context)
+            val place = discoverPlace
+            val location = when {
+                place != null -> DeviceLocation(place.latitude, place.longitude)
+                else -> discoverLocation.takeUnless { refreshLocation } ?: currentDeviceLocation(context)
+            }
             if (location == null) {
-                discoverError = "Couldn't get your location. Check that location is turned on, then try again."
+                discoverError = if (isLocationEnabled(context)) {
+                    "Couldn't find where you are yet. Wait a moment, then try again."
+                } else {
+                    "Location is turned off. Turn it on in your phone's settings, then try again."
+                }
                 isLoadingDiscover = false
                 return@launch
             }
@@ -188,6 +199,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         gamesError = null
         discoverGames.clear()
         discoverLocation = null
+        discoverPlace = null
         hasLoadedDiscover = false
         discoverError = null
         navController.navigate(Routes.SIGN_IN) {
@@ -326,12 +338,19 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 )
             }
 
-            // reload whenever the screen is shown, e.g. coming back after sending a join request
+            /*  reload whenever the screen is shown, e.g. coming back after sending a join
+                request. Coming back from Pick Location with a new place searches there,
+                going back without confirming keeps the current place
+             */
             DisposableEffect(backStackEntry) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+                    val handle = backStackEntry.savedStateHandle
+                    val start = handle.remove<GameLocation>(PICK_START_KEY)
+                    val picked = handle.remove<GameLocation>(PICKED_LOCATION_KEY)
+                    if (picked != null && picked != start) discoverPlace = picked
                     when {
-                        hasLocationPermission(context) -> loadDiscover(refreshLocation = false)
+                        discoverPlace != null || hasLocationPermission(context) -> loadDiscover(refreshLocation = false)
                         !askedForPermission -> askForPermission()
                     }
                 }
@@ -341,12 +360,31 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
             // a new location only when the user asks for it, otherwise the last one is reused
             fun reloadWithNewLocation() {
-                if (hasLocationPermission(context)) loadDiscover(refreshLocation = true) else askForPermission()
+                if (discoverPlace != null || hasLocationPermission(context)) {
+                    loadDiscover(refreshLocation = true)
+                } else {
+                    askForPermission()
+                }
+            }
+
+            // Pick Location starts at the picked place, or at the user's location
+            fun openPickLocation() {
+                val start = discoverPlace ?: discoverLocation?.let {
+                    GameLocation(name = "Your location", address = "", latitude = it.latitude, longitude = it.longitude)
+                }
+                backStackEntry.savedStateHandle[PICK_START_KEY] = start
+                navController.navigate(Routes.PICK_LOCATION)
             }
 
             DiscoverScreen(
                 games = discoverGames,
                 location = discoverLocation,
+                place = discoverPlace,
+                onChangeLocation = { openPickLocation() },
+                onUseMyLocation = {
+                    discoverPlace = null
+                    reloadWithNewLocation()
+                },
                 hasLoaded = hasLoadedDiscover,
                 isLoading = isLoadingDiscover,
                 errorMessage = discoverError,
@@ -684,9 +722,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
 
         composable(Routes.PICK_LOCATION) {
-            // start the map at the place already chosen on the Input Game Info screen, if any
+            // start the map where the previous screen asked (Discover), otherwise at the
+            // place already chosen on the Input Game Info screen, if any
             val currentLocation = remember {
-                navController.previousBackStackEntry?.savedStateHandle?.get<GameLocation>(PICKED_LOCATION_KEY)
+                val handle = navController.previousBackStackEntry?.savedStateHandle
+                handle?.get<GameLocation>(PICK_START_KEY) ?: handle?.get<GameLocation>(PICKED_LOCATION_KEY)
             }
 
             PickLocationScreen(
