@@ -154,18 +154,20 @@ private data class GameInfoDraft(
     fun toForm(location: GameLocation?): GameInfoForm? {
         // null too when the start is in the past
         val start = startsAt?.takeUnless { it.isBefore(Instant.now()) }
-        if (sport == null || title.isBlank() || start == null || location == null) {
+        if (sport == null || title.isBlank() || start == null) {
             return null
         }
-        return GameInfoForm(
-            sport = sport,
-            title = title.trim(),
-            startsAt = start,
-            location = location,
-            maxPlayers = maxPlayers,
-            skillLevel = skillLevel,
-            description = description.trim().ifBlank { null }
-        )
+        return location?.let {
+            GameInfoForm(
+                sport = sport,
+                title = title.trim(),
+                startsAt = start,
+                location = it,
+                maxPlayers = maxPlayers,
+                skillLevel = skillLevel,
+                description = description.trim().ifBlank { null }
+            )
+        }
     }
 
     companion object {
