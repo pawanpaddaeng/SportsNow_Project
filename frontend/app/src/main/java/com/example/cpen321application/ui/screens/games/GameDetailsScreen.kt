@@ -274,26 +274,6 @@ private fun LoadedDetails(
     )
 }
 
-// "Cancel this game?" with Cancel Game and Keep Game
-@Composable
-private fun ConfirmCancelDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Cancel this game?") },
-        text = {
-            Text("$title will be cancelled for everyone. Players and anyone who asked to join will be notified. This can't be undone.")
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Cancel Game", color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Keep Game") }
-        }
-    )
-}
-
 @Composable
 private fun TopBar(showEdit: Boolean, onBack: () -> Unit, onEdit: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -648,7 +628,7 @@ private fun DangerButton(text: String, onClick: () -> Unit, isBusy: Boolean = fa
 
 // round initial (or count) bubble, white ring so overlapping avatars stay apart
 @Composable
-private fun Avatar(
+internal fun Avatar(
     text: String,
     size: Dp,
     fontSize: Int,
@@ -693,28 +673,3 @@ private fun Pill(
     }
 }
 
-// everyone in the game, opened from "See all"
-@Composable
-private fun PlayersDialog(details: GameDetails, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        title = { Text("Players · ${details.playerCount}/${details.maxPlayers}") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                details.players.forEach { player ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Avatar(text = player.initial, size = 32.dp, fontSize = 13)
-                        Text(text = player.fullName, color = SportsOnSurface, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                        if (player == details.organizer) {
-                            Text(text = "Organizer", color = SportsOnSurfaceVariant, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        }
-    )
-}

@@ -474,24 +474,15 @@ fun EditGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
 
     // loads the game into the form, or sets loadError when it can't be edited
     suspend fun loadGame() {
-        when (val result = fetchGameDetails(context, gameId)) {
-            is GameDetailsResult.Loaded -> when {
-                result.details.viewerRole != "organizer" -> loadError = "Only the organizer can edit this game."
-                result.game.status == "cancelled" -> loadError = "This game was cancelled."
-                else -> {
-                    // null when the game's values can't fill the form, the check after loading reports it
-                    val form = runCatching { result.game.toGameInfoForm() }.getOrNull()
-                    if (form != null) {
-                        playerCount = result.game.playerCount
-                        if (backStackEntry.savedStateHandle.get<GameLocation>(PICKED_LOCATION_KEY) == null) {
-                            backStackEntry.savedStateHandle[PICKED_LOCATION_KEY] = form.location
-                        }
-                        initial = form
-                    }
+        when (val game = loadEditableGame(context, gameId)) {
+            is EditableGame.Loaded -> {
+                playerCount = game.playerCount
+                if (backStackEntry.savedStateHandle.get<GameLocation>(PICKED_LOCATION_KEY) == null) {
+                    backStackEntry.savedStateHandle[PICKED_LOCATION_KEY] = game.form.location
                 }
+                initial = game.form
             }
-            GameDetailsResult.NotFound -> loadError = "This game no longer exists."
-            is GameDetailsResult.Failed -> loadError = result.message
+            is EditableGame.Unavailable -> loadError = game.message
         }
     }
 
@@ -518,8 +509,8 @@ fun EditGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
     LaunchedEffect(gameId) {
         if (initial == null) {
             runGuarded(safetyNet) { loadGame() }
-            // nothing loaded (unreadable game or an unexpected error): show a message instead of loading forever
-            if (initial == null && loadError == null) loadError = "Couldn't load this game, try again"
+            // nothing loaded (an unexpected error): show a message instead of loading forever
+            if (initial == null && loadError == null) loadError = COULD_NOT_LOAD_GAME
         }
     }
 
@@ -542,6 +533,29 @@ fun EditGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
         modifier = modifier
     )
 }
+
+private const val COULD_NOT_LOAD_GAME = "Couldn't load this game, try again"
+
+// the game to edit as the form's starting values, or why it can't be edited
+private sealed interface EditableGame {
+    data class Loaded(val form: GameInfoForm, val playerCount: Int) : EditableGame
+    data class Unavailable(val message: String) : EditableGame
+}
+
+// loads a game for the edit screen: only its organizer can edit it, and not once it's cancelled
+private suspend fun loadEditableGame(context: Context, gameId: Int): EditableGame =
+    when (val result = fetchGameDetails(context, gameId)) {
+        is GameDetailsResult.Loaded -> when {
+            result.details.viewerRole != "organizer" -> EditableGame.Unavailable("Only the organizer can edit this game.")
+            result.game.status == "cancelled" -> EditableGame.Unavailable("This game was cancelled.")
+            // the form is null when the game's values can't fill it
+            else -> runCatching { result.game.toGameInfoForm() }.getOrNull()
+                ?.let { EditableGame.Loaded(form = it, playerCount = result.game.playerCount) }
+                ?: EditableGame.Unavailable(COULD_NOT_LOAD_GAME)
+        }
+        GameDetailsResult.NotFound -> EditableGame.Unavailable("This game no longer exists.")
+        is GameDetailsResult.Failed -> EditableGame.Unavailable(result.message)
+    }
 
 @Composable
 fun PickLocationRoute(app: AppState, modifier: Modifier) {
