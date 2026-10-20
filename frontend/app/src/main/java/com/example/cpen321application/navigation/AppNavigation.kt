@@ -37,6 +37,11 @@ import com.example.cpen321application.ui.screens.home.GameSummary
 import com.example.cpen321application.ui.screens.home.HomeScreen
 import com.example.cpen321application.ui.screens.home.toGameSummary
 import kotlinx.coroutines.launch
+import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.screens.profile.ProfileScreen
+import com.example.cpen321application.users.ProfileResult
+import com.example.cpen321application.users.UserProfile
+import com.example.cpen321application.users.fetchMyProfile
 
 /*
     App navigation composable:
@@ -67,6 +72,24 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     val joinedGames = remember { mutableStateListOf<GameSummary>() }
     var isRefreshingGames by remember { mutableStateOf(false) }
     var gamesError by remember { mutableStateOf<String?>(null) }
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+    var isLoadingProfile by remember { mutableStateOf(false) }
+    var profileError by remember { mutableStateOf<String?>(null) }
+
+    fun refreshProfile() {
+        if (isLoadingProfile) return
+        isLoadingProfile = true
+        scope.launch {
+            when (val result = fetchMyProfile(context)) {
+                is ProfileResult.Loaded -> {
+                    profile = result.profile
+                    profileError = null
+                }
+                is ProfileResult.Failed -> profileError = result.message
+            }
+            isLoadingProfile = false
+        }
+    }
 
     // loads the user's games from the server, on failure the last loaded games stay
     fun refreshGames() {
@@ -87,6 +110,18 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
     }
 
+    fun openTab(tab: BottomTab) {
+        when (tab) {
+            BottomTab.Home -> navController.popBackStack(Routes.HOME, inclusive = false)
+            // Home stays underneath so back from Profile returns to it
+            BottomTab.Profile -> navController.navigate(Routes.PROFILE) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+            else -> Toast.makeText(context, "${tab.label} isn't available yet", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // forget the session and show sign in with a message, clearing every other screen
     fun returnToSignIn() {
         jwtToken = null
@@ -95,6 +130,8 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         organizedGames.clear()
         joinedGames.clear()
         gamesError = null
+        profile = null
+        profileError = null
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
@@ -195,7 +232,8 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 isRefreshing = isRefreshingGames,
                 errorMessage = gamesError,
                 onRefresh = { refreshGames() },
-                onCreateGame = { navController.navigate(Routes.CREATE_GAME) }
+                onCreateGame = { navController.navigate(Routes.CREATE_GAME) },
+                onTabSelected = { tab-> openTab(tab)}
             )
         }
 
@@ -246,6 +284,26 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 },
                 onBack = { navController.popBackStack() },
                 modifier = modifier
+            )
+        }
+
+        composable(Routes.PROFILE) { backStackEntry ->
+            DisposableEffect(backStackEntry) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) refreshProfile()
+                }
+                backStackEntry.lifecycle.addObserver(observer)
+                onDispose { backStackEntry.lifecycle.removeObserver(observer) }
+            }
+
+            ProfileScreen(
+                profile = profile,
+                modifier = modifier,
+                isLoading = isLoadingProfile,
+                errorMessage = profileError,
+                onEdit = { Toast.makeText(context, "Edit Profile comes next", Toast.LENGTH_SHORT).show() },
+                onRetry = { refreshProfile() },
+                onTabSelected = { tab -> openTab(tab) }
             )
         }
     }

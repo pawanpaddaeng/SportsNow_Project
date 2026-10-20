@@ -7,6 +7,8 @@ object Routes {
     const val HOME = "home"
     const val CREATE_GAME = "create_game"
     const val PICK_LOCATION = "pick_location"
+
+    const val PROFILE = "profile"
 }
 
 // savedStateHandle key for a message shown on the sign in screen
