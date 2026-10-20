@@ -80,7 +80,6 @@ import com.example.cpen321application.ui.screens.home.GameSummary
 import com.example.cpen321application.ui.screens.home.HomeScreen
 import com.example.cpen321application.ui.screens.home.toGameSummary
 import kotlinx.coroutines.launch
-import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.screens.profile.ProfileScreen
 import com.example.cpen321application.users.ProfileResult
 import com.example.cpen321application.users.UserProfile
@@ -88,6 +87,7 @@ import com.example.cpen321application.users.fetchMyProfile
 import com.example.cpen321application.ui.screens.profile.EditProfileScreen
 import com.example.cpen321application.users.ProfileForm
 import com.example.cpen321application.users.updateMyProfile
+import androidx.core.net.toUri
 
 /*
     App navigation composable:
@@ -226,12 +226,16 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
     }
 
-    // bottom bar: Home and Discover are built, the other tabs aren't yet
+    // bottom bar: Home, Discover and Profile are built, the other tabs aren't yet
     fun openTab(tab: BottomTab) {
         when (tab) {
             BottomTab.Home -> navController.popBackStack(Routes.HOME, inclusive = false)
-            // Home stays underneath so back from Discover returns to it
+            // Home stays underneath so back from Discover or Profile returns to it
             BottomTab.Discover -> navController.navigate(Routes.DISCOVER) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+            BottomTab.Profile -> navController.navigate(Routes.PROFILE) {
                 popUpTo(Routes.HOME)
                 launchSingleTop = true
             }
@@ -362,8 +366,6 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 isRefreshing = isRefreshingGames,
                 errorMessage = gamesError,
                 onRefresh = { refreshGames() },
-                onCreateGame = { navController.navigate(Routes.CREATE_GAME) },
-                onTabSelected = { tab-> openTab(tab)}
                 onCreateGame = { navController.navigate(Routes.CREATE_GAME) },
                 onGameClick = { game ->
                     game.id.toIntOrNull()?.let { navController.navigate(Routes.gameDetails(it)) }
@@ -839,9 +841,8 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
 // opens directions to the place in Google Maps, or the browser if Maps isn't installed
 private fun openDirections(context: Context, location: GameLocation) {
-    val uri = Uri.parse(
-        "https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}"
-    )
+    val uri =
+        "https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}".toUri()
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     } catch (e: ActivityNotFoundException) {
