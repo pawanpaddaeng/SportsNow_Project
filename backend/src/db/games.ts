@@ -1,6 +1,5 @@
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import type { PoolConnection } from 'mysql2/promise';
-import { pool } from './mysql';
+import { executeWrite, pool, selectRows } from './mysql';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
 
@@ -33,7 +32,7 @@ export async function createGame(game: NewGame): Promise<number> {
   try {
     await connection.beginTransaction();
 
-    const [result] = await connection.execute<ResultSetHeader>(
+    const result = await executeWrite(
       `INSERT INTO games (organizer_id, title, sport, description, starts_at, ends_at,
                           location_name, address, latitude, longitude, max_players, skill_level)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -43,10 +42,12 @@ export async function createGame(game: NewGame): Promise<number> {
         game.locationName, game.address, game.latitude, game.longitude,
         game.maxPlayers, game.skillLevel,
       ],
+      connection,
     );
-    await connection.execute<ResultSetHeader>(
+    await executeWrite(
       'INSERT INTO game_players (game_id, user_id) VALUES (?, ?)',
       [result.insertId, game.organizerId],
+      connection,
     );
 
     await connection.commit();
@@ -82,7 +83,7 @@ export interface Game {
   createdAt: string;
 }
 
-interface GameRow extends RowDataPacket {
+interface GameRow {
   game_id: number;
   organizer_id: number;
   title: string;
@@ -118,7 +119,7 @@ const GAME_COLUMNS = `
   (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count`;
 
 export async function getGameById(gameId: number): Promise<Game | null> {
-  const [rows] = await pool.execute<GameRow[]>(
+  const rows = await selectRows<GameRow>(
     `SELECT ${GAME_COLUMNS} FROM games g WHERE g.game_id = ? LIMIT 1`,
     [gameId],
   );
@@ -137,7 +138,7 @@ export interface UserGames {
     cancelled games, each has its status and times so the app can group them
  */
 export async function getGamesForUser(userId: number): Promise<UserGames> {
-  const [rows] = await pool.execute<GameRow[]>(
+  const rows = await selectRows<GameRow>(
     `SELECT ${GAME_COLUMNS}
      FROM games g
      WHERE g.organizer_id = ?
@@ -175,7 +176,7 @@ interface DiscoverGameRow extends GameRow {
  */
 export async function getDiscoverGames(userId: number, latitude: number, longitude: number): Promise<DiscoverGame[]> {
   // ST_Distance_Sphere takes POINT(longitude, latitude) and returns metres
-  const [rows] = await pool.execute<DiscoverGameRow[]>(
+  const rows = await selectRows<DiscoverGameRow>(
     `SELECT ${GAME_COLUMNS},
             ROUND(ST_Distance_Sphere(POINT(g.longitude, g.latitude), POINT(?, ?))) AS distance_m,
             (SELECT r.status FROM join_requests r
@@ -239,7 +240,7 @@ export type UpdateGameResult =
   // the new start is not before the game's existing end time
   | { ok: false; problem: 'ends_before_start' };
 
-interface LockedGameRow extends RowDataPacket {
+interface LockedGameRow {
   organizer_id: number;
   title: string;
   status: GameStatus;
@@ -257,13 +258,14 @@ export async function lockGameForChange(
   gameId: number,
   userId: number,
 ): Promise<{ ok: true; game: LockedGameRow } | { ok: false; problem: GameChangeProblem }> {
-  const [rows] = await connection.execute<LockedGameRow[]>(
+  const rows = await selectRows<LockedGameRow>(
     `SELECT g.organizer_id, g.title, g.status, g.max_players,
             DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
             g.starts_at <= UTC_TIMESTAMP() AS has_started,
             (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count
      FROM games g WHERE g.game_id = ? FOR UPDATE`,
     [gameId],
+    connection,
   );
   const game = rows[0];
   if (!game) return { ok: false, problem: 'not_found' };
@@ -316,7 +318,7 @@ export async function updateGame(
       return { ok: false, problem: 'ends_before_start' };
     }
 
-    const [result] = await connection.execute<ResultSetHeader>(
+    const result = await executeWrite(
       `UPDATE games
        SET title = ?, sport = ?, description = ?, starts_at = ?, ends_at = ?,
            location_name = ?, address = ?, latitude = ?, longitude = ?,
@@ -328,6 +330,7 @@ export async function updateGame(
         changes.locationName, changes.address, changes.latitude, changes.longitude,
         changes.maxPlayers, changes.skillLevel, gameId,
       ],
+      connection,
     );
     // changedRows is 0 when every value was already the same
     return { ok: true, changed: result.changedRows > 0 };
@@ -342,15 +345,16 @@ export async function cancelGame(gameId: number, userId: number): Promise<Cancel
     const locked = await lockGameForChange(connection, gameId, userId);
     if (!locked.ok) return locked;
 
-    await connection.execute<ResultSetHeader>(
+    await executeWrite(
       "UPDATE games SET status = 'cancelled' WHERE game_id = ?",
       [gameId],
+      connection,
     );
     return { ok: true };
   });
 }
 
-interface UserIdRow extends RowDataPacket {
+interface UserIdRow {
   user_id: number;
 }
 
@@ -358,7 +362,7 @@ interface UserIdRow extends RowDataPacket {
     waiting on a join request, except the organizer who made the change
  */
 export async function getUsersToNotify(gameId: number, organizerId: number): Promise<number[]> {
-  const [rows] = await pool.execute<UserIdRow[]>(
+  const rows = await selectRows<UserIdRow>(
     `SELECT user_id FROM game_players WHERE game_id = ? AND user_id <> ?
      UNION
      SELECT user_id FROM join_requests WHERE game_id = ? AND status = 'pending' AND user_id <> ?`,
@@ -374,7 +378,7 @@ export interface GamePlayer {
   lastName: string;
 }
 
-interface GamePlayerRow extends RowDataPacket {
+interface GamePlayerRow {
   user_id: number;
   first_name: string;
   last_name: string;
@@ -382,7 +386,7 @@ interface GamePlayerRow extends RowDataPacket {
 
 // everyone in the game (organizer included), in the order they joined
 export async function getGamePlayers(gameId: number): Promise<GamePlayer[]> {
-  const [rows] = await pool.execute<GamePlayerRow[]>(
+  const rows = await selectRows<GamePlayerRow>(
     `SELECT u.user_id, u.first_name, u.last_name
      FROM game_players p
      JOIN users u ON u.user_id = p.user_id
@@ -393,13 +397,13 @@ export async function getGamePlayers(gameId: number): Promise<GamePlayer[]> {
   return rows.map((row) => ({ userId: row.user_id, firstName: row.first_name, lastName: row.last_name }));
 }
 
-interface CountRow extends RowDataPacket {
+interface CountRow {
   count: number;
 }
 
 // join requests still waiting for the organizer, for the badge on Game Details
 export async function countPendingJoinRequests(gameId: number): Promise<number> {
-  const [rows] = await pool.execute<CountRow[]>(
+  const rows = await selectRows<CountRow>(
     "SELECT COUNT(*) AS count FROM join_requests WHERE game_id = ? AND status = 'pending'",
     [gameId],
   );
@@ -408,13 +412,13 @@ export async function countPendingJoinRequests(gameId: number): Promise<number> 
 
 export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 
-interface JoinRequestStatusRow extends RowDataPacket {
+interface JoinRequestStatusRow {
   status: JoinRequestStatus;
 }
 
 // status of the user's request to join the game, or null if they never asked
 export async function getJoinRequestStatus(gameId: number, userId: number): Promise<JoinRequestStatus | null> {
-  const [rows] = await pool.execute<JoinRequestStatusRow[]>(
+  const rows = await selectRows<JoinRequestStatusRow>(
     'SELECT status FROM join_requests WHERE game_id = ? AND user_id = ? LIMIT 1',
     [gameId, userId],
   );

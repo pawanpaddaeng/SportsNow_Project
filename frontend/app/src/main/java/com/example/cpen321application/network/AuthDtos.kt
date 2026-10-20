@@ -5,8 +5,8 @@ import retrofit2.Response
 
 //add datatypes for sending and receiving information (used by gson for parsing)
 data class User(
-    val firstName: String,
-    val lastName: String
+    @field:Required val firstName: String,
+    @field:Required val lastName: String
 )
 
 data class AuthResponse(
@@ -52,10 +52,5 @@ data class RegisterNotifRequest(
 /*  reads the json reply of the auth style endpoints, error responses (4xx/5xx)
     carry the same json shape in the error body. Returns null if it can't be read
  */
-fun readAuthResponse(response: Response<AuthTokenResponse>): AuthTokenResponse? {
-    return response.body() ?: try {
-        com.google.gson.Gson().fromJson(response.errorBody()?.string(), AuthTokenResponse::class.java)
-    } catch (e: Exception) {
-        null
-    }
-}
+fun readAuthResponse(response: Response<AuthTokenResponse>): AuthTokenResponse? =
+    readReply(response, AuthTokenResponse::class.java)

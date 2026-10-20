@@ -3,25 +3,26 @@ package com.example.cpen321application.network
 import com.google.gson.annotations.SerializedName
 
 /*  a game as the server sends it, the same shape for every endpoint that returns
-    games. Times are UTC ISO 8601 strings, e.g. "2026-10-18T02:00:00Z"
+    games. Times are UTC ISO 8601 strings, e.g. "2026-10-18T02:00:00Z".
+    @Required fields make a reply without them fail to parse (see ServerGson)
  */
 data class GameDto(
     @SerializedName("game_id") val gameId: Int,
     @SerializedName("organizer_id") val organizerId: Int,
-    val title: String,
-    val sport: String,
+    @field:Required val title: String,
+    @field:Required val sport: String,
     val description: String?,
-    @SerializedName("starts_at") val startsAt: String,
+    @field:Required @SerializedName("starts_at") val startsAt: String,
     @SerializedName("ends_at") val endsAt: String?,
-    @SerializedName("location_name") val locationName: String,
-    val address: String,
+    @field:Required @SerializedName("location_name") val locationName: String,
+    @field:Required val address: String,
     val latitude: Double,
     val longitude: Double,
     @SerializedName("max_players") val maxPlayers: Int,
     @SerializedName("player_count") val playerCount: Int,
-    @SerializedName("skill_level") val skillLevel: String,
-    val status: String,
-    @SerializedName("created_at") val createdAt: String
+    @field:Required @SerializedName("skill_level") val skillLevel: String,
+    @field:Required val status: String,
+    @field:Required @SerializedName("created_at") val createdAt: String
 )
 
 /*  body for POST api/games. starts_at is a UTC ISO 8601 time, e.g. "2026-10-18T02:00:00Z".
@@ -53,8 +54,8 @@ data class MyGamesResponse(
 // a player in a game as the server sends it
 data class GamePlayerDto(
     @SerializedName("user_id") val userId: Int,
-    @SerializedName("first_name") val firstName: String,
-    @SerializedName("last_name") val lastName: String
+    @field:Required @SerializedName("first_name") val firstName: String,
+    @field:Required @SerializedName("last_name") val lastName: String
 )
 
 /*  reply from GET api/games/{gameId}: msg "success" with the game, its organizer and
@@ -84,7 +85,7 @@ data class CreateGameResponse(
     and the user's join request for it ("pending", "declined", ... or null if they never asked)
  */
 data class DiscoverGameDto(
-    val game: GameDto,
+    @field:Required val game: GameDto,
     @SerializedName("distance_m") val distanceMeters: Int,
     @SerializedName("join_request_status") val joinRequestStatus: String?
 )
@@ -119,11 +120,11 @@ data class JoinRequestResponse(
  */
 data class PendingJoinRequestDto(
     @SerializedName("request_id") val requestId: Int,
-    val user: GamePlayerDto,
-    @SerializedName("skill_level") val skillLevel: String,
+    @field:Required val user: GamePlayerDto,
+    @field:Required @SerializedName("skill_level") val skillLevel: String,
     @SerializedName("play_frequency") val playFrequency: String?,
     val message: String?,
-    @SerializedName("created_at") val createdAt: String
+    @field:Required @SerializedName("created_at") val createdAt: String
 )
 
 /*  reply from GET api/games/{gameId}/join-requests: msg "success" with the game and its

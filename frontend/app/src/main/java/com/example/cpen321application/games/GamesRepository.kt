@@ -13,10 +13,15 @@ import com.example.cpen321application.network.JoinRequestDecisionResponse
 import com.example.cpen321application.network.JoinRequestResponse
 import com.example.cpen321application.network.PendingJoinRequestDto
 import com.example.cpen321application.network.ServerApi
+import com.example.cpen321application.network.readReply
 import com.example.cpen321application.ui.screens.games.GameInfoForm
+import com.google.gson.JsonParseException
+import java.io.IOException
 
 // shown when Session.call ended the session (the app is going back to sign in)
 private const val SESSION_ENDED_MESSAGE = "Your session ended, please sign in again"
+// shown when the request couldn't reach the server (no connection, timeout, ...)
+private const val NETWORK_MESSAGE = "Cannot reach the server, try again"
 
 // outcome of creating, editing or cancelling a game, message explains a failure to the user
 sealed interface GameChangeResult {
@@ -51,12 +56,7 @@ private suspend fun changeGame(
     return try {
         val response = Session.call(context, request)
             ?: return GameChangeResult.Failed(SESSION_ENDED_MESSAGE)
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val reply = response.body() ?: try {
-            com.google.gson.Gson().fromJson(response.errorBody()?.string(), CreateGameResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val reply = readReply(response, CreateGameResponse::class.java)
 
         val game = reply?.game
         when {
@@ -65,8 +65,10 @@ private suspend fun changeGame(
                 GameChangeResult.Failed(reply.error)
             else -> GameChangeResult.Failed(failureMessage)
         }
-    } catch (e: Exception) {
-        GameChangeResult.Failed("Cannot reach the server, try again")
+    } catch (e: IOException) {
+        GameChangeResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        GameChangeResult.Failed(failureMessage)
     }
 }
 
@@ -115,8 +117,10 @@ suspend fun fetchGameDetails(context: Context, gameId: Int): GameDetailsResult {
         } else {
             GameDetailsResult.Failed("Couldn't load this game, try again")
         }
-    } catch (e: Exception) {
-        GameDetailsResult.Failed("Cannot reach the server, try again")
+    } catch (e: IOException) {
+        GameDetailsResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        GameDetailsResult.Failed("Couldn't load this game, try again")
     }
 }
 
@@ -146,8 +150,10 @@ suspend fun fetchDiscoverGames(context: Context, latitude: Double, longitude: Do
             "no_games" -> DiscoverGamesResult.Loaded(emptyList())
             else -> DiscoverGamesResult.Failed("Couldn't load games near you, try again")
         }
-    } catch (e: Exception) {
-        DiscoverGamesResult.Failed("Cannot reach the server, try again")
+    } catch (e: IOException) {
+        DiscoverGamesResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        DiscoverGamesResult.Failed("Couldn't load games near you, try again")
     }
 }
 
@@ -177,12 +183,7 @@ suspend fun sendJoinRequest(
         val response = Session.call(context) { authorization ->
             ServerApi.retrofitService.sendJoinRequest(authorization = authorization, gameId = gameId, request = request)
         } ?: return JoinRequestResult.Failed(SESSION_ENDED_MESSAGE)
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val reply = response.body() ?: try {
-            com.google.gson.Gson().fromJson(response.errorBody()?.string(), JoinRequestResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val reply = readReply(response, JoinRequestResponse::class.java)
 
         when {
             reply?.msg == "success" -> JoinRequestResult.Sent
@@ -190,8 +191,10 @@ suspend fun sendJoinRequest(
                 JoinRequestResult.Failed(reply.error)
             else -> JoinRequestResult.Failed("Could not send your request, try again")
         }
-    } catch (e: Exception) {
-        JoinRequestResult.Failed("Cannot reach the server, try again")
+    } catch (e: IOException) {
+        JoinRequestResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        JoinRequestResult.Failed("Could not send your request, try again")
     }
 }
 
@@ -223,8 +226,10 @@ suspend fun fetchPendingJoinRequests(context: Context, gameId: Int): PendingJoin
         } else {
             PendingJoinRequestsResult.Failed("Couldn't load join requests, try again")
         }
-    } catch (e: Exception) {
-        PendingJoinRequestsResult.Failed("Cannot reach the server, try again")
+    } catch (e: IOException) {
+        PendingJoinRequestsResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        PendingJoinRequestsResult.Failed("Couldn't load join requests, try again")
     }
 }
 
@@ -255,12 +260,7 @@ suspend fun decideJoinRequest(
                 request = request
             )
         } ?: return JoinRequestDecisionResult.Failed(SESSION_ENDED_MESSAGE)
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val reply = response.body() ?: try {
-            com.google.gson.Gson().fromJson(response.errorBody()?.string(), JoinRequestDecisionResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val reply = readReply(response, JoinRequestDecisionResponse::class.java)
 
         val game = reply?.game
         when {
@@ -269,8 +269,10 @@ suspend fun decideJoinRequest(
                 JoinRequestDecisionResult.Failed(reply.error)
             else -> JoinRequestDecisionResult.Failed("Could not save your answer, try again")
         }
-    } catch (e: Exception) {
-        JoinRequestDecisionResult.Failed("Cannot reach the server, try again")
+    } catch (e: IOException) {
+        JoinRequestDecisionResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        JoinRequestDecisionResult.Failed("Could not save your answer, try again")
     }
 }
 
@@ -298,7 +300,9 @@ suspend fun fetchMyGames(context: Context): MyGamesResult {
             "no_games" -> MyGamesResult.Loaded(organized = emptyList(), joined = emptyList())
             else -> MyGamesResult.Failed("Couldn't update your games, try again")
         }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
         MyGamesResult.Failed("Couldn't reach the server, showing your last loaded games")
+    } catch (e: JsonParseException) {
+        MyGamesResult.Failed("Couldn't update your games, try again")
     }
 }

@@ -17,7 +17,7 @@ import retrofit2.http.Query
     using gson
  */
 private val retrofit = Retrofit.Builder()
-    .addConverterFactory(GsonConverterFactory.create())
+    .addConverterFactory(GsonConverterFactory.create(serverGson))
     .baseUrl(BuildConfig.API_BASE_URL)
     .build()
 

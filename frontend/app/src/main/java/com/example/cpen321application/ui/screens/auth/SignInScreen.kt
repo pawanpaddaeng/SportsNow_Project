@@ -15,10 +15,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.example.cpen321application.auth.triggerGoogleSignIn
-import com.example.cpen321application.network.AuthTokenResponse
+import com.example.cpen321application.rememberSafeCoroutineScope
 import com.example.cpen321application.network.LoginRequest
 import com.example.cpen321application.network.ServerApi
-import com.google.gson.Gson
+import com.example.cpen321application.network.readAuthResponse
+import com.google.gson.JsonParseException
+import java.io.IOException
 
 /*
     Sign in screen for SportsNow:
@@ -34,7 +36,7 @@ fun SignInScreen(
     infoMessage: String? = null
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
     var statusText by remember { mutableStateOf<String?>(null) }
     var noticeText by remember { mutableStateOf<String?>(null) }
     var isSigningIn by remember { mutableStateOf(false) }
@@ -109,22 +111,24 @@ fun SignInScreen(
                 statusText = null
                 noticeText = null
                 scope.launch {
-                    val googleToken = triggerGoogleSignIn(context)
-                    if (googleToken == null) {
-                        statusText = "Google sign in failed. Make sure a Google account " +
-                                "is added to this device"
-                        isSigningIn = false
-                        return@launch
-                    }
+                    try {
+                        val googleToken = triggerGoogleSignIn(context)
+                        if (googleToken == null) {
+                            statusText = "Google sign in failed. Make sure a Google account " +
+                                    "is added to this device"
+                            return@launch
+                        }
 
-                    // valid token, log in with the server
-                    when (val result = submitLogin(googleToken)) {
-                        is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
-                        LoginResult.NoUser -> noticeText =
-                            "No account found for this Google account. Please sign up first."
-                        LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
+                        // valid token, log in with the server
+                        when (val result = submitLogin(googleToken)) {
+                            is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
+                            LoginResult.NoUser -> noticeText =
+                                "No account found for this Google account. Please sign up first."
+                            LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
+                        }
+                    } finally {
+                        isSigningIn = false
                     }
-                    isSigningIn = false
                 }
             }
         )
@@ -191,19 +195,16 @@ private sealed interface LoginResult {
 private suspend fun submitLogin(googleToken: String): LoginResult {
     return try {
         val response = ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val body = response.body() ?: try {
-            Gson().fromJson(response.errorBody()?.string(), AuthTokenResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val body = readAuthResponse(response)
 
         when {
             body?.msg == "signedIn" && body.jwtToken != null -> LoginResult.SignedIn(body.jwtToken)
             body?.msg == "no_user" -> LoginResult.NoUser
             else -> LoginResult.Failed
         }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
+        LoginResult.Failed
+    } catch (e: JsonParseException) {
         LoginResult.Failed
     }
 }

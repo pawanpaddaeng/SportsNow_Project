@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.google.gson.JsonParseException
+import org.json.JSONException
 import org.json.JSONObject
 import retrofit2.Response
+import java.io.IOException
 
 //variables to store a logged-in user's name as returned by backend
 var firstName: String? = "Not"
@@ -86,8 +89,11 @@ object Session {
                 ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
             )
             reply?.jwtToken?.takeIf { reply.msg == "signedIn" }
-        } catch (e: Exception) {
-            Log.w(TAG, "Silent sign in failed", e)
+        } catch (e: IOException) {
+            Log.w(TAG, "Silent sign in failed, server unreachable", e)
+            null
+        } catch (e: JsonParseException) {
+            Log.w(TAG, "Silent sign in failed, unreadable reply", e)
             null
         } ?: return@withLock null
 
@@ -112,7 +118,9 @@ object Session {
             source.request(Long.MAX_VALUE)
             val text = source.buffer.clone().readUtf8()
             JSONObject(text).optString("msg").ifBlank { "unauthorized" }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            "unauthorized"
+        } catch (e: JSONException) {
             "unauthorized"
         }
     }

@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.cpen321application.MainActivity
+import com.example.cpen321application.unexpectedErrorHandler
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -40,8 +41,9 @@ fun createNotificationChannel(context: Context) {
  */
 class PushNotificationService : FirebaseMessagingService() {
 
-    // not tied to the service's lifetime, which can end before the request finishes
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // not tied to the service's lifetime, which can end before the request finishes.
+    // An unexpected error is only logged, the app may not be open to show anything
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + unexpectedErrorHandler())
 
     // Firebase issued a new token for this device (e.g. app data cleared, token rotated)
     override fun onNewToken(token: String) {

@@ -31,6 +31,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Locale
 
 private val headerDayFormat = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
@@ -58,7 +59,7 @@ data class JoinRequestItem(
 fun GameDto.toJoinRequestsHeader(): JoinRequestsHeader {
     val day = try {
         Instant.parse(startsAt).atZone(ZoneId.systemDefault()).format(headerDayFormat)
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         startsAt
     }
     val spotsLeft = (maxPlayers - playerCount).coerceAtLeast(0)
@@ -91,7 +92,7 @@ internal fun formatRequestedAgo(createdAt: Instant, now: Instant): String {
 fun PendingJoinRequestDto.toJoinRequestItem(now: Instant = Instant.now()): JoinRequestItem {
     val requested = try {
         "requested ${formatRequestedAgo(Instant.parse(createdAt), now)}"
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         null
     }
     val details = listOfNotNull(

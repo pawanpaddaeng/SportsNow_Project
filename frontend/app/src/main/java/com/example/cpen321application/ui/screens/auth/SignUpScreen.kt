@@ -27,16 +27,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.auth.triggerGoogleSignIn
-import com.example.cpen321application.network.AuthTokenResponse
+import com.example.cpen321application.rememberSafeCoroutineScope
 import com.example.cpen321application.network.ServerApi
 import com.example.cpen321application.network.SignUpRequest
-import com.google.gson.Gson
+import com.example.cpen321application.network.readAuthResponse
+import com.google.gson.JsonParseException
 import com.example.cpen321application.ui.theme.*
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.sportsFieldColors
 import kotlinx.coroutines.launch
+import org.json.JSONException
 import org.json.JSONObject
+import java.io.IOException
 import java.time.Year
 
 // youngest and oldest ages offered in the birth year picker
@@ -70,7 +73,7 @@ fun SignUpScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
 
     var idToken by remember { mutableStateOf<String?>(null) }
     var email by remember { mutableStateOf<String?>(null) }
@@ -134,7 +137,11 @@ fun SignUpScreen(
                 isVerifying = true
                 errorText = null
                 scope.launch {
-                    val token = triggerGoogleSignIn(context)
+                    val token = try {
+                        triggerGoogleSignIn(context)
+                    } finally {
+                        isVerifying = false
+                    }
                     if (token == null) {
                         errorText = "Google verification failed. Try again."
                     } else {
@@ -145,7 +152,6 @@ fun SignUpScreen(
                         if (firstNameText.isBlank()) firstNameText = profile.givenName ?: ""
                         if (lastNameText.isBlank()) lastNameText = profile.familyName ?: ""
                     }
-                    isVerifying = false
                 }
             }
         )
@@ -197,12 +203,16 @@ fun SignUpScreen(
                     isSubmitting = true
                     errorText = null
                     scope.launch {
-                        when (val result = submitSignUp(details)) {
+                        val result = try {
+                            submitSignUp(details)
+                        } finally {
+                            isSubmitting = false
+                        }
+                        when (result) {
                             is SignUpResult.Created -> onSignedUp(details, result.jwtToken)
                             SignUpResult.AlreadyExists -> onAlreadyExists()
                             is SignUpResult.Failed -> errorText = result.message
                         }
-                        isSubmitting = false
                     }
                 },
                 enabled = canCreate,
@@ -374,8 +384,8 @@ private data class GoogleProfile(
     verifies the token itself
  */
 private fun readGoogleProfile(idToken: String): GoogleProfile {
+    val payload = idToken.split(".").getOrNull(1) ?: return GoogleProfile(null, null, null)
     return try {
-        val payload = idToken.split(".")[1]
         val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
         val json = JSONObject(String(Base64.decode(payload, flags)))
         GoogleProfile(
@@ -383,7 +393,10 @@ private fun readGoogleProfile(idToken: String): GoogleProfile {
             givenName = json.optString("given_name").ifBlank { null },
             familyName = json.optString("family_name").ifBlank { null }
         )
-    } catch (e: Exception) {
+    } catch (e: IllegalArgumentException) {
+        // not valid base64
+        GoogleProfile(null, null, null)
+    } catch (e: JSONException) {
         GoogleProfile(null, null, null)
     }
 }
@@ -413,12 +426,7 @@ private suspend fun submitSignUp(details: SignUpDetails): SignUpResult {
                 birthYear = details.birthYear
             )
         )
-        // error responses (4xx/5xx) carry the same json shape in the error body
-        val body = response.body() ?: try {
-            Gson().fromJson(response.errorBody()?.string(), AuthTokenResponse::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        val body = readAuthResponse(response)
 
         when {
             body?.msg == "signedIn" && body.jwtToken != null -> SignUpResult.Created(body.jwtToken)
@@ -427,7 +435,9 @@ private suspend fun submitSignUp(details: SignUpDetails): SignUpResult {
                 SignUpResult.Failed("Your Google verification expired, verify with Google again")
             else -> SignUpResult.Failed(body?.error ?: "Could not create account, try again")
         }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
         SignUpResult.Failed("Cannot Reach Server")
+    } catch (e: JsonParseException) {
+        SignUpResult.Failed("Could not create account, try again")
     }
 }

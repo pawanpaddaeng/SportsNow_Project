@@ -28,8 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.BuildConfig
+import com.example.cpen321application.rememberSafeCoroutineScope
+import com.example.cpen321application.rememberUnexpectedErrorHandler
+import com.example.cpen321application.runGuarded
 import com.example.cpen321application.location.hasLocationPermission
 import com.example.cpen321application.ui.theme.*
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -52,6 +56,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -87,7 +92,8 @@ fun PickLocationScreen(
     initialLocation: GameLocation? = null
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
+    val safetyNet = rememberUnexpectedErrorHandler()
     val focusManager = LocalFocusManager.current
     val placesClient = remember { createPlacesClient(context) }
     val sessionToken = remember { AutocompleteSessionToken.newInstance() }
@@ -122,8 +128,13 @@ fun PickLocationScreen(
     LaunchedEffect(Unit) {
         if (selected == null) {
             isResolving = true
-            selected = describePoint(context, start)
-            isResolving = false
+            runGuarded(safetyNet) {
+                try {
+                    selected = describePoint(context, start)
+                } finally {
+                    isResolving = false
+                }
+            }
         }
     }
 
@@ -133,10 +144,12 @@ fun PickLocationScreen(
             cameraState.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE
         ) {
             isResolving = true
-            try {
-                selected = describePoint(context, cameraState.position.target)
-            } finally {
-                isResolving = false
+            runGuarded(safetyNet) {
+                try {
+                    selected = describePoint(context, cameraState.position.target)
+                } finally {
+                    isResolving = false
+                }
             }
         }
     }
@@ -149,7 +162,9 @@ fun PickLocationScreen(
             return@LaunchedEffect
         }
         delay(300)
-        suggestions = findSuggestions(placesClient, text, sessionToken)
+        runGuarded(safetyNet) {
+            suggestions = findSuggestions(placesClient, text, sessionToken)
+        }
     }
 
     val isBusy = isResolving || cameraState.isMoving
@@ -361,7 +376,11 @@ private fun createPlacesClient(context: Context): PlacesClient? {
             Places.initializeWithNewPlacesApiEnabled(context.applicationContext, apiKey)
         }
         Places.createClient(context)
-    } catch (e: Exception) {
+    } catch (e: IllegalArgumentException) {
+        // the API key was rejected
+        Log.w(TAG, "Could not start Places search", e)
+        null
+    } catch (e: IllegalStateException) {
         Log.w(TAG, "Could not start Places search", e)
         null
     }
@@ -379,7 +398,7 @@ private suspend fun findSuggestions(
         .build()
     return try {
         client.findAutocompletePredictions(request).await().autocompletePredictions
-    } catch (e: Exception) {
+    } catch (e: ApiException) {
         Log.w(TAG, "Place search failed", e)
         emptyList()
     }
@@ -404,7 +423,7 @@ private suspend fun fetchPlace(
             latitude = point.latitude,
             longitude = point.longitude
         )
-    } catch (e: Exception) {
+    } catch (e: ApiException) {
         Log.w(TAG, "Could not load the place", e)
         null
     }
@@ -447,7 +466,11 @@ private suspend fun reverseGeocode(context: Context, point: LatLng): Address? {
                 geocoder.getFromLocation(point.latitude, point.longitude, 1)?.firstOrNull()
             }
         }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
+        // the geocoder service couldn't be reached
+        Log.w(TAG, "Could not find an address for the point", e)
+        null
+    } catch (e: IllegalArgumentException) {
         Log.w(TAG, "Could not find an address for the point", e)
         null
     }

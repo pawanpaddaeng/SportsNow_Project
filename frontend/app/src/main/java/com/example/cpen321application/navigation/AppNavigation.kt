@@ -17,7 +17,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -80,6 +79,9 @@ import com.example.cpen321application.ui.screens.home.GameSummary
 import com.example.cpen321application.ui.screens.home.HomeScreen
 import com.example.cpen321application.ui.screens.home.toGameSummary
 import kotlinx.coroutines.launch
+import com.example.cpen321application.rememberSafeCoroutineScope
+import com.example.cpen321application.rememberUnexpectedErrorHandler
+import com.example.cpen321application.runGuarded
 import com.example.cpen321application.ui.screens.profile.ProfileScreen
 import com.example.cpen321application.users.ProfileResult
 import com.example.cpen321application.users.UserProfile
@@ -98,7 +100,10 @@ import androidx.core.net.toUri
 fun AppNavigation(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    // an unexpected error in these coroutines shows a message instead of crashing,
+    // so each one resets its loading flag in a finally block
+    val scope = rememberSafeCoroutineScope()
+    val safetyNet = rememberUnexpectedErrorHandler()
 
     // sign in automatically with a token from a previous session, if it expired
     // the notification registration below renews it
@@ -126,14 +131,17 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         if (isLoadingProfile) return
         isLoadingProfile = true
         scope.launch {
-            when (val result = fetchMyProfile(context)) {
-                is ProfileResult.Loaded -> {
-                    profile = result.profile
-                    profileError = null
+            try {
+                when (val result = fetchMyProfile(context)) {
+                    is ProfileResult.Loaded -> {
+                        profile = result.profile
+                        profileError = null
+                    }
+                    is ProfileResult.Failed -> profileError = result.message
                 }
-                is ProfileResult.Failed -> profileError = result.message
+            } finally {
+                isLoadingProfile = false
             }
-            isLoadingProfile = false
         }
     }
 
@@ -145,7 +153,12 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         isSavingProfile = true
         saveProfileError = null
         scope.launch {
-            when (val result = updateMyProfile(context, form)) {
+            val result = try {
+                updateMyProfile(context, form)
+            } finally {
+                isSavingProfile = false
+            }
+            when (result) {
                 is ProfileResult.Loaded -> {
                     profile = result.profile
                     profileError = null
@@ -157,7 +170,6 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 }
                 is ProfileResult.Failed -> saveProfileError = result.message
             }
-            isSavingProfile = false
         }
     }
 
@@ -166,17 +178,20 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         if (isRefreshingGames) return
         isRefreshingGames = true
         scope.launch {
-            when (val result = fetchMyGames(context)) {
-                is MyGamesResult.Loaded -> {
-                    organizedGames.clear()
-                    organizedGames.addAll(result.organized.map { it.toGameSummary() })
-                    joinedGames.clear()
-                    joinedGames.addAll(result.joined.map { it.toGameSummary() })
-                    gamesError = null
+            try {
+                when (val result = fetchMyGames(context)) {
+                    is MyGamesResult.Loaded -> {
+                        organizedGames.clear()
+                        organizedGames.addAll(result.organized.map { it.toGameSummary() })
+                        joinedGames.clear()
+                        joinedGames.addAll(result.joined.map { it.toGameSummary() })
+                        gamesError = null
+                    }
+                    is MyGamesResult.Failed -> gamesError = result.message
                 }
-                is MyGamesResult.Failed -> gamesError = result.message
+            } finally {
+                isRefreshingGames = false
             }
-            isRefreshingGames = false
         }
     }
 
@@ -198,31 +213,33 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         if (isLoadingDiscover) return
         isLoadingDiscover = true
         scope.launch {
-            val place = discoverPlace
-            val location = when {
-                place != null -> DeviceLocation(place.latitude, place.longitude)
-                else -> discoverLocation.takeUnless { refreshLocation } ?: currentDeviceLocation(context)
-            }
-            if (location == null) {
-                discoverError = if (isLocationEnabled(context)) {
-                    "Couldn't find where you are yet. Wait a moment, then try again."
-                } else {
-                    "Location is turned off. Turn it on in your phone's settings, then try again."
+            try {
+                val place = discoverPlace
+                val location = when {
+                    place != null -> DeviceLocation(place.latitude, place.longitude)
+                    else -> discoverLocation.takeUnless { refreshLocation } ?: currentDeviceLocation(context)
                 }
+                if (location == null) {
+                    discoverError = if (isLocationEnabled(context)) {
+                        "Couldn't find where you are yet. Wait a moment, then try again."
+                    } else {
+                        "Location is turned off. Turn it on in your phone's settings, then try again."
+                    }
+                    return@launch
+                }
+                discoverLocation = location
+                when (val result = fetchDiscoverGames(context, location.latitude, location.longitude)) {
+                    is DiscoverGamesResult.Loaded -> {
+                        discoverGames.clear()
+                        discoverGames.addAll(result.games.map { it.toDiscoverGame() })
+                        hasLoadedDiscover = true
+                        discoverError = null
+                    }
+                    is DiscoverGamesResult.Failed -> discoverError = result.message
+                }
+            } finally {
                 isLoadingDiscover = false
-                return@launch
             }
-            discoverLocation = location
-            when (val result = fetchDiscoverGames(context, location.latitude, location.longitude)) {
-                is DiscoverGamesResult.Loaded -> {
-                    discoverGames.clear()
-                    discoverGames.addAll(result.games.map { it.toDiscoverGame() })
-                    hasLoadedDiscover = true
-                    discoverError = null
-                }
-                is DiscoverGamesResult.Failed -> discoverError = result.message
-            }
-            isLoadingDiscover = false
         }
     }
 
@@ -476,20 +493,23 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 if (isLoading) return
                 isLoading = true
                 scope.launch {
-                    when (val result = fetchGameDetails(context, gameId)) {
-                        is GameDetailsResult.Loaded -> {
-                            details = result.details.toGameDetails(result.game)
-                            error = null
-                            notFound = false
+                    try {
+                        when (val result = fetchGameDetails(context, gameId)) {
+                            is GameDetailsResult.Loaded -> {
+                                details = result.details.toGameDetails(result.game)
+                                error = null
+                                notFound = false
+                            }
+                            GameDetailsResult.NotFound -> {
+                                details = null
+                                error = "This game no longer exists."
+                                notFound = true
+                            }
+                            is GameDetailsResult.Failed -> error = result.message
                         }
-                        GameDetailsResult.NotFound -> {
-                            details = null
-                            error = "This game no longer exists."
-                            notFound = true
-                        }
-                        is GameDetailsResult.Failed -> error = result.message
+                    } finally {
+                        isLoading = false
                     }
-                    isLoading = false
                 }
             }
 
@@ -526,8 +546,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onCancelGame = {
                     isCancelling = true
                     scope.launch {
-                        val result = cancelGame(context, gameId)
-                        isCancelling = false
+                        val result = try {
+                            cancelGame(context, gameId)
+                        } finally {
+                            isCancelling = false
+                        }
                         when (result) {
                             is GameChangeResult.Done -> {
                                 Toast.makeText(context, "Game cancelled", Toast.LENGTH_SHORT).show()
@@ -559,14 +582,17 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                         isSendingRequest = true
                         joinRequestError = null
                         scope.launch {
-                            val result = sendJoinRequest(
-                                context = context,
-                                gameId = gameId,
-                                skillLevel = answers.skillLevel,
-                                playFrequency = answers.playFrequency,
-                                message = answers.message
-                            )
-                            isSendingRequest = false
+                            val result = try {
+                                sendJoinRequest(
+                                    context = context,
+                                    gameId = gameId,
+                                    skillLevel = answers.skillLevel,
+                                    playFrequency = answers.playFrequency,
+                                    message = answers.message
+                                )
+                            } finally {
+                                isSendingRequest = false
+                            }
                             when (result) {
                                 is JoinRequestResult.Sent -> {
                                     showJoinSheet = false
@@ -601,22 +627,25 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 if (isLoading) return
                 isLoading = true
                 scope.launch {
-                    when (val result = fetchPendingJoinRequests(context, gameId)) {
-                        is PendingJoinRequestsResult.Loaded -> {
-                            header = result.game.toJoinRequestsHeader()
-                            requests.clear()
-                            requests.addAll(result.requests.map { it.toJoinRequestItem() })
-                            error = null
+                    try {
+                        when (val result = fetchPendingJoinRequests(context, gameId)) {
+                            is PendingJoinRequestsResult.Loaded -> {
+                                header = result.game.toJoinRequestsHeader()
+                                requests.clear()
+                                requests.addAll(result.requests.map { it.toJoinRequestItem() })
+                                error = null
+                            }
+                            is PendingJoinRequestsResult.Unavailable -> {
+                                header = null
+                                requests.clear()
+                                error = result.message
+                                unavailable = true
+                            }
+                            is PendingJoinRequestsResult.Failed -> error = result.message
                         }
-                        is PendingJoinRequestsResult.Unavailable -> {
-                            header = null
-                            requests.clear()
-                            error = result.message
-                            unavailable = true
-                        }
-                        is PendingJoinRequestsResult.Failed -> error = result.message
+                    } finally {
+                        isLoading = false
                     }
-                    isLoading = false
                 }
             }
 
@@ -624,8 +653,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             fun decide(request: JoinRequestItem, approve: Boolean) {
                 busyRequestIds = busyRequestIds + request.requestId
                 scope.launch {
-                    val result = decideJoinRequest(context, gameId, request.requestId, approve)
-                    busyRequestIds = busyRequestIds - request.requestId
+                    val result = try {
+                        decideJoinRequest(context, gameId, request.requestId, approve)
+                    } finally {
+                        busyRequestIds = busyRequestIds - request.requestId
+                    }
                     when (result) {
                         is JoinRequestDecisionResult.Done -> {
                             requests.removeAll { it.requestId == request.requestId }
@@ -688,8 +720,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onSubmit = { form ->
                     isSubmitting = true
                     scope.launch {
-                        val result = createGame(context, form)
-                        isSubmitting = false
+                        val result = try {
+                            createGame(context, form)
+                        } finally {
+                            isSubmitting = false
+                        }
                         when (result) {
                             is GameChangeResult.Done -> {
                                 // show the new game right away, at the top of Organized Games
@@ -724,27 +759,31 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
             LaunchedEffect(gameId) {
                 if (initial != null) return@LaunchedEffect
-                when (val result = fetchGameDetails(context, gameId)) {
-                    is GameDetailsResult.Loaded -> when {
-                        result.details.viewerRole != "organizer" ->
-                            loadError = "Only the organizer can edit this game."
-                        result.game.status == "cancelled" -> loadError = "This game was cancelled."
-                        else -> {
-                            val form = runCatching { result.game.toGameInfoForm() }.getOrNull()
-                            if (form == null) {
-                                loadError = "Couldn't load this game, try again"
-                                return@LaunchedEffect
+                runGuarded(safetyNet) {
+                    when (val result = fetchGameDetails(context, gameId)) {
+                        is GameDetailsResult.Loaded -> when {
+                            result.details.viewerRole != "organizer" ->
+                                loadError = "Only the organizer can edit this game."
+                            result.game.status == "cancelled" -> loadError = "This game was cancelled."
+                            else -> {
+                                val form = runCatching { result.game.toGameInfoForm() }.getOrNull()
+                                if (form == null) {
+                                    loadError = "Couldn't load this game, try again"
+                                    return@runGuarded
+                                }
+                                playerCount = result.game.playerCount
+                                if (backStackEntry.savedStateHandle.get<GameLocation>(PICKED_LOCATION_KEY) == null) {
+                                    backStackEntry.savedStateHandle[PICKED_LOCATION_KEY] = form.location
+                                }
+                                initial = form
                             }
-                            playerCount = result.game.playerCount
-                            if (backStackEntry.savedStateHandle.get<GameLocation>(PICKED_LOCATION_KEY) == null) {
-                                backStackEntry.savedStateHandle[PICKED_LOCATION_KEY] = form.location
-                            }
-                            initial = form
                         }
+                        GameDetailsResult.NotFound -> loadError = "This game no longer exists."
+                        is GameDetailsResult.Failed -> loadError = result.message
                     }
-                    GameDetailsResult.NotFound -> loadError = "This game no longer exists."
-                    is GameDetailsResult.Failed -> loadError = result.message
                 }
+                // an unexpected error left nothing loaded: show a message instead of loading forever
+                if (initial == null && loadError == null) loadError = "Couldn't load this game, try again"
             }
 
             InputGameInfoScreen(
@@ -761,8 +800,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 onSubmit = { form ->
                     isSubmitting = true
                     scope.launch {
-                        val result = updateGame(context, gameId, form)
-                        isSubmitting = false
+                        val result = try {
+                            updateGame(context, gameId, form)
+                        } finally {
+                            isSubmitting = false
+                        }
                         when (result) {
                             // Game Details reloads when it's shown again, so it has the changes
                             is GameChangeResult.Done -> {

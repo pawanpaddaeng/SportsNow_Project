@@ -12,11 +12,16 @@ const DEAD_TOKEN_ERRORS = new Set([
     GOOGLE_APPLICATION_CREDENTIALS. Set up on first use so the server still
     starts (and tests run) without the key
  */
-function messaging() {
+function ensureFirebaseApp(): void {
   if (getApps().length === 0) {
     initializeApp({ credential: applicationDefault() });
   }
-  return getMessaging();
+}
+
+// whether Firebase answered a send with an error meaning the token will never work again
+function isDeadTokenResponse(response: unknown): boolean {
+  const code = (response as { error?: { code?: unknown } } | undefined)?.error?.code;
+  return typeof code === 'string' && DEAD_TOKEN_ERRORS.has(code);
 }
 
 export interface PushMessage {
@@ -35,19 +40,19 @@ export async function sendPushToUser(userId: number, message: PushMessage): Prom
     const tokens = await getDeviceTokens(userId);
     if (tokens.length === 0) return 0;
 
-    const result = await messaging().sendEachForMulticast({
+    ensureFirebaseApp();
+    const result = await getMessaging().sendEachForMulticast({
       tokens,
       notification: { title: message.title, body: message.body },
       data: message.data ?? {},
     });
 
-    const deadTokens = tokens.filter((_token, i) => {
-      const code = result.responses[i]?.error?.code;
-      return code !== undefined && DEAD_TOKEN_ERRORS.has(code);
-    });
+    // one response per token, in the same order
+    const responses: unknown[] = result.responses;
+    const deadTokens = tokens.filter((_token, i) => isDeadTokenResponse(responses.at(i)));
     await deleteDeviceTokens(deadTokens);
 
-    return result.successCount;
+    return Number(result.successCount);
   } catch (error) {
     console.error(`Sending push notification to user ${userId} failed:`, error);
     return 0;

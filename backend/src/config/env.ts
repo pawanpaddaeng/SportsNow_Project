@@ -10,10 +10,13 @@ if (Number.isNaN(port) || port < 1 || port > 65535) {
   throw new Error(`Invalid PORT: ${rawPort}`);
 }
 
+// the environment variables, looked up by name with get() instead of indexing process.env
+const environment = new Map(Object.entries(process.env));
+
 // MySQL credentials are defined once in the root .env and passed in by
 // docker-compose; the connection URL is built from them here.
 function requiredEnv(name: string): string {
-  const value = process.env[name];
+  const value = environment.get(name);
   if (value === undefined || value === '') {
     throw new Error(`${name} is not set (see .env.example)`);
   }

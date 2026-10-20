@@ -5,9 +5,9 @@ import com.google.gson.annotations.SerializedName
 
 data class UserProfileDto(
     @SerializedName("user_id") val userId: Int,
-    val email: String,
-    @SerializedName("f_name") val firstName: String,
-    @SerializedName("l_name") val lastName: String,
+    @field:Required val email: String,
+    @field:Required @SerializedName("f_name") val firstName: String,
+    @field:Required @SerializedName("l_name") val lastName: String,
     val birthYear: Int,
     @SerializedName("created_at") val createdAt: String?
 )

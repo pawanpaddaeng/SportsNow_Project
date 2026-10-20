@@ -33,6 +33,8 @@ import { parseCoordinates } from './validation/coordinates';
 import { parseJoinRequest, type JoinRequestBody } from './validation/joinRequest';
 import { parseNewGame, type CreateGameBody } from './validation/newGame';
 import { sendPushToUser, sendPushToUsers } from './notifications/push';
+import { asyncRoute } from './http/asyncRoute';
+import { logInfo } from './logger';
 
 // how long after creating a game the debug notification is sent
 const DEBUG_NOTIFICATION_DELAY_MS = 5000;
@@ -137,7 +139,7 @@ export function createApp(): Express {
 
   //add clients to set when connected
   server.on('connection', (ws) => {
-    console.log("CLIENT CONNECTED TO WEBSOCKET")
+    logInfo('CLIENT CONNECTED TO WEBSOCKET')
     clients.add(ws);
     ws.on('close', () => clients.delete(ws));
   });
@@ -157,9 +159,9 @@ export function createApp(): Express {
     idToken: string;
   }
 
-  app.post('/api/auth/google', async (req: Request<{}, {}, GoogleAuthRequestBody>, res: Response) => {
-    const { idToken } = req.body;
-    console.log("Received an authorization request");
+  app.post('/api/auth/google', asyncRoute(async (req: Request<{}, {}, GoogleAuthRequestBody | undefined>, res: Response) => {
+    const { idToken } = req.body ?? {};
+    logInfo('Received an authorization request');
     
 
     if (!idToken) {
@@ -181,7 +183,7 @@ export function createApp(): Express {
 
       const firstName = payload.given_name || '';
       const lastName = payload.family_name || '';
-      console.log(`Successfully authenticated user`);
+      logInfo('Successfully authenticated user');
 
       //send user info back, add more to this when adding session ids
       return res.status(200).json({
@@ -195,7 +197,7 @@ export function createApp(): Express {
       console.error('Token verification failed:', error);
       return res.status(401).json({ error: 'Invalid Google ID token' });
     }
-  });
+  }));
 
   interface SignUpRequestBody {
     id_token?: unknown;
@@ -209,9 +211,9 @@ export function createApp(): Express {
       returns a JWT for future requests. Responds already_exists if the
       Google account already has a user, they should sign in instead
    */
-  app.post('/api/auth/signup', async (req: Request<{}, {}, SignUpRequestBody>, res: Response) => {
+  app.post('/api/auth/signup', asyncRoute(async (req: Request<{}, {}, SignUpRequestBody | undefined>, res: Response) => {
     const { id_token, email } = req.body ?? {};
-    console.log("Received a sign up request");
+    logInfo('Received a sign up request');
 
     if (typeof id_token !== 'string' || id_token === '' || typeof email !== 'string' || email === '') {
       return res.status(400).json({ msg: 'invalid_request', error: 'id_token and email are required' });
@@ -258,7 +260,7 @@ export function createApp(): Express {
         lastName,
         birthYear: year,
       });
-      console.log(`User created id:`, userId);
+      logInfo(`User created id: ${userId}`);
 
       return res.status(201).json({ msg: 'signedIn', jwt_token: createAuthToken(userId) });
     } catch (error) {
@@ -269,7 +271,7 @@ export function createApp(): Express {
       console.error('Sign up failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not create account, try again later' });
     }
-  });
+  }));
 
   interface LoginRequestBody {
     id_token?: unknown;
@@ -279,9 +281,9 @@ export function createApp(): Express {
       user exists. Responds no_user if they need to sign up first, other
       errors use the same msg codes as sign up with a description in error
    */
-  app.post('/api/auth/login', async (req: Request<{}, {}, LoginRequestBody>, res: Response) => {
+  app.post('/api/auth/login', asyncRoute(async (req: Request<{}, {}, LoginRequestBody | undefined>, res: Response) => {
     const { id_token } = req.body ?? {};
-    console.log("Received a login request");
+    logInfo('Received a login request');
 
     if (typeof id_token !== 'string' || id_token === '') {
       return res.status(400).json({ msg: 'invalid_request', error: 'id_token is required' });
@@ -307,18 +309,18 @@ export function createApp(): Express {
         return res.status(404).json({ msg: 'no_user' });
       }
 
-      console.log(`User signed in id:`, user.userId);
+      logInfo(`User signed in id: ${user.userId}`);
       return res.status(200).json({ msg: 'signedIn', jwt_token: createAuthToken(user.userId) });
     } catch (error) {
       console.error('Login failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not sign in, try again later' });
     }
-  });
+  }));
 
   /*  saves the device's Firebase token for the signed in user so the server
       can send them push notifications. requireAuth checks the JWT first
    */
-  app.post('/api/register_notif', requireAuth, async (req: Request, res: Response) => {
+  app.post('/api/register_notif', requireAuth, asyncRoute(async (req: Request, res: Response) => {
     const fcmToken: unknown = req.body?.fcm_token;
     const user = getAuthUser(res);
 
@@ -331,20 +333,20 @@ export function createApp(): Express {
 
     try {
       await saveDeviceToken(fcmToken.trim(), user.userId);
-      console.log(`Registered notification token for user id:`, user.userId);
+      logInfo(`Registered notification token for user id: ${user.userId}`);
       return res.status(200).json({ msg: 'success' });
     } catch (error) {
       console.error('Registering notification token failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not register notifications, try again later' });
     }
-  });
+  }));
 
   /*  create game: makes the game described in the body for the signed in user, who
       becomes its organizer and first player. Responds with the stored game, or
       400 invalid_request with the problem if a field is missing or invalid.
       Also sends the organizer a push notification after a few seconds to test notifications
    */
-  app.post('/api/games', requireAuth, async (req: Request<{}, {}, CreateGameBody>, res: Response) => {
+  app.post('/api/games', requireAuth, asyncRoute(async (req: Request<{}, {}, CreateGameBody | undefined>, res: Response) => {
     const user = getAuthUser(res);
     const parsed = parseNewGame(req.body, user.userId);
     if (!parsed.ok) {
@@ -354,7 +356,7 @@ export function createApp(): Express {
 
     try {
       const gameId = await createGame(game);
-      console.log(`Game created id:`, gameId);
+      logInfo(`Game created id: ${gameId}`);
       // read it back so the app gets the stored values (times, player count, status, ...)
       const created = await getGameById(gameId);
       if (!created) {
@@ -367,7 +369,7 @@ export function createApp(): Express {
           title: 'Game created',
           body: `${game.title} at ${game.locationName} was created`,
           data: { type: 'game_created', gameId: String(gameId) },
-        }).then((devices) => console.log(`Debug game notification sent to ${devices} device(s)`));
+        }).then((devices) => logInfo(`Debug game notification sent to ${devices} device(s)`));
       }, DEBUG_NOTIFICATION_DELAY_MS);
 
       return res.status(201).json({ msg: 'success', game: gameJson(created) });
@@ -375,12 +377,12 @@ export function createApp(): Express {
       console.error('Creating game failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not create game, try again later' });
     }
-  });
+  }));
 
   /*  the signed in user's games, split into the ones they organized and the ones
       they joined, soonest first. Responds msg "no_games" if they have none yet
    */
-  app.get('/api/games/mine', requireAuth, async (_req: Request, res: Response) => {
+  app.get('/api/games/mine', requireAuth, asyncRoute(async (_req: Request, res: Response) => {
     const user = getAuthUser(res);
     try {
       const { organized, joined } = await getGamesForUser(user.userId);
@@ -396,7 +398,7 @@ export function createApp(): Express {
       console.error('Loading games failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
     }
-  });
+  }));
 
   /*  discover: upcoming games near ?lat=&lng= (within MAX_DISCOVER_DISTANCE_M) that the
       signed in user can ask to join, closest first. Each has distance_m and the user's
@@ -404,7 +406,7 @@ export function createApp(): Express {
       are nearby, 400 invalid_request for missing or out of range coordinates.
       Registered before /api/games/:gameId so "discover" isn't read as an id
    */
-  app.get('/api/games/discover', requireAuth, async (req: Request, res: Response) => {
+  app.get('/api/games/discover', requireAuth, asyncRoute(async (req: Request, res: Response) => {
     const user = getAuthUser(res);
     const point = parseCoordinates(req.query.lat, req.query.lng);
     if (!point) {
@@ -424,7 +426,7 @@ export function createApp(): Express {
       console.error('Loading discover games failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not load games, try again later' });
     }
-  });
+  }));
 
   /*  game details: the game with its organizer, players and what the signed in user
       can do with it. viewer_role is "organizer", "player" (joined) or "viewer".
@@ -433,7 +435,7 @@ export function createApp(): Express {
       Responds 400 invalid_request for a malformed id, 404 not_found if no game has it.
       Registered after /api/games/mine so "mine" isn't read as an id
    */
-  app.get('/api/games/:gameId', requireAuth, async (req: Request<{ gameId: string }>, res: Response) => {
+  app.get('/api/games/:gameId', requireAuth, asyncRoute(async (req: Request<{ gameId: string }>, res: Response) => {
     const user = getAuthUser(res);
     const gameId = readGameId(req.params.gameId);
     if (gameId === null) {
@@ -476,7 +478,7 @@ export function createApp(): Express {
       console.error('Loading game details failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not load the game, try again later' });
     }
-  });
+  }));
 
   /*  edit game: the organizer replaces the game's details. The body has the same
       fields as create game; ends_at is kept as it is when left out. Responds with the
@@ -484,7 +486,8 @@ export function createApp(): Express {
       Errors: 400 invalid_request (bad field, or max_players below the current players),
       403 forbidden (not the organizer), 404 not_found, 409 game_cancelled / game_started
    */
-  app.put('/api/games/:gameId', requireAuth, async (req: Request<{ gameId: string }, {}, CreateGameBody>, res: Response) => {
+  app.put('/api/games/:gameId', requireAuth,
+    asyncRoute(async (req: Request<{ gameId: string }, {}, CreateGameBody | undefined>, res: Response) => {
     const user = getAuthUser(res);
     const gameId = readGameId(req.params.gameId);
     if (gameId === null) {
@@ -522,7 +525,7 @@ export function createApp(): Express {
       if (!after) {
         throw new Error(`Game ${gameId} not found after updating it`);
       }
-      console.log(`Game updated id:`, gameId);
+      logInfo(`Game updated id: ${gameId}`);
 
       const changes = describeChanges(before, after);
       if (result.changed && changes.length > 0) {
@@ -533,7 +536,7 @@ export function createApp(): Express {
             body: `${after.title}: the organizer changed the ${changes.join(', ')}`,
             data: { type: 'game_updated', gameId: String(gameId) },
           }))
-          .then((devices) => console.log(`Game ${gameId} update notification sent to ${devices} device(s)`))
+          .then((devices) => logInfo(`Game ${gameId} update notification sent to ${devices} device(s)`))
           .catch((error: unknown) => console.error(`Notifying players of game ${gameId} failed:`, error));
       }
 
@@ -542,14 +545,14 @@ export function createApp(): Express {
       console.error('Updating game failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not update game, try again later' });
     }
-  });
+  }));
 
   /*  cancel game: the organizer cancels a game that hasn't started. It stays with
       status "cancelled" so players can see what happened, and they and anyone with a
       pending join request are notified. Responds with the cancelled game.
       Errors: 400 invalid_request, 403 forbidden, 404 not_found, 409 game_cancelled / game_started
    */
-  app.post('/api/games/:gameId/cancel', requireAuth, async (req: Request<{ gameId: string }>, res: Response) => {
+  app.post('/api/games/:gameId/cancel', requireAuth, asyncRoute(async (req: Request<{ gameId: string }>, res: Response) => {
     const user = getAuthUser(res);
     const gameId = readGameId(req.params.gameId);
     if (gameId === null) {
@@ -567,7 +570,7 @@ export function createApp(): Express {
       if (!game) {
         throw new Error(`Game ${gameId} not found after cancelling it`);
       }
-      console.log(`Game cancelled id:`, gameId);
+      logInfo(`Game cancelled id: ${gameId}`);
 
       void getUsersToNotify(gameId, user.userId)
         .then((userIds) => sendPushToUsers(userIds, {
@@ -575,7 +578,7 @@ export function createApp(): Express {
           body: `${game.title} at ${game.locationName} was cancelled by the organizer`,
           data: { type: 'game_cancelled', gameId: String(gameId) },
         }))
-        .then((devices) => console.log(`Game ${gameId} cancel notification sent to ${devices} device(s)`))
+        .then((devices) => logInfo(`Game ${gameId} cancel notification sent to ${devices} device(s)`))
         .catch((error: unknown) => console.error(`Notifying players of game ${gameId} failed:`, error));
 
       return res.status(200).json({ msg: 'success', game: gameJson(game) });
@@ -583,7 +586,7 @@ export function createApp(): Express {
       console.error('Cancelling game failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not cancel game, try again later' });
     }
-  });
+  }));
 
   /*  join request: the signed in user asks the organizer to let them join, with the
       answers from the join request popup. Responds 201 with the pending request and
@@ -591,7 +594,7 @@ export function createApp(): Express {
       409 own_game / already_player / already_requested / game_full / game_cancelled / game_started
    */
   app.post('/api/games/:gameId/join-requests', requireAuth,
-    async (req: Request<{ gameId: string }, {}, JoinRequestBody>, res: Response) => {
+    asyncRoute(async (req: Request<{ gameId: string }, {}, JoinRequestBody | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const gameId = readGameId(req.params.gameId);
       if (gameId === null) {
@@ -608,14 +611,14 @@ export function createApp(): Express {
           const { status, body } = joinRequestError(result.problem);
           return res.status(status).json(body);
         }
-        console.log(`Join request ${result.requestId} sent for game id:`, gameId);
+        logInfo(`Join request ${result.requestId} sent for game id: ${gameId}`);
 
         // best effort, the app gets its reply without waiting for the notification
         void sendPushToUser(result.organizerId, {
           title: 'New join request',
           body: `${user.firstName} wants to join ${result.title}`,
           data: { type: 'join_request', gameId: String(gameId) },
-        }).then((devices) => console.log(`Join request notification sent to ${devices} device(s)`));
+        }).then((devices) => logInfo(`Join request notification sent to ${devices} device(s)`));
 
         return res.status(201).json({
           msg: 'success',
@@ -625,13 +628,14 @@ export function createApp(): Express {
         console.error('Sending join request failed:', error);
         return res.status(500).json({ msg: 'server_error', error: 'Could not send your request, try again later' });
       }
-    });
+    }));
 
   /*  the organizer's view of who asked to join: the game and its pending requests,
       newest first (an empty list when there are none).
       Errors: 400 invalid_request, 403 forbidden (not the organizer), 404 not_found
    */
-  app.get('/api/games/:gameId/join-requests', requireAuth, async (req: Request<{ gameId: string }>, res: Response) => {
+  app.get('/api/games/:gameId/join-requests', requireAuth,
+    asyncRoute(async (req: Request<{ gameId: string }>, res: Response) => {
     const user = getAuthUser(res);
     const gameId = readGameId(req.params.gameId);
     if (gameId === null) {
@@ -657,7 +661,7 @@ export function createApp(): Express {
       console.error('Loading join requests failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not load join requests, try again later' });
     }
-  });
+  }));
 
   /*  the organizer approves or declines a pending request ({ decision: "approve" | "decline" }).
       Approving adds the requester to the game. Responds with the game after the decision
@@ -665,7 +669,7 @@ export function createApp(): Express {
       404 not_found / request_not_found, 409 game_cancelled / game_started / game_full / already_responded
    */
   app.patch('/api/games/:gameId/join-requests/:requestId', requireAuth,
-    async (req: Request<{ gameId: string; requestId: string }, {}, { decision?: unknown }>, res: Response) => {
+    asyncRoute(async (req: Request<{ gameId: string; requestId: string }, {}, { decision?: unknown } | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const gameId = readGameId(req.params.gameId);
       // request ids are INT UNSIGNED like game ids, so they're read the same way
@@ -690,7 +694,7 @@ export function createApp(): Express {
         if (!game) {
           throw new Error(`Game ${gameId} not found after answering request ${requestId}`);
         }
-        console.log(`Join request ${requestId} ${approve ? 'approved' : 'declined'} for game id:`, gameId);
+        logInfo(`Join request ${requestId} ${approve ? 'approved' : 'declined'} for game id: ${gameId}`);
 
         // best effort, the app gets its reply without waiting for the notification
         void sendPushToUser(result.requesterId, approve
@@ -703,7 +707,7 @@ export function createApp(): Express {
             title: 'Request declined',
             body: `The organizer declined your request to join ${result.title}`,
             data: { type: 'join_request_declined', gameId: String(gameId) },
-          }).then((devices) => console.log(`Join request answer sent to ${devices} device(s)`));
+          }).then((devices) => logInfo(`Join request answer sent to ${devices} device(s)`));
 
         return res.status(200).json({
           msg: 'success',
@@ -714,7 +718,7 @@ export function createApp(): Express {
         console.error('Answering join request failed:', error);
         return res.status(500).json({ msg: 'server_error', error: 'Could not save your answer, try again later' });
       }
-    });
+    }));
     /*GET profile
   */
   app.get('/api/users/me', requireAuth, (_req: Request, res: Response) => {
@@ -725,7 +729,7 @@ export function createApp(): Express {
   /*
   Update Profile
   */
-  app.put('/api/users/me', requireAuth, async (req: Request<{}, {}, ProfileBody>, res: Response) => {
+  app.put('/api/users/me', requireAuth, asyncRoute(async (req: Request<{}, {}, ProfileBody | undefined>, res: Response) => {
     const parsed = parseProfileFields(req.body);
     if(!parsed.ok) {
       return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
@@ -744,7 +748,7 @@ export function createApp(): Express {
       console.error('Updating profile failed:', error);
       return res.status(500).json({ msg: 'server_error', error: 'Could not update profile, try again later' });
     }
-  });
+  }));
 
   //simple api to test connection health
   app.get('/health', (_req, res) => {
@@ -752,14 +756,14 @@ export function createApp(): Express {
   });
 
   //get the server's public api
-  app.get('/getIP4', async (_req, res) => {
+  app.get('/getIP4', asyncRoute(async (_req: Request, res: Response) => {
     let address = '127.0.0.1'
     try{
-      console.log("Trying fetch")
+      logInfo('Trying fetch')
       const publicIp = await fetch('https://icanhazip.com')
           .then((res) => res.text())
           .then((text) => text.trim());
-      console.log("GOT" + publicIp)
+      logInfo(`GOT ${publicIp}`)
       address = publicIp
       return res.status(200).json({
         msg: address,
@@ -769,10 +773,10 @@ export function createApp(): Express {
         msg: error,
       });
     }
-  });
+  }));
 
   //server time in 24-hour format: hh:mm:ss GMT+/-hh:mm
-  app.get('/getTime', async (_req, res) => {
+  app.get('/getTime', (_req, res) => {
     const now = new Date();
 
     const hours = String(now.getHours()).padStart(2, '0');
@@ -793,7 +797,7 @@ export function createApp(): Express {
   })
 
   //returns the name of the application creator
-  app.get('/getAuthorName', async(_req, res) => {
+  app.get('/getAuthorName', (_req, res) => {
     res.status(200).json({
           firstName: "Pawanpreet",
           lastName: "Padda"

@@ -36,6 +36,7 @@ import com.example.cpen321application.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Locale
 
 /*  short summary of a game used by the cards on the home screen
@@ -59,7 +60,7 @@ private val cardDateFormat = DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a",
 fun GameDto.toGameSummary(): GameSummary {
     val dateTime = try {
         Instant.parse(startsAt).atZone(ZoneId.systemDefault()).format(cardDateFormat)
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         startsAt
     }
     return GameSummary(

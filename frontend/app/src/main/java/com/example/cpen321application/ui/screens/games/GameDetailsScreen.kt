@@ -32,6 +32,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Locale
 
 // player avatars shown before the "+N" bubble
@@ -98,12 +99,12 @@ fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
     val zone = ZoneId.systemDefault()
     val start = try {
         Instant.parse(game.startsAt).atZone(zone)
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         null
     }
     val end = try {
         game.endsAt?.let { Instant.parse(it).atZone(zone) }
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         null
     }
     val players = players.orEmpty().map { GamePlayer(it.firstName, it.lastName) }

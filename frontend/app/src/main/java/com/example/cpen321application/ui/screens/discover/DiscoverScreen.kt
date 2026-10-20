@@ -48,6 +48,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -126,7 +127,7 @@ internal fun formatStartsIn(start: Instant, now: Instant): String? {
 fun DiscoverGameDto.toDiscoverGame(now: Instant = Instant.now()): DiscoverGame {
     val start = try {
         Instant.parse(game.startsAt)
-    } catch (e: Exception) {
+    } catch (e: DateTimeParseException) {
         null
     }
     return DiscoverGame(
