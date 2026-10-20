@@ -8,6 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.POST
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PUT
 
 /*  retrofit for server connection and auto parsing to objects
     using gson
@@ -44,6 +45,15 @@ interface NetworkConnection {
     // games the signed in user organized and joined, soonest first
     @GET("api/games/mine")
     suspend fun getMyGames(@Header("Authorization") authorization: String) : Response<MyGamesResponse>
+
+    @GET("api/users/me")
+    suspend fun getMyProfile(@Header("Authorization") authorization: String): Response<ProfileResponse>
+
+    @PUT("api/users/me")
+    suspend fun updateMyProfile(
+        @Header("Authorization") authorization: String,
+        @Body request: UpdateProfileRequest
+    ) : Response<ProfileResponse>
 }
 
 // main object instance with retrofit service used to connect to server
