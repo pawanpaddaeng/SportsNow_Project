@@ -116,15 +116,14 @@ fun SignInScreen(
                         if (googleToken == null) {
                             statusText = "Google sign in failed. Make sure a Google account " +
                                     "is added to this device"
-                            return@launch
-                        }
-
-                        // valid token, log in with the server
-                        when (val result = submitLogin(googleToken)) {
-                            is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
-                            LoginResult.NoUser -> noticeText =
-                                "No account found for this Google account. Please sign up first."
-                            LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
+                        } else {
+                            // valid token, log in with the server
+                            when (val result = submitLogin(googleToken)) {
+                                is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
+                                LoginResult.NoUser -> noticeText =
+                                    "No account found for this Google account. Please sign up first."
+                                LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
+                            }
                         }
                     } finally {
                         isSigningIn = false

@@ -8,10 +8,12 @@ const server = app.listen(env.port, () => {
   logInfo(`Server listening on port ${env.port}`);
 });
 
+// stop taking requests, then send the signal again: the listener is gone (once),
+// so Node handles it the default way and the process ends
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => {
+  process.once(signal, () => {
     server.close(() => {
-      process.exit(0);
+      process.kill(process.pid, signal);
     });
   });
 }

@@ -1,14 +1,16 @@
-import mysql, { type Pool, type PoolConnection } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
 import { env } from '../config/env';
 
 // One pool for the whole app; mysql2 reuses connections from it.
 export const pool = mysql.createPool(env.mysqlUrl);
 
-// the pool, or one of its connections when the query is part of a transaction
-export type Queryable = Pool | PoolConnection;
-
 // values that can fill a query's ? placeholders
 export type SqlValue = string | number | boolean | Date | null;
+
+// the pool, or one of its connections when the query is part of a transaction
+export interface Queryable {
+  execute(sql: string, params: SqlValue[]): Promise<unknown>;
+}
 
 // what mysql2 reports for an INSERT, UPDATE or DELETE
 export interface WriteResult {

@@ -190,43 +190,42 @@ fun GameDetailsScreen(
 
             if (details == null) {
                 LoadingOrError(isLoading = isLoading, errorMessage = errorMessage, onRetry = onRetry)
-                return@Column
-            }
+            } else {
+                // a refresh failed, the last loaded details stay visible
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
-            // a refresh failed, the last loaded details stay visible
-            if (errorMessage != null) {
-                Text(
-                    text = errorMessage,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+                Hero(details)
+                InfoCard(details)
+                LocationCard(location = details.location, onDirections = { onDirections(details.location) })
+
+                if (details.role == GameRole.Organizer && details.pendingRequests > 0 && !details.isCancelled) {
+                    JoinRequestsBanner(count = details.pendingRequests, onClick = onJoinRequests)
+                }
+
+                PlayersSection(details = details, onSeeAll = { showPlayers = true })
+
+                if (details.description != null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(text = "About", color = SportsOnSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                        Text(text = details.description, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+                    }
+                }
+
+                Actions(
+                    details = details,
+                    isCancelling = isCancelling,
+                    onOpenChat = onOpenChat,
+                    onCancelGame = { confirmCancel = true },
+                    onLeaveGame = onLeaveGame,
+                    onRequestToJoin = onRequestToJoin
                 )
             }
-
-            Hero(details)
-            InfoCard(details)
-            LocationCard(location = details.location, onDirections = { onDirections(details.location) })
-
-            if (details.role == GameRole.Organizer && details.pendingRequests > 0 && !details.isCancelled) {
-                JoinRequestsBanner(count = details.pendingRequests, onClick = onJoinRequests)
-            }
-
-            PlayersSection(details = details, onSeeAll = { showPlayers = true })
-
-            if (details.description != null) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "About", color = SportsOnSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text(text = details.description, color = SportsOnSurfaceVariant, fontSize = 14.sp)
-                }
-            }
-
-            Actions(
-                details = details,
-                isCancelling = isCancelling,
-                onOpenChat = onOpenChat,
-                onCancelGame = { confirmCancel = true },
-                onLeaveGame = onLeaveGame,
-                onRequestToJoin = onRequestToJoin
-            )
         }
     }
 

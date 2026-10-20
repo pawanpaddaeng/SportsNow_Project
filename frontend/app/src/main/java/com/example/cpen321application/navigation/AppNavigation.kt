@@ -225,17 +225,17 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                     } else {
                         "Location is turned off. Turn it on in your phone's settings, then try again."
                     }
-                    return@launch
-                }
-                discoverLocation = location
-                when (val result = fetchDiscoverGames(context, location.latitude, location.longitude)) {
-                    is DiscoverGamesResult.Loaded -> {
-                        discoverGames.clear()
-                        discoverGames.addAll(result.games.map { it.toDiscoverGame() })
-                        hasLoadedDiscover = true
-                        discoverError = null
+                } else {
+                    discoverLocation = location
+                    when (val result = fetchDiscoverGames(context, location.latitude, location.longitude)) {
+                        is DiscoverGamesResult.Loaded -> {
+                            discoverGames.clear()
+                            discoverGames.addAll(result.games.map { it.toDiscoverGame() })
+                            hasLoadedDiscover = true
+                            discoverError = null
+                        }
+                        is DiscoverGamesResult.Failed -> discoverError = result.message
                     }
-                    is DiscoverGamesResult.Failed -> discoverError = result.message
                 }
             } finally {
                 isLoadingDiscover = false
@@ -418,14 +418,15 @@ fun AppNavigation(modifier: Modifier = Modifier) {
              */
             DisposableEffect(backStackEntry) {
                 val observer = LifecycleEventObserver { _, event ->
-                    if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
-                    val handle = backStackEntry.savedStateHandle
-                    val start = handle.remove<GameLocation>(PICK_START_KEY)
-                    val picked = handle.remove<GameLocation>(PICKED_LOCATION_KEY)
-                    if (picked != null && picked != start) discoverPlace = picked
-                    when {
-                        discoverPlace != null || hasLocationPermission(context) -> loadDiscover(refreshLocation = false)
-                        !askedForPermission -> askForPermission()
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        val handle = backStackEntry.savedStateHandle
+                        val start = handle.remove<GameLocation>(PICK_START_KEY)
+                        val picked = handle.remove<GameLocation>(PICKED_LOCATION_KEY)
+                        if (picked != null && picked != start) discoverPlace = picked
+                        when {
+                            discoverPlace != null || hasLocationPermission(context) -> loadDiscover(refreshLocation = false)
+                            !askedForPermission -> askForPermission()
+                        }
                     }
                 }
                 backStackEntry.lifecycle.addObserver(observer)
@@ -757,33 +758,34 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 .getStateFlow<GameLocation?>(PICKED_LOCATION_KEY, null)
                 .collectAsState()
 
+            // loads the game once, it's kept (saveable) while going to Pick Location and back
             LaunchedEffect(gameId) {
-                if (initial != null) return@LaunchedEffect
-                runGuarded(safetyNet) {
-                    when (val result = fetchGameDetails(context, gameId)) {
-                        is GameDetailsResult.Loaded -> when {
-                            result.details.viewerRole != "organizer" ->
-                                loadError = "Only the organizer can edit this game."
-                            result.game.status == "cancelled" -> loadError = "This game was cancelled."
-                            else -> {
-                                val form = runCatching { result.game.toGameInfoForm() }.getOrNull()
-                                if (form == null) {
-                                    loadError = "Couldn't load this game, try again"
-                                    return@runGuarded
+                if (initial == null) {
+                    runGuarded(safetyNet) {
+                        when (val result = fetchGameDetails(context, gameId)) {
+                            is GameDetailsResult.Loaded -> when {
+                                result.details.viewerRole != "organizer" ->
+                                    loadError = "Only the organizer can edit this game."
+                                result.game.status == "cancelled" -> loadError = "This game was cancelled."
+                                else -> {
+                                    // null when the game's values can't fill the form, the check below reports it
+                                    val form = runCatching { result.game.toGameInfoForm() }.getOrNull()
+                                    if (form != null) {
+                                        playerCount = result.game.playerCount
+                                        if (backStackEntry.savedStateHandle.get<GameLocation>(PICKED_LOCATION_KEY) == null) {
+                                            backStackEntry.savedStateHandle[PICKED_LOCATION_KEY] = form.location
+                                        }
+                                        initial = form
+                                    }
                                 }
-                                playerCount = result.game.playerCount
-                                if (backStackEntry.savedStateHandle.get<GameLocation>(PICKED_LOCATION_KEY) == null) {
-                                    backStackEntry.savedStateHandle[PICKED_LOCATION_KEY] = form.location
-                                }
-                                initial = form
                             }
+                            GameDetailsResult.NotFound -> loadError = "This game no longer exists."
+                            is GameDetailsResult.Failed -> loadError = result.message
                         }
-                        GameDetailsResult.NotFound -> loadError = "This game no longer exists."
-                        is GameDetailsResult.Failed -> loadError = result.message
                     }
+                    // nothing loaded (unreadable game or an unexpected error): show a message instead of loading forever
+                    if (initial == null && loadError == null) loadError = "Couldn't load this game, try again"
                 }
-                // an unexpected error left nothing loaded: show a message instead of loading forever
-                if (initial == null && loadError == null) loadError = "Couldn't load this game, try again"
             }
 
             InputGameInfoScreen(

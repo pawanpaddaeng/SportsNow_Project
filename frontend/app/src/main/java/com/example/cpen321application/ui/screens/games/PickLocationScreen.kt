@@ -159,11 +159,11 @@ fun PickLocationScreen(
         val text = query.trim()
         if (placesClient == null || text.length < 2) {
             suggestions = emptyList()
-            return@LaunchedEffect
-        }
-        delay(300)
-        runGuarded(safetyNet) {
-            suggestions = findSuggestions(placesClient, text, sessionToken)
+        } else {
+            delay(300)
+            runGuarded(safetyNet) {
+                suggestions = findSuggestions(placesClient, text, sessionToken)
+            }
         }
     }
 
@@ -253,20 +253,23 @@ fun PickLocationScreen(
                             SuggestionRow(
                                 prediction = prediction,
                                 onClick = {
-                                    val client = placesClient ?: return@SuggestionRow
-                                    query = ""
-                                    suggestions = emptyList()
-                                    focusManager.clearFocus()
-                                    scope.launch {
-                                        val place = fetchPlace(client, prediction.placeId, sessionToken)
-                                            ?: return@launch
-                                        selected = place
-                                        cameraState.animate(
-                                            CameraUpdateFactory.newLatLngZoom(
-                                                LatLng(place.latitude, place.longitude),
-                                                PICKED_ZOOM
-                                            )
-                                        )
+                                    // suggestions only exist when search is available
+                                    placesClient?.let { client ->
+                                        query = ""
+                                        suggestions = emptyList()
+                                        focusManager.clearFocus()
+                                        scope.launch {
+                                            val place = fetchPlace(client, prediction.placeId, sessionToken)
+                                            if (place != null) {
+                                                selected = place
+                                                cameraState.animate(
+                                                    CameraUpdateFactory.newLatLngZoom(
+                                                        LatLng(place.latitude, place.longitude),
+                                                        PICKED_ZOOM
+                                                    )
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             )

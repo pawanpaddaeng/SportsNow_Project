@@ -78,12 +78,16 @@ object Session {
         otherwise a different Google account was picked and it is rejected.
         Returns null if the user has to sign in themselves
      */
-    suspend fun renew(context: Context, expiredJwt: String): String? = renewLock.withLock {
+    suspend fun renew(context: Context, expiredJwt: String): String? =
+        renewLock.withLock { renewWhileLocked(context, expiredJwt) }
+
+    // renew's work, renewLock makes sure only one call runs it at a time
+    private suspend fun renewWhileLocked(context: Context, expiredJwt: String): String? {
         // another call already renewed the session while this one waited
         val current = jwtToken
-        if (current != null && current != expiredJwt) return@withLock current
+        if (current != null && current != expiredJwt) return current
 
-        val googleToken = triggerSilentGoogleSignIn(context) ?: return@withLock null
+        val googleToken = triggerSilentGoogleSignIn(context) ?: return null
         val newJwt = try {
             val reply = readAuthResponse(
                 ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
@@ -95,16 +99,16 @@ object Session {
         } catch (e: JsonParseException) {
             Log.w(TAG, "Silent sign in failed, unreadable reply", e)
             null
-        } ?: return@withLock null
+        } ?: return null
 
         val previousUser = AuthTokenStore.userIdOf(expiredJwt)
         if (previousUser == null || AuthTokenStore.userIdOf(newJwt) != previousUser) {
-            return@withLock null
+            return null
         }
 
         jwtToken = newJwt
         AuthTokenStore.save(context, newJwt)
-        newJwt
+        return newJwt
     }
 
     /*  the JWT middleware answers 401 with msg expired_token, invalid_token or

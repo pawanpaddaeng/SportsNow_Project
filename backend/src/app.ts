@@ -119,10 +119,6 @@ function describeChanges(before: Game, after: Game): string[] {
   return changes;
 }
 
-// youngest and oldest ages allowed to sign up, matches the app's birth year picker
-const MIN_AGE = 19;
-const MAX_AGE = 100;
-const MAX_NAME_LENGTH = 100;
 
 
 export function createApp(): Express {
@@ -159,7 +155,7 @@ export function createApp(): Express {
     idToken: string;
   }
 
-  app.post('/api/auth/google', asyncRoute(async (req: Request<{}, {}, GoogleAuthRequestBody | undefined>, res: Response) => {
+  app.post('/api/auth/google', asyncRoute(async (req: Request<Record<string, never>, unknown, GoogleAuthRequestBody | undefined>, res: Response) => {
     const { idToken } = req.body ?? {};
     logInfo('Received an authorization request');
     
@@ -211,7 +207,7 @@ export function createApp(): Express {
       returns a JWT for future requests. Responds already_exists if the
       Google account already has a user, they should sign in instead
    */
-  app.post('/api/auth/signup', asyncRoute(async (req: Request<{}, {}, SignUpRequestBody | undefined>, res: Response) => {
+  app.post('/api/auth/signup', asyncRoute(async (req: Request<Record<string, never>, unknown, SignUpRequestBody | undefined>, res: Response) => {
     const { id_token, email } = req.body ?? {};
     logInfo('Received a sign up request');
 
@@ -281,7 +277,7 @@ export function createApp(): Express {
       user exists. Responds no_user if they need to sign up first, other
       errors use the same msg codes as sign up with a description in error
    */
-  app.post('/api/auth/login', asyncRoute(async (req: Request<{}, {}, LoginRequestBody | undefined>, res: Response) => {
+  app.post('/api/auth/login', asyncRoute(async (req: Request<Record<string, never>, unknown, LoginRequestBody | undefined>, res: Response) => {
     const { id_token } = req.body ?? {};
     logInfo('Received a login request');
 
@@ -346,7 +342,7 @@ export function createApp(): Express {
       400 invalid_request with the problem if a field is missing or invalid.
       Also sends the organizer a push notification after a few seconds to test notifications
    */
-  app.post('/api/games', requireAuth, asyncRoute(async (req: Request<{}, {}, CreateGameBody | undefined>, res: Response) => {
+  app.post('/api/games', requireAuth, asyncRoute(async (req: Request<Record<string, never>, unknown, CreateGameBody | undefined>, res: Response) => {
     const user = getAuthUser(res);
     const parsed = parseNewGame(req.body, user.userId);
     if (!parsed.ok) {
@@ -369,7 +365,7 @@ export function createApp(): Express {
           title: 'Game created',
           body: `${game.title} at ${game.locationName} was created`,
           data: { type: 'game_created', gameId: String(gameId) },
-        }).then((devices) => logInfo(`Debug game notification sent to ${devices} device(s)`));
+        }).then((devices) => { logInfo(`Debug game notification sent to ${devices} device(s)`); });
       }, DEBUG_NOTIFICATION_DELAY_MS);
 
       return res.status(201).json({ msg: 'success', game: gameJson(created) });
@@ -487,7 +483,7 @@ export function createApp(): Express {
       403 forbidden (not the organizer), 404 not_found, 409 game_cancelled / game_started
    */
   app.put('/api/games/:gameId', requireAuth,
-    asyncRoute(async (req: Request<{ gameId: string }, {}, CreateGameBody | undefined>, res: Response) => {
+    asyncRoute(async (req: Request<{ gameId: string }, unknown, CreateGameBody | undefined>, res: Response) => {
     const user = getAuthUser(res);
     const gameId = readGameId(req.params.gameId);
     if (gameId === null) {
@@ -536,8 +532,8 @@ export function createApp(): Express {
             body: `${after.title}: the organizer changed the ${changes.join(', ')}`,
             data: { type: 'game_updated', gameId: String(gameId) },
           }))
-          .then((devices) => logInfo(`Game ${gameId} update notification sent to ${devices} device(s)`))
-          .catch((error: unknown) => console.error(`Notifying players of game ${gameId} failed:`, error));
+          .then((devices) => { logInfo(`Game ${gameId} update notification sent to ${devices} device(s)`); })
+          .catch((error: unknown) => { console.error(`Notifying players of game ${gameId} failed:`, error); });
       }
 
       return res.status(200).json({ msg: 'success', game: gameJson(after) });
@@ -578,8 +574,8 @@ export function createApp(): Express {
           body: `${game.title} at ${game.locationName} was cancelled by the organizer`,
           data: { type: 'game_cancelled', gameId: String(gameId) },
         }))
-        .then((devices) => logInfo(`Game ${gameId} cancel notification sent to ${devices} device(s)`))
-        .catch((error: unknown) => console.error(`Notifying players of game ${gameId} failed:`, error));
+        .then((devices) => { logInfo(`Game ${gameId} cancel notification sent to ${devices} device(s)`); })
+        .catch((error: unknown) => { console.error(`Notifying players of game ${gameId} failed:`, error); });
 
       return res.status(200).json({ msg: 'success', game: gameJson(game) });
     } catch (error) {
@@ -594,7 +590,7 @@ export function createApp(): Express {
       409 own_game / already_player / already_requested / game_full / game_cancelled / game_started
    */
   app.post('/api/games/:gameId/join-requests', requireAuth,
-    asyncRoute(async (req: Request<{ gameId: string }, {}, JoinRequestBody | undefined>, res: Response) => {
+    asyncRoute(async (req: Request<{ gameId: string }, unknown, JoinRequestBody | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const gameId = readGameId(req.params.gameId);
       if (gameId === null) {
@@ -618,7 +614,7 @@ export function createApp(): Express {
           title: 'New join request',
           body: `${user.firstName} wants to join ${result.title}`,
           data: { type: 'join_request', gameId: String(gameId) },
-        }).then((devices) => logInfo(`Join request notification sent to ${devices} device(s)`));
+        }).then((devices) => { logInfo(`Join request notification sent to ${devices} device(s)`); });
 
         return res.status(201).json({
           msg: 'success',
@@ -669,7 +665,7 @@ export function createApp(): Express {
       404 not_found / request_not_found, 409 game_cancelled / game_started / game_full / already_responded
    */
   app.patch('/api/games/:gameId/join-requests/:requestId', requireAuth,
-    asyncRoute(async (req: Request<{ gameId: string; requestId: string }, {}, { decision?: unknown } | undefined>, res: Response) => {
+    asyncRoute(async (req: Request<{ gameId: string; requestId: string }, unknown, { decision?: unknown } | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const gameId = readGameId(req.params.gameId);
       // request ids are INT UNSIGNED like game ids, so they're read the same way
@@ -707,7 +703,7 @@ export function createApp(): Express {
             title: 'Request declined',
             body: `The organizer declined your request to join ${result.title}`,
             data: { type: 'join_request_declined', gameId: String(gameId) },
-          }).then((devices) => logInfo(`Join request answer sent to ${devices} device(s)`));
+          }).then((devices) => { logInfo(`Join request answer sent to ${devices} device(s)`); });
 
         return res.status(200).json({
           msg: 'success',
@@ -729,7 +725,7 @@ export function createApp(): Express {
   /*
   Update Profile
   */
-  app.put('/api/users/me', requireAuth, asyncRoute(async (req: Request<{}, {}, ProfileBody | undefined>, res: Response) => {
+  app.put('/api/users/me', requireAuth, asyncRoute(async (req: Request<Record<string, never>, unknown, ProfileBody | undefined>, res: Response) => {
     const parsed = parseProfileFields(req.body);
     if(!parsed.ok) {
       return res.status(400).json({ msg: 'invalid_request', error: parsed.error });

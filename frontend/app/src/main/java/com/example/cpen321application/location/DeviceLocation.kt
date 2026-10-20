@@ -82,16 +82,16 @@ private suspend fun requestCurrentLocation(
 ): Location? = suspendCancellableCoroutine { continuation ->
     if (!hasLocationPermission(context)) {
         continuation.resume(null)
-        return@suspendCancellableCoroutine
-    }
-    val cancellation = CancellationSignal()
-    continuation.invokeOnCancellation { cancellation.cancel() }
-    LocationManagerCompat.getCurrentLocation(
-        manager,
-        provider,
-        cancellation,
-        ContextCompat.getMainExecutor(context)
-    ) { location ->
-        if (continuation.isActive) continuation.resume(location)
+    } else {
+        val cancellation = CancellationSignal()
+        continuation.invokeOnCancellation { cancellation.cancel() }
+        LocationManagerCompat.getCurrentLocation(
+            manager,
+            provider,
+            cancellation,
+            ContextCompat.getMainExecutor(context)
+        ) { location ->
+            if (continuation.isActive) continuation.resume(location)
+        }
     }
 }
