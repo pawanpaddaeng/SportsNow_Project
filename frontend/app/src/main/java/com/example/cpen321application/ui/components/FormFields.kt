@@ -23,6 +23,16 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsOutline
 import com.example.cpen321application.ui.theme.SportsPrimary
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.cpen321application.users.MAX_PROFILE_AGE
+import com.example.cpen321application.users.MIN_PROFILE_AGE
+import java.time.Year
 
 // small label shown above a form field, as in the mockups
 @Composable
@@ -107,5 +117,50 @@ fun PickerField(
                     .clickable(onClick = onClick)
             )
         }
+    }
+}
+
+@Composable
+fun BirthYearField(
+    birthYear: Int?,
+    onYearSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentYear = Year.now().value
+    val years = remember(currentYear) {
+        (currentYear - MIN_PROFILE_AGE downTo currentYear - MAX_PROFILE_AGE).toList()
+    }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // the menu opens under the field it is anchored to
+        Box {
+            PickerField(
+                label = "Birth year *",
+                value = birthYear?.toString(),
+                placeholder = "Select year",
+                onClick = { expanded = true }
+            )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.heightIn(max = 280.dp)
+            ) {
+                years.forEach { year ->
+                    DropdownMenuItem(
+                        text = { Text(year.toString()) },
+                        onClick = {
+                            onYearSelected(year)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+        Text(
+            text = "Only your age range is shown to other players.",
+            color = SportsOnSurfaceVariant,
+            fontSize = 12.sp
+        )
     }
 }

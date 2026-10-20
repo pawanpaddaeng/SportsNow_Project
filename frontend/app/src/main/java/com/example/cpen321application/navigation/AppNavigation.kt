@@ -42,6 +42,9 @@ import com.example.cpen321application.ui.screens.profile.ProfileScreen
 import com.example.cpen321application.users.ProfileResult
 import com.example.cpen321application.users.UserProfile
 import com.example.cpen321application.users.fetchMyProfile
+import com.example.cpen321application.ui.screens.profile.EditProfileScreen
+import com.example.cpen321application.users.ProfileForm
+import com.example.cpen321application.users.updateMyProfile
 
 /*
     App navigation composable:
@@ -91,6 +94,30 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
     }
 
+    var isSavingProfile by remember { mutableStateOf(false) }
+    var saveProfileError by remember { mutableStateOf<String?>(null) }
+
+    fun saveProfile(form: ProfileForm) {
+        if (isSavingProfile) return
+        isSavingProfile = true
+        saveProfileError = null
+        scope.launch {
+            when (val result = updateMyProfile(context, form)) {
+                is ProfileResult.Loaded -> {
+                    profile = result.profile
+                    profileError = null
+                    Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                    // the user may have left Edit Profile while it was saving
+                    if (navController.currentDestination?.route == Routes.EDIT_PROFILE) {
+                        navController.popBackStack()
+                    }
+                }
+                is ProfileResult.Failed -> saveProfileError = result.message
+            }
+            isSavingProfile = false
+        }
+    }
+
     // loads the user's games from the server, on failure the last loaded games stay
     fun refreshGames() {
         if (isRefreshingGames) return
@@ -132,6 +159,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         gamesError = null
         profile = null
         profileError = null
+        saveProfileError=null
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
@@ -301,10 +329,29 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 modifier = modifier,
                 isLoading = isLoadingProfile,
                 errorMessage = profileError,
-                onEdit = { Toast.makeText(context, "Edit Profile comes next", Toast.LENGTH_SHORT).show() },
+                onEdit = {
+                    saveProfileError = null
+                    navController.navigate(Routes.EDIT_PROFILE)
+                },
                 onRetry = { refreshProfile() },
                 onTabSelected = { tab -> openTab(tab) }
             )
+        }
+
+        composable(Routes.EDIT_PROFILE) {
+            val current = profile
+            if (current == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                EditProfileScreen(
+                    profile = current,
+                    onSave = { form -> saveProfile(form) },
+                    onCancel = { navController.popBackStack() },
+                    modifier = modifier,
+                    isSaving = isSavingProfile,
+                    errorMessage = saveProfileError
+                )
+            }
         }
     }
 }
