@@ -74,25 +74,31 @@ fun GameDto.toGameSummary(): GameSummary {
     )
 }
 
+/*  what the Home screen shows. isRefreshing shows a loading bar while the list updates,
+    errorMessage is shown above the games when an update failed (the last loaded games stay visible)
+ */
+data class HomeUiState(
+    val joinedGames: List<GameSummary>,
+    val organizedGames: List<GameSummary>,
+    val isRefreshing: Boolean = false,
+    val errorMessage: String? = null
+)
+
+// what the Home screen's controls do
+data class HomeActions(
+    val onCreateGame: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
+    val onGameClick: (GameSummary) -> Unit = {},
+    val onTabSelected: (BottomTab) -> Unit = {}
+)
+
 /*
     Home screen for SportsNow:
     Shows the games the user joined and organized with the bottom navigation bar.
-    isRefreshing shows a loading bar while the list updates, errorMessage is shown
-    above the games when an update failed (the last loaded games stay visible).
-    The callbacks connect it to other screens through AppNavigation
+    The actions connect it to other screens through AppNavigation
  */
 @Composable
-fun HomeScreen(
-    joinedGames: List<GameSummary>,
-    organizedGames: List<GameSummary>,
-    modifier: Modifier = Modifier,
-    isRefreshing: Boolean = false,
-    errorMessage: String? = null,
-    onCreateGame: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onGameClick: (GameSummary) -> Unit = {},
-    onTabSelected: (BottomTab) -> Unit = {}
-) {
+fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Modifier) {
     var joinedExpanded by rememberSaveable { mutableStateOf(true) }
     var organizedExpanded by rememberSaveable { mutableStateOf(true) }
 
@@ -101,7 +107,7 @@ fun HomeScreen(
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected)
         }
     ) { innerPadding ->
         LazyColumn(
@@ -111,70 +117,78 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "SportsNow",
-                        color = SportsOnSurface,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onRefresh, enabled = !isRefreshing) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "Refresh",
-                            tint = if (isRefreshing) SportsOutlineVariant else SportsOnSurface
-                        )
-                    }
-                }
-            }
+            item { HomeHeader(isRefreshing = state.isRefreshing, onRefresh = actions.onRefresh) }
 
-            // thin loading bar while the games update, the current list stays visible
-            if (isRefreshing) {
-                item(key = "refreshing") {
-                    LinearProgressIndicator(
-                        color = SportsPrimary,
-                        trackColor = SportsPrimaryContainer,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            if (errorMessage != null) {
-                item(key = "error") {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
+            refreshStatus(isRefreshing = state.isRefreshing, errorMessage = state.errorMessage)
 
             gameSection(
                 title = "Joined Games",
-                games = joinedGames,
+                games = state.joinedGames,
                 expanded = joinedExpanded,
                 onToggle = { joinedExpanded = !joinedExpanded },
                 emptyText = "You haven't joined any games yet. Check Discover for games near you.",
-                onGameClick = onGameClick
+                onGameClick = actions.onGameClick
             )
 
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
             gameSection(
                 title = "Organized Games",
-                games = organizedGames,
+                games = state.organizedGames,
                 expanded = organizedExpanded,
                 onToggle = { organizedExpanded = !organizedExpanded },
                 emptyText = "You haven't organized any games yet.",
-                onGameClick = onGameClick
+                onGameClick = actions.onGameClick
             )
 
-            item { CreateGameButton(onClick = onCreateGame) }
+            item { CreateGameButton(onClick = actions.onCreateGame) }
+        }
+    }
+}
+
+// "SportsNow" title with the refresh button
+@Composable
+private fun HomeHeader(isRefreshing: Boolean, onRefresh: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "SportsNow",
+            color = SportsOnSurface,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onRefresh, enabled = !isRefreshing) {
+            Icon(
+                imageVector = Icons.Filled.Refresh,
+                contentDescription = "Refresh",
+                tint = if (isRefreshing) SportsOutlineVariant else SportsOnSurface
+            )
+        }
+    }
+}
+
+// thin loading bar while the games update and the error of a failed update, the current list stays visible
+private fun LazyListScope.refreshStatus(isRefreshing: Boolean, errorMessage: String?) {
+    if (isRefreshing) {
+        item(key = "refreshing") {
+            LinearProgressIndicator(
+                color = SportsPrimary,
+                trackColor = SportsPrimaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    if (errorMessage != null) {
+        item(key = "error") {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }

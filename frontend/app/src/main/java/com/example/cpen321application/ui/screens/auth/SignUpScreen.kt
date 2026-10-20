@@ -87,6 +87,53 @@ fun SignUpScreen(
     val canCreate = idToken != null && firstNameText.isNotBlank() &&
             lastNameText.isNotBlank() && birthYear != null && !isSubmitting
 
+    // verifies with Google and prefills the form with the name on the Google account
+    fun verify() {
+        isVerifying = true
+        errorText = null
+        scope.launch {
+            val token = try {
+                triggerGoogleSignIn(context)
+            } finally {
+                isVerifying = false
+            }
+            if (token == null) {
+                errorText = "Google verification failed. Try again."
+            } else {
+                val profile = readGoogleProfile(token)
+                idToken = token
+                email = profile.email
+                if (firstNameText.isBlank()) firstNameText = profile.givenName ?: ""
+                if (lastNameText.isBlank()) lastNameText = profile.familyName ?: ""
+            }
+        }
+    }
+
+    // sends the form to the server, only called once canCreate is true
+    fun createAccount() {
+        val details = SignUpDetails(
+            idToken = idToken!!,
+            email = email,
+            firstName = firstNameText.trim(),
+            lastName = lastNameText.trim(),
+            birthYear = birthYear!!
+        )
+        isSubmitting = true
+        errorText = null
+        scope.launch {
+            val result = try {
+                submitSignUp(details)
+            } finally {
+                isSubmitting = false
+            }
+            when (result) {
+                is SignUpResult.Created -> onSignedUp(details, result.jwtToken)
+                SignUpResult.AlreadyExists -> onAlreadyExists()
+                is SignUpResult.Failed -> errorText = result.message
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -95,88 +142,23 @@ fun SignUpScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // top bar with back button and centered app name
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = SportsOnSurface
-                )
-            }
-            Text(
-                text = "SportsNow",
-                color = SportsOnSurface,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.size(48.dp))
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "Create your account",
-                color = SportsOnSurface,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        SignUpHeader(onBack = onBack)
 
         GoogleVerificationCard(
             email = email,
             isVerified = idToken != null,
             isVerifying = isVerifying,
-            onVerify = {
-                isVerifying = true
-                errorText = null
-                scope.launch {
-                    val token = try {
-                        triggerGoogleSignIn(context)
-                    } finally {
-                        isVerifying = false
-                    }
-                    if (token == null) {
-                        errorText = "Google verification failed. Try again."
-                    } else {
-                        // prefill the form with the name on the Google account
-                        val profile = readGoogleProfile(token)
-                        idToken = token
-                        email = profile.email
-                        if (firstNameText.isBlank()) firstNameText = profile.givenName ?: ""
-                        if (lastNameText.isBlank()) lastNameText = profile.familyName ?: ""
-                    }
-                }
-            }
+            onVerify = { verify() }
         )
 
-        // profile fields, new fields get added to this column
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LabeledTextField(
-                    label = "First name *",
-                    value = firstNameText,
-                    onValueChange = { firstNameText = it },
-                    modifier = Modifier.weight(1f)
-                )
-                LabeledTextField(
-                    label = "Last name *",
-                    value = lastNameText,
-                    onValueChange = { lastNameText = it },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            BirthYearField(
-                birthYear = birthYear,
-                onYearSelected = { birthYear = it }
-            )
-        }
+        NameAndBirthYearFields(
+            firstName = firstNameText,
+            lastName = lastNameText,
+            birthYear = birthYear,
+            onFirstNameChange = { firstNameText = it },
+            onLastNameChange = { lastNameText = it },
+            onBirthYearChange = { birthYear = it }
+        )
 
         if (errorText != null) {
             Text(
@@ -186,66 +168,127 @@ fun SignUpScreen(
             )
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+        CreateAccountFooter(
+            enabled = canCreate,
+            isSubmitting = isSubmitting,
+            onCreate = { createAccount() },
+            onNavigateToSignIn = onNavigateToSignIn
+        )
+    }
+}
+
+// top bar with back button and centered app name, then "Create your account"
+@Composable
+private fun SignUpHeader(onBack: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = SportsOnSurface
+            )
+        }
+        Text(
+            text = "SportsNow",
+            color = SportsOnSurface,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.size(48.dp))
+    }
+
+    Text(
+        text = "Create your account",
+        color = SportsOnSurface,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+// profile fields, new fields get added to this column
+@Composable
+private fun NameAndBirthYearFields(
+    firstName: String,
+    lastName: String,
+    birthYear: Int?,
+    onFirstNameChange: (String) -> Unit,
+    onLastNameChange: (String) -> Unit,
+    onBirthYearChange: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LabeledTextField(
+                label = "First name *",
+                value = firstName,
+                onValueChange = onFirstNameChange,
+                modifier = Modifier.weight(1f)
+            )
+            LabeledTextField(
+                label = "Last name *",
+                value = lastName,
+                onValueChange = onLastNameChange,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        BirthYearField(
+            birthYear = birthYear,
+            onYearSelected = onBirthYearChange
+        )
+    }
+}
+
+// Create Account button (a spinner while sending) and the link back to sign in
+@Composable
+private fun CreateAccountFooter(
+    enabled: Boolean,
+    isSubmitting: Boolean,
+    onCreate: () -> Unit,
+    onNavigateToSignIn: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+    ) {
+        Button(
+            onClick = onCreate,
+            enabled = enabled,
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
         ) {
-            Button(
-                onClick = {
-                    val details = SignUpDetails(
-                        idToken = idToken!!,
-                        email = email,
-                        firstName = firstNameText.trim(),
-                        lastName = lastNameText.trim(),
-                        birthYear = birthYear!!
-                    )
-                    isSubmitting = true
-                    errorText = null
-                    scope.launch {
-                        val result = try {
-                            submitSignUp(details)
-                        } finally {
-                            isSubmitting = false
-                        }
-                        when (result) {
-                            is SignUpResult.Created -> onSignedUp(details, result.jwtToken)
-                            SignUpResult.AlreadyExists -> onAlreadyExists()
-                            is SignUpResult.Failed -> errorText = result.message
-                        }
-                    }
-                },
-                enabled = canCreate,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    Text(text = "Create Account", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-            Row {
-                Text(
-                    text = "Already have an account? ",
-                    color = SportsOnSurfaceVariant,
-                    fontSize = 14.sp
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp)
                 )
-                Text(
-                    text = "Sign In",
-                    color = SportsPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable(onClick = onNavigateToSignIn)
-                )
+            } else {
+                Text(text = "Create Account", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
+        }
+        Row {
+            Text(
+                text = "Already have an account? ",
+                color = SportsOnSurfaceVariant,
+                fontSize = 14.sp
+            )
+            Text(
+                text = "Sign In",
+                color = SportsPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable(onClick = onNavigateToSignIn)
+            )
         }
     }
 }

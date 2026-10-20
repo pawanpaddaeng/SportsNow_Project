@@ -150,36 +150,43 @@ fun DiscoverGameDto.toDiscoverGame(now: Instant = Instant.now()): DiscoverGame {
     )
 }
 
+/*  what the Discover screen shows. location is where the games were searched around,
+    null until it is known. place is the place the user picked to search around instead
+    of their own location, null when searching near them. isLoading shows a loading bar,
+    errorMessage a problem with a Try again button: no location (2a) or the games couldn't
+    load. games are the last loaded games, they stay visible while refreshing
+ */
+data class DiscoverUiState(
+    val games: List<DiscoverGame>,
+    val location: DeviceLocation?,
+    val place: GameLocation? = null,
+    val hasLoaded: Boolean = false,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+
+/*  what the Discover screen's controls do. Tapping the map opens the map picker
+    (onChangeLocation) and onUseMyLocation goes back to searching near the user
+ */
+data class DiscoverActions(
+    val onRetry: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
+    val onChangeLocation: () -> Unit = {},
+    val onUseMyLocation: () -> Unit = {},
+    val onGameClick: (DiscoverGame) -> Unit = {},
+    val onTabSelected: (BottomTab) -> Unit = {}
+)
+
 /*
     Discover screen from the Figma mockup (Use Case 3, Discover Game): the games near
     the user on a map and as a list, closest first, with a sport filter at the top.
-    location is where the games were searched around, null until it is known. place is
-    the place the user picked to search around instead of their own location, null when
-    searching near them. Tapping the map opens the map picker (onChangeLocation) and
-    onUseMyLocation goes back to searching near the user. isLoading shows a loading bar,
-    errorMessage a problem with a Try again button (onRetry): no location (2a) or the
-    games couldn't load. games are the last loaded games, they stay visible while
-    refreshing. The callbacks connect it to other screens through AppNavigation
+    The actions connect it to other screens through AppNavigation
  */
 @Composable
-fun DiscoverScreen(
-    games: List<DiscoverGame>,
-    location: DeviceLocation?,
-    modifier: Modifier = Modifier,
-    place: GameLocation? = null,
-    hasLoaded: Boolean = false,
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
-    onRetry: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onChangeLocation: () -> Unit = {},
-    onUseMyLocation: () -> Unit = {},
-    onGameClick: (DiscoverGame) -> Unit = {},
-    onTabSelected: (BottomTab) -> Unit = {}
-) {
+fun DiscoverScreen(state: DiscoverUiState, actions: DiscoverActions, modifier: Modifier = Modifier) {
     // null shows every sport
     var selectedSport by rememberSaveable { mutableStateOf<String?>(null) }
-    val shownGames = games.filter { selectedSport == null || it.sport == selectedSport }
+    val shownGames = state.games.filter { selectedSport == null || it.sport == selectedSport }
     val sportLabel = SPORTS.firstOrNull { it.second == selectedSport }?.first
 
     Scaffold(
@@ -187,7 +194,7 @@ fun DiscoverScreen(
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Discover, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = BottomTab.Discover, onTabSelected = actions.onTabSelected)
         }
     ) { innerPadding ->
         LazyColumn(
@@ -197,16 +204,18 @@ fun DiscoverScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            item(key = "header") { Header(place = place, isLoading = isLoading, onRefresh = onRefresh) }
+            item(key = "header") {
+                Header(place = state.place, isLoading = state.isLoading, onRefresh = actions.onRefresh)
+            }
 
             item(key = "search_area") {
                 SearchArea(
-                    location = location,
-                    place = place,
+                    location = state.location,
+                    place = state.place,
                     games = shownGames,
-                    onChangeLocation = onChangeLocation,
-                    onUseMyLocation = onUseMyLocation,
-                    onGameClick = onGameClick
+                    onChangeLocation = actions.onChangeLocation,
+                    onUseMyLocation = actions.onUseMyLocation,
+                    onGameClick = actions.onGameClick
                 )
             }
 
@@ -215,7 +224,7 @@ fun DiscoverScreen(
             }
 
             // thin loading bar while the games update, the current list stays visible
-            if (isLoading) {
+            if (state.isLoading) {
                 item(key = "loading") {
                     LinearProgressIndicator(
                         color = SportsPrimary,
@@ -225,12 +234,12 @@ fun DiscoverScreen(
                 }
             }
 
-            if (errorMessage != null) {
-                item(key = "error") { ErrorMessage(message = errorMessage, onRetry = onRetry) }
+            if (state.errorMessage != null) {
+                item(key = "error") { ErrorMessage(message = state.errorMessage, onRetry = actions.onRetry) }
             }
 
-            if (hasLoaded) {
-                gameList(games = shownGames, allGames = games, sportLabel = sportLabel, onGameClick = onGameClick)
+            if (state.hasLoaded) {
+                gameList(games = shownGames, allGames = state.games, sportLabel = sportLabel, onGameClick = actions.onGameClick)
             }
         }
     }
@@ -472,7 +481,6 @@ private fun EmptyMessage(text: String) {
 }
 
 // "1. Volleyball Drop-in" card with time, place, distance and status pills
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
@@ -516,23 +524,30 @@ private fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            when {
-                game.isFull -> Pill(text = "Full")
-                game.spotsLeft == 1 -> Pill(text = "1 spot left")
-                else -> Pill(text = "${game.spotsLeft} spots left")
-            }
-            if (game.requestPending) {
-                Pill(text = "Request pending", textColor = SportsPrimary, borderColor = SportsPrimary)
-            }
-            if (game.startsInText != null && !game.isFull) {
-                Pill(
-                    text = game.startsInText,
-                    background = SportsPrimaryContainer,
-                    textColor = SportsOnPrimaryContainer,
-                    borderColor = null
-                )
-            }
+        StatusPills(game)
+    }
+}
+
+// "3 spots left", "Request pending" and "Starts in 45 min" under a game card
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatusPills(game: DiscoverGame) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when {
+            game.isFull -> Pill(text = "Full")
+            game.spotsLeft == 1 -> Pill(text = "1 spot left")
+            else -> Pill(text = "${game.spotsLeft} spots left")
+        }
+        if (game.requestPending) {
+            Pill(text = "Request pending", textColor = SportsPrimary, borderColor = SportsPrimary)
+        }
+        if (game.startsInText != null && !game.isFull) {
+            Pill(
+                text = game.startsInText,
+                background = SportsPrimaryContainer,
+                textColor = SportsOnPrimaryContainer,
+                borderColor = null
+            )
         }
     }
 }

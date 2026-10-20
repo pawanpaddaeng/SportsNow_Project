@@ -133,35 +133,44 @@ fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
     )
 }
 
+/*  what the Game Details screen shows. details is null until the game loads; isLoading
+    shows a spinner and errorMessage a problem. isCancelling shows progress on the Cancel
+    Game button. selectedTab is highlighted in the bottom bar: Discover when the game was
+    opened from there, otherwise Home
+ */
+data class GameDetailsUiState(
+    val details: GameDetails?,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val isCancelling: Boolean = false,
+    val selectedTab: BottomTab = BottomTab.Home
+)
+
+/*  what the Game Details screen's controls do. onRetry is null when retrying won't help.
+    onCancelGame is only called after the organizer confirms
+ */
+data class GameDetailsActions(
+    val onBack: () -> Unit,
+    val onRetry: (() -> Unit)? = null,
+    val onEdit: () -> Unit = {},
+    val onDirections: (GameLocation) -> Unit = {},
+    val onJoinRequests: () -> Unit = {},
+    val onOpenChat: () -> Unit = {},
+    val onCancelGame: () -> Unit = {},
+    val onLeaveGame: () -> Unit = {},
+    val onRequestToJoin: () -> Unit = {},
+    val onTabSelected: (BottomTab) -> Unit = {}
+)
+
 /*
     Game Details screen from the Figma mockups, one screen for the three versions:
     the organizer sees Edit, pending join requests and Cancel Game, a joined player
     sees "You're in" and Leave Game, anyone else sees the spots left and Request to Join.
-    details is null until the game loads; isLoading shows a spinner and errorMessage
-    a problem (with Retry when onRetry is given). onCancelGame is only called after the
-    organizer confirms, isCancelling shows progress on the button while it runs.
-    The callbacks connect it to other screens through AppNavigation
+    The actions connect it to other screens through AppNavigation
  */
 @Composable
-fun GameDetailsScreen(
-    details: GameDetails?,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
-    isCancelling: Boolean = false,
-    onRetry: (() -> Unit)? = null,
-    onEdit: () -> Unit = {},
-    onDirections: (GameLocation) -> Unit = {},
-    onJoinRequests: () -> Unit = {},
-    onOpenChat: () -> Unit = {},
-    onCancelGame: () -> Unit = {},
-    onLeaveGame: () -> Unit = {},
-    onRequestToJoin: () -> Unit = {},
-    // highlighted in the bottom bar: Discover when opened from there, otherwise Home
-    selectedTab: BottomTab = BottomTab.Home,
-    onTabSelected: (BottomTab) -> Unit = {}
-) {
+fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, modifier: Modifier = Modifier) {
+    val details = state.details
     var showPlayers by remember { mutableStateOf(false) }
     var confirmCancel by remember { mutableStateOf(false) }
 
@@ -170,7 +179,7 @@ fun GameDetailsScreen(
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = selectedTab, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = state.selectedTab, onTabSelected = actions.onTabSelected)
         }
     ) { innerPadding ->
         Column(
@@ -184,46 +193,19 @@ fun GameDetailsScreen(
             TopBar(
                 // a cancelled or started game can't be changed any more
                 showEdit = details?.role == GameRole.Organizer && !details.isCancelled && !details.hasStarted,
-                onBack = onBack,
-                onEdit = onEdit
+                onBack = actions.onBack,
+                onEdit = actions.onEdit
             )
 
             if (details == null) {
-                LoadingOrError(isLoading = isLoading, errorMessage = errorMessage, onRetry = onRetry)
+                LoadingOrError(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
             } else {
-                // a refresh failed, the last loaded details stay visible
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-
-                Hero(details)
-                InfoCard(details)
-                LocationCard(location = details.location, onDirections = { onDirections(details.location) })
-
-                if (details.role == GameRole.Organizer && details.pendingRequests > 0 && !details.isCancelled) {
-                    JoinRequestsBanner(count = details.pendingRequests, onClick = onJoinRequests)
-                }
-
-                PlayersSection(details = details, onSeeAll = { showPlayers = true })
-
-                if (details.description != null) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(text = "About", color = SportsOnSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = details.description, color = SportsOnSurfaceVariant, fontSize = 14.sp)
-                    }
-                }
-
-                Actions(
+                LoadedDetails(
                     details = details,
-                    isCancelling = isCancelling,
-                    onOpenChat = onOpenChat,
-                    onCancelGame = { confirmCancel = true },
-                    onLeaveGame = onLeaveGame,
-                    onRequestToJoin = onRequestToJoin
+                    state = state,
+                    actions = actions,
+                    onSeeAllPlayers = { showPlayers = true },
+                    onCancelGame = { confirmCancel = true }
                 )
             }
         }
@@ -234,25 +216,82 @@ fun GameDetailsScreen(
     }
 
     if (confirmCancel && details != null) {
-        AlertDialog(
-            onDismissRequest = { confirmCancel = false },
-            title = { Text("Cancel this game?") },
-            text = {
-                Text("${details.title} will be cancelled for everyone. Players and anyone who asked to join will be notified. This can't be undone.")
+        ConfirmCancelDialog(
+            title = details.title,
+            onConfirm = {
+                confirmCancel = false
+                actions.onCancelGame()
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmCancel = false
-                    onCancelGame()
-                }) {
-                    Text("Cancel Game", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmCancel = false }) { Text("Keep Game") }
-            }
+            onDismiss = { confirmCancel = false }
         )
     }
+}
+
+/*  the loaded game's sections, from the hero to the action buttons. onCancelGame asks
+    the organizer to confirm first, onSeeAllPlayers opens the players dialog
+ */
+@Composable
+private fun LoadedDetails(
+    details: GameDetails,
+    state: GameDetailsUiState,
+    actions: GameDetailsActions,
+    onSeeAllPlayers: () -> Unit,
+    onCancelGame: () -> Unit
+) {
+    // a refresh failed, the last loaded details stay visible
+    if (state.errorMessage != null) {
+        Text(
+            text = state.errorMessage,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+
+    Hero(details)
+    InfoCard(details)
+    LocationCard(location = details.location, onDirections = { actions.onDirections(details.location) })
+
+    if (details.role == GameRole.Organizer && details.pendingRequests > 0 && !details.isCancelled) {
+        JoinRequestsBanner(count = details.pendingRequests, onClick = actions.onJoinRequests)
+    }
+
+    PlayersSection(details = details, onSeeAll = onSeeAllPlayers)
+
+    if (details.description != null) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text = "About", color = SportsOnSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = details.description, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+        }
+    }
+
+    Actions(
+        details = details,
+        isCancelling = state.isCancelling,
+        onOpenChat = actions.onOpenChat,
+        onCancelGame = onCancelGame,
+        onLeaveGame = actions.onLeaveGame,
+        onRequestToJoin = actions.onRequestToJoin
+    )
+}
+
+// "Cancel this game?" with Cancel Game and Keep Game
+@Composable
+private fun ConfirmCancelDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cancel this game?") },
+        text = {
+            Text("$title will be cancelled for everyone. Players and anyone who asked to join will be notified. This can't be undone.")
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Cancel Game", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Keep Game") }
+        }
+    )
 }
 
 @Composable

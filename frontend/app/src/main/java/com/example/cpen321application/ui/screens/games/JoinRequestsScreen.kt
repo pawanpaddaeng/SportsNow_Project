@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -109,34 +110,41 @@ fun PendingJoinRequestDto.toJoinRequestItem(now: Instant = Instant.now()): JoinR
     )
 }
 
+/*  what the Join Requests screen shows. header is null until the game loads. isLoading
+    shows a loading bar, errorMessage a problem (with Retry when the actions' onRetry is
+    given). busyRequestIds are requests whose answer is being sent, their buttons are disabled
+ */
+data class JoinRequestsUiState(
+    val header: JoinRequestsHeader?,
+    val requests: List<JoinRequestItem>,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val busyRequestIds: Set<Int> = emptySet()
+)
+
+// what the Join Requests screen's controls do, onRetry is null when retrying won't help
+data class JoinRequestsActions(
+    val onBack: () -> Unit,
+    val onRetry: (() -> Unit)? = null,
+    val onApprove: (JoinRequestItem) -> Unit = {},
+    val onDecline: (JoinRequestItem) -> Unit = {},
+    val onTabSelected: (BottomTab) -> Unit = {}
+)
+
 /*
     Join Requests screen from the Figma mockup (Accept players to join): the organizer's
-    pending requests for one game, each with Decline and Approve. header is null until
-    the game loads. isLoading shows a loading bar, errorMessage a problem with Retry when
-    onRetry is given. busyRequestIds are requests whose answer is being sent, their
-    buttons are disabled. Approve is disabled once the game is full.
-    The callbacks connect it to other screens through AppNavigation
+    pending requests for one game, each with Decline and Approve. Approve is disabled
+    once the game is full. The actions connect it to other screens through AppNavigation
  */
 @Composable
-fun JoinRequestsScreen(
-    header: JoinRequestsHeader?,
-    requests: List<JoinRequestItem>,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
-    busyRequestIds: Set<Int> = emptySet(),
-    onRetry: (() -> Unit)? = null,
-    onApprove: (JoinRequestItem) -> Unit = {},
-    onDecline: (JoinRequestItem) -> Unit = {},
-    onTabSelected: (BottomTab) -> Unit = {}
-) {
+fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions, modifier: Modifier = Modifier) {
+    val header = state.header
     Scaffold(
         modifier = modifier,
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected)
         }
     ) { innerPadding ->
         LazyColumn(
@@ -146,7 +154,7 @@ fun JoinRequestsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            item(key = "top") { TopBar(onBack = onBack) }
+            item(key = "top") { TopBar(onBack = actions.onBack) }
 
             if (header != null) {
                 item(key = "game") {
@@ -157,41 +165,28 @@ fun JoinRequestsScreen(
                 }
             }
 
-            // thin loading bar while the list updates, the current requests stay visible
-            if (isLoading) {
-                item(key = "loading") {
-                    LinearProgressIndicator(
-                        color = SportsPrimary,
-                        trackColor = SportsPrimaryContainer,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+            loadStatus(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
 
-            if (errorMessage != null) {
-                item(key = "error") { ErrorMessage(message = errorMessage, onRetry = onRetry) }
-            }
-
-            if (header?.isFull == true && requests.isNotEmpty()) {
+            if (header?.isFull == true && state.requests.isNotEmpty()) {
                 item(key = "full") {
                     Note("The game is full. Edit the game to add spots before approving more players.")
                 }
             }
 
-            items(requests, key = { it.requestId }) { request ->
+            items(state.requests, key = { it.requestId }) { request ->
                 RequestCard(
                     request = request,
-                    isBusy = request.requestId in busyRequestIds,
+                    isBusy = request.requestId in state.busyRequestIds,
                     canApprove = header?.isFull == false,
-                    onApprove = { onApprove(request) },
-                    onDecline = { onDecline(request) }
+                    onApprove = { actions.onApprove(request) },
+                    onDecline = { actions.onDecline(request) }
                 )
             }
 
             if (header != null) {
                 item(key = "footer") {
                     Note(
-                        if (requests.isEmpty()) {
+                        if (state.requests.isEmpty()) {
                             "No join requests right now. You'll get a notification when someone asks to join."
                         } else {
                             "Approved players are added to the game and its chat."
@@ -200,6 +195,23 @@ fun JoinRequestsScreen(
                 }
             }
         }
+    }
+}
+
+// thin loading bar while the list updates and the error of a failed update, the current requests stay visible
+private fun LazyListScope.loadStatus(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
+    if (isLoading) {
+        item(key = "loading") {
+            LinearProgressIndicator(
+                color = SportsPrimary,
+                trackColor = SportsPrimaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    if (errorMessage != null) {
+        item(key = "error") { ErrorMessage(message = errorMessage, onRetry = onRetry) }
     }
 }
 
@@ -293,36 +305,42 @@ private fun RequestCard(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = onDecline,
-                enabled = !isBusy,
-                shape = RoundedCornerShape(50),
-                border = BorderStroke(1.dp, SportsOutline),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-            ) {
-                Icon(Icons.Filled.Close, contentDescription = null, tint = SportsPrimary, modifier = Modifier.size(18.dp))
+        DecisionButtons(isBusy = isBusy, canApprove = canApprove, onApprove = onApprove, onDecline = onDecline)
+    }
+}
+
+// Decline and Approve side by side, Approve shows progress while the answer is sent
+@Composable
+private fun DecisionButtons(isBusy: Boolean, canApprove: Boolean, onApprove: () -> Unit, onDecline: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = onDecline,
+            enabled = !isBusy,
+            shape = RoundedCornerShape(50),
+            border = BorderStroke(1.dp, SportsOutline),
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp)
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = null, tint = SportsPrimary, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = "Decline", color = SportsPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        Button(
+            onClick = onApprove,
+            enabled = !isBusy && canApprove,
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp)
+        ) {
+            if (isBusy) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            } else {
+                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Decline", color = SportsPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-            Button(
-                onClick = onApprove,
-                enabled = !isBusy && canApprove,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-            ) {
-                if (isBusy) {
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                } else {
-                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Approve", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
+                Text(text = "Approve", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
     }

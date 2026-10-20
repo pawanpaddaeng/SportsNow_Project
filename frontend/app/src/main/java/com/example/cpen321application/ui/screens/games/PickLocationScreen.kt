@@ -47,6 +47,7 @@ import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
 import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.maps.android.compose.CameraMoveStartedReason
+import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
@@ -110,53 +111,50 @@ fun PickLocationScreen(
     var isResolving by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var suggestions by remember { mutableStateOf<List<AutocompletePrediction>>(emptyList()) }
+    val hasLocationPermission = rememberLocationPermission()
 
-    // location permission only adds the blue dot and "my location" button, the picker works without it
-    var hasLocationPermission by remember { mutableStateOf(hasLocationPermission(context)) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results -> hasLocationPermission = results.values.any { it } }
-    LaunchedEffect(Unit) {
-        if (!hasLocationPermission) {
-            permissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            )
+    // the place at point becomes the selection, the sheet says "Finding address…" meanwhile
+    suspend fun selectPlaceAt(point: LatLng) {
+        isResolving = true
+        runGuarded(safetyNet) {
+            try {
+                selected = describePoint(context, point)
+            } finally {
+                isResolving = false
+            }
+        }
+    }
+
+    // a search suggestion was tapped: select that place and move the map to it
+    fun pickSuggestion(client: PlacesClient, prediction: AutocompletePrediction) {
+        query = ""
+        suggestions = emptyList()
+        focusManager.clearFocus()
+        scope.launch {
+            val place = fetchPlace(client, prediction.placeId, sessionToken)
+            if (place != null) {
+                selected = place
+                cameraState.animate(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(place.latitude, place.longitude), PICKED_ZOOM)
+                )
+            }
         }
     }
 
     // nothing picked yet: start with the place at the starting point
     LaunchedEffect(Unit) {
-        if (selected == null) {
-            isResolving = true
-            runGuarded(safetyNet) {
-                try {
-                    selected = describePoint(context, start)
-                } finally {
-                    isResolving = false
-                }
-            }
-        }
+        if (selected == null) selectPlaceAt(start)
     }
 
     // when the user stops dragging, the place under the pin becomes the selection
     LaunchedEffect(cameraState.isMoving) {
-        if (!cameraState.isMoving &&
-            cameraState.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE
-        ) {
-            isResolving = true
-            runGuarded(safetyNet) {
-                try {
-                    selected = describePoint(context, cameraState.position.target)
-                } finally {
-                    isResolving = false
-                }
-            }
+        if (!cameraState.isMoving && cameraState.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE) {
+            selectPlaceAt(cameraState.position.target)
         }
     }
 
-    // search suggestions once typing pauses
-    LaunchedEffect(query) {
-        val text = query.trim()
+    // search suggestions for text once typing pauses, none for less than 2 letters
+    suspend fun showSuggestions(text: String) {
         if (placesClient == null || text.length < 2) {
             suggestions = emptyList()
         } else {
@@ -167,172 +165,213 @@ fun PickLocationScreen(
         }
     }
 
+    LaunchedEffect(query) { showSuggestions(query.trim()) }
+
     val isBusy = isResolving || cameraState.isMoving
 
     Box(modifier = modifier.fillMaxSize()) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraState,
-            contentPadding = PaddingValues(top = MAP_TOP_PADDING, bottom = MAP_BOTTOM_PADDING),
-            properties = MapProperties(isMyLocationEnabled = hasLocationPermission),
-            uiSettings = MapUiSettings(
-                myLocationButtonEnabled = hasLocationPermission,
-                zoomControlsEnabled = false,
-                mapToolbarEnabled = false
+        PickerMap(cameraState = cameraState, showMyLocation = hasLocationPermission)
+        CenterPin(modifier = Modifier.align(Alignment.Center))
+        SearchPanel(
+            query = query,
+            onQueryChange = { query = it },
+            searchEnabled = placesClient != null,
+            suggestions = suggestions,
+            // suggestions only exist when search is available
+            onPick = { prediction -> placesClient?.let { pickSuggestion(it, prediction) } },
+            onBack = onBack,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+        SelectedPlaceSheet(
+            selected = selected,
+            isBusy = isBusy,
+            onConfirm = { selected?.let(onLocationPicked) },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+/*  whether the app may use the user's location, asked for once when the screen opens.
+    It only adds the blue dot and "my location" button, the picker works without it
+ */
+@Composable
+private fun rememberLocationPermission(): Boolean {
+    val context = LocalContext.current
+    var granted by remember { mutableStateOf(hasLocationPermission(context)) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results -> granted = results.values.any { it } }
+    LaunchedEffect(Unit) {
+        if (!granted) {
+            permissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             )
-        )
+        }
+    }
+    return granted
+}
 
-        // fixed pin over the map's centre, its tip marks the chosen point
-        Icon(
-            imageVector = Icons.Filled.Place,
-            contentDescription = null,
-            tint = Color(0xFFD93025),
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = (MAP_TOP_PADDING - MAP_BOTTOM_PADDING) / 2 - PIN_SIZE / 2)
-                .size(PIN_SIZE)
+// the full screen map, its centre is moved into the area between the search bar and the sheet
+@Composable
+private fun PickerMap(cameraState: CameraPositionState, showMyLocation: Boolean) {
+    GoogleMap(
+        modifier = Modifier.fillMaxSize(),
+        cameraPositionState = cameraState,
+        contentPadding = PaddingValues(top = MAP_TOP_PADDING, bottom = MAP_BOTTOM_PADDING),
+        properties = MapProperties(isMyLocationEnabled = showMyLocation),
+        uiSettings = MapUiSettings(
+            myLocationButtonEnabled = showMyLocation,
+            zoomControlsEnabled = false,
+            mapToolbarEnabled = false
         )
+    )
+}
 
-        // search bar and suggestions
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
+// fixed pin over the map's centre, its tip marks the chosen point
+@Composable
+private fun CenterPin(modifier: Modifier) {
+    Icon(
+        imageVector = Icons.Filled.Place,
+        contentDescription = null,
+        tint = Color(0xFFD93025),
+        modifier = modifier
+            .offset(y = (MAP_TOP_PADDING - MAP_BOTTOM_PADDING) / 2 - PIN_SIZE / 2)
+            .size(PIN_SIZE)
+    )
+}
+
+// search bar with the back button, and the suggestions under it while there are any
+@Composable
+private fun SearchPanel(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    searchEnabled: Boolean,
+    suggestions: List<AutocompletePrediction>,
+    onPick: (AutocompletePrediction) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        SearchBar(query = query, onQueryChange = onQueryChange, enabled = searchEnabled, onBack = onBack)
+
+        if (suggestions.isNotEmpty()) {
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 shadowElevation = 4.dp
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = SportsOnSurface
-                        )
-                    }
-                    TextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        enabled = placesClient != null,
-                        singleLine = true,
-                        placeholder = {
-                            Text(if (placesClient != null) "Search for a place" else "Search unavailable")
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            cursorColor = SportsPrimary
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = SportsOnSurfaceVariant,
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
-                }
-            }
-
-            if (suggestions.isNotEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    shadowElevation = 4.dp
-                ) {
-                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                        suggestions.forEach { prediction ->
-                            SuggestionRow(
-                                prediction = prediction,
-                                onClick = {
-                                    // suggestions only exist when search is available
-                                    placesClient?.let { client ->
-                                        query = ""
-                                        suggestions = emptyList()
-                                        focusManager.clearFocus()
-                                        scope.launch {
-                                            val place = fetchPlace(client, prediction.placeId, sessionToken)
-                                            if (place != null) {
-                                                selected = place
-                                                cameraState.animate(
-                                                    CameraUpdateFactory.newLatLngZoom(
-                                                        LatLng(place.latitude, place.longitude),
-                                                        PICKED_ZOOM
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                        }
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    suggestions.forEach { prediction ->
+                        SuggestionRow(prediction = prediction, onClick = { onPick(prediction) })
                     }
                 }
             }
         }
+    }
+}
 
-        // bottom sheet with the selected place
-        Surface(
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            color = Color.White,
-            shadowElevation = 8.dp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
+@Composable
+private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: Boolean, onBack: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = SportsOnSurface
+                )
+            }
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                enabled = enabled,
+                singleLine = true,
+                placeholder = {
+                    Text(if (enabled) "Search for a place" else "Search unavailable")
+                },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    cursorColor = SportsPrimary
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = SportsOnSurfaceVariant,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+        }
+    }
+}
+
+// bottom sheet with the selected place and Confirm Location
+@Composable
+private fun SelectedPlaceSheet(selected: GameLocation?, isBusy: Boolean, onConfirm: () -> Unit, modifier: Modifier) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = Color.White,
+        shadowElevation = 8.dp,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp)
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 32.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(SportsOutlineVariant)
+            )
+            Text(
+                text = "SELECTED LOCATION",
+                color = SportsOnSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = if (isBusy) "Finding address…" else selected?.name ?: "Move the map to choose a place",
+                color = SportsOnSurface,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = if (isBusy) " " else selected?.address ?: " ",
+                color = SportsOnSurfaceVariant,
+                fontSize = 14.sp
+            )
+            Text(
+                text = "Drag the map to move the pin, or search above.",
+                color = SportsOnSurfaceVariant,
+                fontSize = 12.sp
+            )
+            Button(
+                onClick = onConfirm,
+                enabled = selected != null && !isBusy,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+                    .height(48.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .size(width = 32.dp, height = 4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(SportsOutlineVariant)
-                )
-                Text(
-                    text = "SELECTED LOCATION",
-                    color = SportsOnSurfaceVariant,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = if (isBusy) "Finding address…" else selected?.name ?: "Move the map to choose a place",
-                    color = SportsOnSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (isBusy) " " else selected?.address ?: " ",
-                    color = SportsOnSurfaceVariant,
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = "Drag the map to move the pin, or search above.",
-                    color = SportsOnSurfaceVariant,
-                    fontSize = 12.sp
-                )
-                Button(
-                    onClick = { selected?.let(onLocationPicked) },
-                    enabled = selected != null && !isBusy,
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp)
-                        .height(48.dp)
-                ) {
-                    Text(text = "Confirm Location", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
+                Text(text = "Confirm Location", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
