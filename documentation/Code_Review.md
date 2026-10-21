@@ -12,28 +12,23 @@
 
 ### 2.1. Commit Hash Where Codacy Ran
 
-`[Insert Commit SHA here]`
+`363c564e2122d5faa4a972a74499b5ab6367ec77`
 
 ### 2.2. Unfixed Issues per Codacy Category
 
-_(Placeholder for screenshots of Codacy's Category Breakdown table in Overview)_
+![Codacy Overview](images/codacy-overview.png)
+
+![Codacy Overview-2](images/codacy-overview-2.png)
 
 ### 2.3. Unfixed Issues per Codacy Code Pattern
 
-_(Placeholder for screenshots of Codacy's Issues page)_
+![Codacy Issues](images/codacy-issues.png)
 
 ### 2.4. Justifications for Unfixed Issues
 
-- **Code Pattern: [Usage of Deprecated Modules](#)**
+There are no unfixed Codacy issues at this commit, so no justifications are needed.
 
-  1. **Issue**
-
-     - **Location in Git:** [`src/services/chatService.js#L31`](#)
-     - **Justification:** ...
-
-  2. ...
-
-- ...
+Codacy reports low duplication (8%), but 15% of files are marked as complex. We plan to reduce it in a later milestone by decresing nested code and the number of complex files.
 
 ---
 
