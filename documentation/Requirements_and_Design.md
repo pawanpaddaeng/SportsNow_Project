@@ -4,7 +4,9 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+| 2026-10-21 | 4.1 Main Components, 4.2 Databases, 4.3 External Modules | Added the purpose, rationale, and interfaces of each component, database, and external module, including Firebase Cloud Messaging. |
+| 2026-10-21 | 4.4 Frameworks and Libraries | Added the frameworks and libraries used on the back-end and front-end and the reasons for choosing them. |
+| 2026-10-21 | 4.5 Dependencies Diagram | Added the dependency diagram showing calls between the front-end, back-end components, databases, and external modules. |
 
 ---
 
@@ -240,66 +242,187 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 ## 4. Designs Specification
 ### **4.1. Main Components**
+All front-end to back-end interfaces are HTTP/REST calls that send and return JSON. Every endpoint except sign up and login needs the JWT from sign up or login in the `Authorization: Bearer <token>` header. Back-end components call each other directly in the same Node.js process, and those interfaces are written as Java-style method signatures.
+
 1. **User**
     - **Purpose**: Handles sign up, login, sign out, and user profiles, verifying identity through Google Authentication.
+    - **Rationale**: Keeping accounts in their own component lets every other component get the signed in user from one place. We chose Google sign in with our own JWT over username and password accounts so we never store passwords.
     - **Interfaces**: 
-        1. ...
-            - **Purpose**: ...
-        2. ...
+        1. `POST /api/auth/signup` body `{ id_token, email, f_name, l_name, birthYear }` → `201 { msg: "signedIn", jwt_token }`
+            - **Purpose**: Verifies the Google ID token, creates the user's account, and returns a JWT for later requests.
+        2. `POST /api/auth/login` body `{ id_token }` → `200 { msg: "signedIn", jwt_token }` or `404 { msg: "no_user" }`
+            - **Purpose**: Verifies the Google ID token and returns a JWT if the user already has an account.
+        3. `POST /api/register_notif` body `{ fcm_token }` → `200 { msg: "success" }`
+            - **Purpose**: Saves the device's Firebase token so the server can send the user push notifications.
+        4. `GET /api/users/me` → `200 { user }`
+            - **Purpose**: Returns the signed in user's profile.
+        5. `PUT /api/users/me` body `{ f_name, l_name, birthYear }` → `200 { user }`
+            - **Purpose**: Updates the signed in user's profile.
+        6. `User findUserById(int userId)`
+            - **Purpose**: Used by the other components to get a user's name and details, returning null if no user has the id.
+        7. `int sendPushToUser(int userId, PushMessage message)`
+            - **Purpose**: Sends a push notification to every device the user is signed into and returns how many devices it reached.
 
 2. **Game**
     - **Purpose**: Handles creating, editing, discovering, joining, and leaving games, accepting and removing players, and invitations, using the Google Maps API for locations.
+    - **Rationale**: Games, their players and join requests change together, so one component owns them and can lock a game while it changes, so two approvals at once can't go over the player limit. We chose to search by distance in a MySQL query over loading every game into the server so Discover Game stays fast.
     - **Interfaces**: 
-        1. ...
-            - **Purpose**: ...
-        2. ...
+        1. `POST /api/games` body `{ title, sport, description, starts_at, ends_at, location_name, address, latitude, longitude, max_players, skill_level }` → `201 { game }`
+            - **Purpose**: Creates a game with the signed in user as its organiser and first player.
+        2. `GET /api/games/mine` → `200 { organized_games, joined_games }`
+            - **Purpose**: Returns the games the user organises and the games they have joined.
+        3. `GET /api/games/discover?lat=&lng=` → `200 { games }` or `200 { msg: "no_games" }`
+            - **Purpose**: Returns the nearby games the user can join, closest first.
+        4. `GET /api/games/{gameId}` → `200 { game, organizer, players, viewer_role }`
+            - **Purpose**: Returns a game's details, its players, and what the signed in user can do with it.
+        5. `PUT /api/games/{gameId}` body same as create → `200 { game }`
+            - **Purpose**: Lets the organiser edit the details of their game.
+        6. `POST /api/games/{gameId}/cancel` → `200 { game }`
+            - **Purpose**: Lets the organiser cancel their game and notifies its players.
+        7. `POST /api/games/{gameId}/join-requests` body `{ skill_level, play_frequency, message }` → `201 { request }`
+            - **Purpose**: Sends a join request for a game and notifies the organiser.
+        8. `GET /api/games/{gameId}/join-requests` → `200 { game, requests }`
+            - **Purpose**: Returns the pending join requests for the organiser to review.
+        9. `PATCH /api/games/{gameId}/join-requests/{requestId}` body `{ decision: "approve" | "decline" }` → `200 { game }`
+            - **Purpose**: Lets the organiser approve or decline a join request and notifies the requester.
+        10. `DELETE /api/games/{gameId}/players/{userId}` → `200 { game }` *(planned)*
+            - **Purpose**: Lets a player leave a game, or the organiser remove a player, before the game starts.
+        11. `POST /api/games/{gameId}/invites` body `{ friend_ids }` → `201 { msg: "success" }` *(planned)*
+            - **Purpose**: Lets the organiser invite friends to their game by notifying them.
+        12. `List<GamePlayer> getGamePlayers(int gameId)`
+            - **Purpose**: Used by Player Review and Message to check who played in a game.
+        13. `List<Game> getFinishedGames(int userId)` *(planned)*
+            - **Purpose**: Used by Player Review to find the user's finished games that can be rated.
 
 3. **Player Review**
     - **Purpose**: Handles player ratings after a game, no-shows, reputation scores, and badges.
-    - **Interfaces**: 
-        1. ...
-            - **Purpose**: ...
-        2. ...
+    - **Rationale**: The reputation score and badges are computed from ratings, so keeping them apart from games keeps the scoring algorithm in one place. We chose to recompute the score after each game over computing it on every profile view so profiles load quickly.
+    - **Interfaces**: *(planned)*
+        1. `POST /api/games/{gameId}/ratings` body `{ rated_user_id, sportsmanship, skill, honesty, reliability, overall }` → `201 { msg: "success" }`
+            - **Purpose**: Records a user's rating of another player after a finished game.
+        2. `POST /api/games/{gameId}/no-shows` body `{ user_ids }` → `200 { msg: "success" }`
+            - **Purpose**: Lets the organiser mark players who did not show up.
+        3. `GET /api/users/{userId}/stats` → `200 { reputation_score, games_played, badges }`
+            - **Purpose**: Returns a user's reputation score, game history, and badges.
+        4. `Reputation getReputation(int userId)`
+            - **Purpose**: Used by Game to show each requester's score and badges on the join request list.
+        5. `void updateReputation(int gameId)`
+            - **Purpose**: Recomputes the score of every player in a finished game and awards any new badges.
 
 4. **Message**
     - **Purpose**: Handles chat messages for both game chat and friend chat.
-    - **Interfaces**: 
-        1. ...
-            - **Purpose**: ...
-        2. ...
+    - **Rationale**: Game chat and friend chat send and store messages the same way, so one component handles both. We chose a WebSocket connection over polling so messages arrive live and the app doesn't use battery asking for new ones.
+    - **Interfaces**: *(planned)*
+        1. `GET /api/chats/{chatId}/messages?before=` → `200 { messages }`
+            - **Purpose**: Returns the earlier messages of a game or friend chat, newest first.
+        2. WebSocket `send_message { chat_id, text }` → `new_message { message }`
+            - **Purpose**: Sends a message and delivers it live to everyone in the chat.
+        3. `String createGameChat(int gameId)`
+            - **Purpose**: Used by Game to open a temporary chat room for a new game, returning its chat id.
+        4. `void closeGameChat(int gameId)`
+            - **Purpose**: Used by Game to close a game's chat room after the game ends.
 
 5. **Social**
     - **Purpose**: Handles friend search, friend requests, removing friends, and friend recommendations.
-    - **Interfaces**: 
-        1. ...
-            - **Purpose**: ...
-        2. ...
+    - **Rationale**: Friendships are used by chat, invites and recommendations, so one component owns them. We chose to recommend friends from shared games, mutual friends and sports in our own query over an external recommendation service, since the data is already in our database.
+    - **Interfaces**: *(planned)*
+        1. `GET /api/users/search?q=` → `200 { users }`
+            - **Purpose**: Searches for users by name.
+        2. `POST /api/friends/requests` body `{ user_id }` → `201 { request }`
+            - **Purpose**: Sends a friend request and notifies the other user.
+        3. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
+            - **Purpose**: Accepts or declines a friend request.
+        4. `GET /api/friends` → `200 { friends }`
+            - **Purpose**: Returns the user's friends.
+        5. `DELETE /api/friends/{userId}` → `200 { msg: "success" }`
+            - **Purpose**: Removes a friend.
+        6. `GET /api/friends/recommendations` → `200 { users }`
+            - **Purpose**: Returns suggested friends based on shared games, mutual friends, sports, and skill level.
+        7. `boolean areFriends(int userId, int otherUserId)`
+            - **Purpose**: Used by Message and Game to check that two users are friends before a chat or invite.
 
 
 ### **4.2. Databases**
 1. **Relational Database (MySQL)**
-    - **Purpose**: ...
+    - **Purpose**: Stores users, games, players, join requests, device tokens, friendships, and ratings.
+    - **Rationale**: This data has clear links between tables and needs transactions, such as locking a game while a join request is approved. We chose MySQL over a document database for these joins and transactions.
 2. **Chat Database (MongoDB)**
     - **Purpose**: Stores chat messages for the Message component.
+    - **Rationale**: Chat messages are many small records read by chat in time order and don't need joins. We chose MongoDB over storing them in MySQL so the large message volume doesn't slow down the game queries.
 
 
 
 ### **4.3. External Modules**
 1. **Google Authentication** 
     - **Purpose**: Verifies users’ identity when they sign up and log in.
+    - **Rationale**: We chose it over our own password accounts so we don't store passwords, and most Android users already have a Google account.
+    - **Interface**: `OAuth2Client.verifyIdToken(String idToken, String audience)` → `LoginTicket` holding the Google account id and verified email.
 2. **Google Maps API** 
     - **Purpose**: Provides the map for selecting a game location and determines addresses, and gives the location for nearby game search.
+    - **Rationale**: We chose it over OpenStreetMap because it is made for Android, is well documented, and uses the same Google Cloud project as Google sign in.
+    - **Interface**: `GoogleMap(CameraPositionState cameraPositionState, Function<LatLng, Unit> onMapClick)` from the Maps SDK for Android, which shows the map in the app and returns the coordinates of the spot the user taps.
+3. **Firebase Cloud Messaging** 
+    - **Purpose**: Sends push notifications, such as new join requests and request decisions, to users' phones.
+    - **Rationale**: We chose it over keeping a connection open or polling the server because it is built into Android and saves battery.
+    - **Interface**: `BatchResponse messaging.sendEachForMulticast(MulticastMessage message)`, which sends a title, body and data to a list of device tokens and reports which tokens no longer work.
 
 
 ### **4.4. Frameworks and Libraries**
-1. **[WRITE_NAME_HERE]**
-    - **Purpose**: ...
-    - **Reason**: ...
-2. ...
+#### Back-end
+1. **Node.js with TypeScript**
+    - **Purpose**: Runs the back-end server.
+    - **Reason**: TypeScript's types catch mistakes in request and database fields before the code runs, and Node.js handles many requests at once without threads.
+2. **Express.js**
+    - **Purpose**: Routes HTTP requests to the handlers for each component and parses JSON bodies.
+    - **Reason**: It is small, well known, and lets us split the routes into one router per component.
+3. **mysql2**
+    - **Purpose**: Connects to the MySQL database and runs queries and transactions.
+    - **Reason**: It supports connection pools, transactions and parameterised queries, which keep queries safe from SQL injection.
+4. **google-auth-library**
+    - **Purpose**: Verifies the Google ID token the app sends when signing up or logging in.
+    - **Reason**: It is Google's own library, so it checks the token's signature and audience correctly.
+5. **jsonwebtoken**
+    - **Purpose**: Creates and checks the JWT the app sends with every request after signing in.
+    - **Reason**: A JWT lets the server know who the user is without storing sessions.
+6. **firebase-admin**
+    - **Purpose**: Sends push notifications to users' phones through Firebase Cloud Messaging.
+    - **Reason**: It is the official way for a server to send Firebase notifications and reports tokens that no longer work.
+7. **ws** *(planned)*
+    - **Purpose**: Keeps a WebSocket connection open while a chat screen is shown so messages arrive live.
+    - **Reason**: It is a small WebSocket library that works with the Express server.
+8. **MongoDB Node.js Driver** *(planned)*
+    - **Purpose**: Stores and reads chat messages in the Chat Database.
+    - **Reason**: It is MongoDB's official driver and is enough for the simple message queries chat needs.
+9. **dotenv**
+    - **Purpose**: Loads settings such as the database password and Google client id from a `.env` file.
+    - **Reason**: It keeps secrets out of the code.
+10. **Jest and Supertest**
+    - **Purpose**: Run the back-end tests and send test HTTP requests to the server.
+    - **Reason**: Jest is the most used Node.js test framework, and Supertest calls the Express app without starting a real server.
+
+#### Front-end
+1. **Kotlin with Jetpack Compose (Material 3)**
+    - **Purpose**: Builds the Android app and its screens.
+    - **Reason**: Compose is Android's recommended UI toolkit, and building screens in Kotlin code is quicker than XML layouts.
+2. **Navigation Compose**
+    - **Purpose**: Moves between the app's screens.
+    - **Reason**: It is the standard navigation library for Compose apps.
+3. **Retrofit with Gson and OkHttp**
+    - **Purpose**: Makes the HTTP requests to the back-end and turns the JSON replies into Kotlin objects.
+    - **Reason**: Retrofit turns each endpoint into one Kotlin function, which keeps the network code short.
+4. **Credential Manager with Google ID**
+    - **Purpose**: Shows the Google sign in prompt and gets the Google ID token.
+    - **Reason**: It is Android's current recommended way to sign in with Google.
+5. **Firebase Cloud Messaging**
+    - **Purpose**: Gets the device's notification token and receives push notifications.
+    - **Reason**: It is built into Android and works with the firebase-admin library on the back-end.
+6. **Maps Compose, Play Services Maps and Places**
+    - **Purpose**: Show the map for picking a game location and discovering games, and search for places by name.
+    - **Reason**: Maps Compose lets us use Google Maps directly in Compose screens.
 
 
 ### **4.5. Dependencies Diagram**
-
+![Dependencies Diagram](images/Dependency%20diagram-High%20Level%20Diagram.jpg)
 
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
