@@ -4,7 +4,7 @@
 
 | **Change Date** | **Modified Sections** | **Rationale** |
 | --------------- | --------------------- | ------------- |
-| Oct 20, 2026 | 2.1, 4 | First test plan for CP1. Section 2.1 plans the back-end tests for the Game component. Section 4 plans the end-to-end test for Use Case 3, Discover Game. We will write and run the tests, and add the results, coverage, GitHub Actions file and logs, at CP2. |
+| Oct 20, 2026 | 2.1, 4 | First test plan for CP1. Section 2.1 plans the back-end tests for the Game component. Section 4 plans the end-to-end test for Use Case 2, Discover Game. We will write and run the tests, and add the results, coverage, GitHub Actions file and logs, at CP2. |
 
 ---
 
@@ -228,7 +228,7 @@ _To be added at CP2._
 
 ### 4.2. Tests
 
-- **Use Case: Discover Game (Use Case 3)**
+- **Use Case: Discover Game (Use Case 2)**
 
   - **Before the tests:**
     - **Signed in:** Each test starts signed in, on the Home screen.
