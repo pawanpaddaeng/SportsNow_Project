@@ -1,6 +1,6 @@
-# CPEN321_26W1_ProjectName
+# SportsNow
 
-_Keep this README up to date with the steps required to build and run the frontend and backend (including any scripts, config files, and environment variables). TAs ill follow these instructions._
+_Keep this README up to date with the steps required to build and run the frontend and backend (including any scripts, config files, and environment variables). TAs will follow these instructions._
 
 ## Requirements
 
@@ -36,8 +36,8 @@ Install the following before the frontend or backend setup steps:
    - `API_BASE_URL`: backend URL baked into the APK (rebuild the app after changing it).
      - **Local backend** (plain HTTP, no Caddy): `http://10.0.2.2:3000` for the emulator (`10.0.2.2` is the host machine). For a physical device on the same Wi-Fi, use `http://<your-lan-ip>:3000`.
      - **Server backend** (HTTPS through Caddy): `https://<SERVER_IP>.sslip.io`, e.g. `https://1.2.3.123.sslip.io`.
-   - `GOOGLE_CLIENT_ID`: Google OAuth client ID used for Google sign in.
-   - `MAPS_API_KEY`: Google Maps API key (Maps SDK for Android enabled) for the location picker.
+   - `GOOGLE_CLIENT_ID`: the **Web** OAuth client ID used for Google sign in (see [Google Cloud project](#google-cloud-project)).
+   - `MAPS_API_KEY`: Google Maps API key with **Maps SDK for Android** and **Places API** enabled, for the maps and the location search.
 6. **Firebase config**: put `google-services.json` (Firebase console → Project settings → your Android app) in `frontend/app/`. Without it the app still builds, but push notifications are disabled.
 
 
@@ -67,8 +67,8 @@ cp .env.example .env
 
 Set at least:
 - `JWT_SECRET`: a long random string used to sign auth tokens.
-- `GOOGLE_CLIENT_ID`: same Google OAuth client ID as the frontend, used to verify sign ins.
-- `GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json`: Firebase service account key for sending push notifications. Download it from Firebase console → Project settings → Service accounts → Generate new private key, and save it as `backend/firebase-service-account.json` (it is a secret: never commit it).
+- `GOOGLE_CLIENT_ID`: same **Web** OAuth client ID as the frontend, used to verify sign ins.
+- `GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json`: Firebase service account key for sending push notifications. Download it from Firebase console → Project settings → Service accounts → Generate new private key, and save it as `backend/firebase-service-account.json` (it is a secret: never commit it). The file must exist **before** you run `docker compose up`: Docker Compose mounts it into the container, and if it is missing Docker creates an empty folder with that name instead and push notifications fail. If that happens, delete the folder, add the file, and start the backend again.
 - `PORT` (optional): defaults to `3000` if unset.
 - In the root `.env`: `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` (database credentials), and `SERVER_IP`: public IP of the server (Caddy serves `https://<SERVER_IP>.sslip.io`). Locally `SERVER_IP` is unused but must still be set to any value.
 
@@ -111,4 +111,11 @@ Don't add `-v` unless you mean to wipe data: it deletes the MySQL database and C
 
 ## Additional Setup
 
-_Please specify any other additional setup steps non-specific to either frontend nor backend_
+### Google Cloud project
+
+The frontend and backend share one Google Cloud project for sign in and maps. In [Google Cloud Console](https://console.cloud.google.com/):
+
+1. **OAuth clients** (APIs & Services → Credentials → Create credentials → OAuth client ID):
+   - A **Web application** client. Its client ID is the `GOOGLE_CLIENT_ID` in both `frontend/local.properties` and `backend/.env`.
+   - An **Android** client with package name `com.example.cpen321application` and the SHA-1 of your debug key. Get the SHA-1 by running `./gradlew signingReport` in `frontend/`. Sign in fails without this client, even though its ID isn't used anywhere.
+2. **APIs** (APIs & Services → Library): enable **Maps SDK for Android** and **Places API**, then create an API key for `MAPS_API_KEY`.
