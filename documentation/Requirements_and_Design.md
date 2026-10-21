@@ -31,7 +31,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 ### **3.2. Use Case Diagram**
-![Use Case Diagram](images/Use%20Case%20Diagram.png)
+![Use Case Diagram](images/UCD_ver2.png)
 
 ### **3.3. Actors Description**
 1. User: A user is anyone with a SportsNow account. A user signs up, logs in, signs out, manages friends, chats with friends, rates players, and views player statistics.
@@ -74,39 +74,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a id="uc1r"></a>
-#### **Use Case 1: Account Creation**
-
-**Description**: A new user opens the app and signs up. The user verifies their identity with Google, then provides their personal details and, optionally, their favourite sports, skill level, and a photo.
-
-**Primary actor(s)**: User
-
-**Preconditions**: None
-
-[**[Sequence Diagram]**](#seq-uc1)
-    
-**Main success scenario**:
-1. User selects “Sign up”.
-2. System displays the sign-up screen with a field at the top to verify with Google, and fields below for first name, last name, and birth year, and optionally favourite sports, skill level, and a photo.
-3. User clicks the field to verify with Google.
-4. System verifies the user’s identity with Google.
-5. User enters their details and submits.
-6. System registers the user’s account and logs the user into the new account.
-
-
-
-**Failure scenario(s)**:
-- 4a. Google verification cannot be reached.
-    -  4a1. System displays an error message and returns to the first screen so the user can try again.
-- 5a. User entered illegal characters in at least one field.
-    -  5a1. System displays an error message identifying the erroneous field and characters.
-- 5b. User did not enter text in the name fields and/or birth year.
-    -  5b1. System displays an error message saying “First Name, Last Name and Birth Year fields are compulsory.”
-- 6a. The account could not be registered.
-    -  6a1. System displays a message saying the account could not be registered, along with the reason.
-
-
-<a id="uc2r"></a>
-#### **Use Case 2: Create Game**
+#### **Use Case 1: Create Game**
 
 **Description**: A Game Organiser creates a new game by entering its details and selecting a location on the map.
 
@@ -114,7 +82,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 **Preconditions**: Game Organiser is logged in
 
-[**[Sequence Diagram]**](#seq-uc2)
+[**[Sequence Diagram]**](#seq-uc1)
     
 **Main success scenario**:
 1. Game Organiser selects “Create game”.
@@ -140,8 +108,8 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     - 8a1. System displays a message saying the game could not be created, along with the reason.
 
 
-<a id="uc3r"></a>
-#### **Use Case 3: Discover Game**
+<a id="uc2r"></a>
+#### **Use Case 2: Discover Game**
 
 **Description**: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
 
@@ -149,7 +117,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 **Preconditions**: Player is logged in
 
-[**[Sequence Diagram]**](#seq-uc3)
+[**[Sequence Diagram]**](#seq-uc2)
 
 **Main success scenario**: 
 1. Player selects the compass in the navigation bar 
@@ -166,6 +134,32 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     - 3a1. System displays a message saying no nearby games were found.
 - 5a. No nearby games are found for the selected sport.
     - 5a1. System displays a message saying no games were found of the selected sport.
+
+
+<a id="uc3r"></a>
+#### **Use Case 3: Join Request**
+
+**Description**: A player sends a request to join a game, stating their skill level, how often they play, and an optional message. The request waits for the organiser’s approval.
+
+**Primary actor(s)**: Player
+
+**Preconditions**: Player is logged in and is viewing the details of a game they have not joined
+
+[**[Sequence Diagram]**](#seq-uc3)
+    
+**Main success scenario**:
+1. Player selects “Request to join”.
+2. System displays the join request form with fields for skill level, how often they play (optional), and a message (optional).
+3. Player fills in the form and clicks “Send request”.
+4. System sends the request to the organiser and shows the request as pending.
+
+
+
+**Failure scenario(s)**:
+- 3a. Player did not select a skill level.
+    -  3a1. System displays an error message asking the Player to select their skill level.
+- 4a. The request could not be sent.
+    -  4a1. System displays a message saying the request could not be sent, along with the reason.
 
 
 <a id="uc4r"></a>
@@ -430,24 +424,24 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
-1. <a id="seq-uc1"></a> [**Use Case 1: Account Creation**](#uc1r)\
-![Sequence Diagram UC1](images/UC1-%20Auth.png)
+1. <a id="seq-uc1"></a> [**Use Case 1: Create Game**](#uc1r)\
+![Sequence Diagram UC1](images/UC1%20-%20Create_ver2.png)
 <br><br>
 
-2. <a id="seq-uc2"></a> [**Use Case 2: Create Game**](#uc2r)\
-![Sequence Diagram UC2](images/UC2%20-%20Create.png)
+2. <a id="seq-uc2"></a> [**Use Case 2: Discover Game**](#uc2r)\
+![Sequence Diagram UC2](images/UC2%20-%20Discover_ver2.png)
 <br><br>
 
-3. <a id="seq-uc3"></a> [**Use Case 3: Discover Game**](#uc3r)\
-![Sequence Diagram UC3](images/UC3%20-%20Discover.png)
+3. <a id="seq-uc3"></a> [**Use Case 3: Join Request**](#uc3r)\
+![Sequence Diagram UC3](images/UC3%20-%20Join%20Request.png)
 <br><br>
 
 4. <a id="seq-uc4"></a> [**Use Case 4: Friend Chat**](#uc4r)\
-![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat.png)
+![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat_ver2.png)
 <br><br>
 
 5. <a id="seq-uc5"></a> [**Use Case 5: Rate Players**](#uc5r)\
-![Sequence Diagram UC5](images/UC5%20-%20Rating.png)
+![Sequence Diagram UC5](images/UC5%20-%20Rating_ver2.png)
 <br><br>
 
 ### **4.7. Design of Non-Functional Requirements**
