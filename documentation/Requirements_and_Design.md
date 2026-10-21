@@ -4,14 +4,12 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| 2026-10-21 | 4.1 Main Components, 4.2 Databases, 4.3 External Modules | Added the purpose, rationale, and interfaces of each component, database, and external module, including Firebase Cloud Messaging. |
-| 2026-10-21 | 4.4 Frameworks and Libraries | Added the frameworks and libraries used on the back-end and front-end and the reasons for choosing them. |
-| 2026-10-21 | 4.5 Dependencies Diagram | Added the dependency diagram showing calls between the front-end, back-end components, databases, and external modules. |
+| _Nothing to show_ |
 
 ---
 
 ## 2. Project Description
-SportsNow is a mobile app that helps people find like-minded players for sports games. Organisers can create games and set the sport, time, location, and the skill level, age group, and gender they are looking for. Nearby players can browse these games and request to join. Users can also add friends, chat with them, and invite them to games.
+SportsNow is a mobile app that helps people find like-minded players for sports games. Organisers can create games and set the sport, time, location, number of players, and the skill level they are looking for. Nearby players can browse these games and request to join. Users can also add friends, chat with them, and invite them to games.
 
 To keep the community made up of accurately skilled players, SportsNow builds a reputation for every user. After each game, players rate one another on punctuality, sportsmanship, skill and reliability, and organisers record no-shows. These ratings feed a reputation score, and players also earn badges for milestones. Organisers see each requester’s score, history, and badges before accepting or rejecting them, so games are filled with reliable players.
 
@@ -21,15 +19,15 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 ## 3. Requirements Specification
 
 ### **3.1. List of Features**
-1. Authentication: To access app features, a user must Sign In using Google Authentication Service first. New users must set up a profile by providing their name, age, gender, sports, and skill level per sport. Users can also sign out.
+1. Authentication: To access app features, a user must Sign In using Google Authentication Service first. New users must set up a profile by providing their first name, last name, and birth year. Users can also sign out.
 
-2. Game Planning: A user can create a game by specifying the sport (from the database), date, time, duration, max players, age group, gender, and skill level. The user picks the game location on a map using the Google Maps API. The organiser can then review join requests, each shown with the player’s rating, history, and badges, and can accept or reject each one. The join request list updates live as new requests arrive. The Game Organiser can also invite friends and edit or cancel the game. Each game has a temporary real-time chat room, which is closed after the game ends.
+2. Game Planning: A user can create a game by specifying the sport, title, date, start time, max players, skill level, and an optional description. The user picks the game location on a map using the Google Maps API. Every player who wants to join must send a join request that the organiser approves. The organiser can then review join requests, each shown with the player’s rating, history, and badges, and can accept or reject each one. The join request list updates live as new requests arrive. The Game Organiser can also invite friends and edit or cancel the game. Each game has a temporary real-time chat room, which is closed after the game ends.
 
-3. Game Discovery: A user can browse nearby games as a list or on a map using the Google Maps API. Games are sorted by distance, and the games are filtered by sport, time, skill level, age group, and gender. A user can view game details and the organiser’s reputation, and can send a join request with their skill level. The user is notified when a request is accepted or rejected, and the game status updates automatically. A user can also view upcoming games and leave a game before it starts.
+3. Game Discovery: A user can browse a list of games near their location, or near a place they choose on a map using the Google Maps API. Games are sorted by distance and can be filtered by sport. A user can view game details and the organiser’s reputation, and can send a join request with their skill level, how often they play, and an optional message. The user is notified when a request is accepted or rejected, and the game status updates automatically. A user can also view upcoming games and leave a game before it starts.
 
-4. Friend System: A user can search for other users and send, accept, or decline friend requests. A user can remove a friend. Friends can chat in real-time direct chat. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games. Friend recommendations are based on shared games, mutual friends, sports, and skill level.
+4. Friend System: A user can search for other users and send, accept, or decline friend requests. A user can remove a friend. Friends can chat in real-time direct chat. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games.
 
-5. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill honesty, and reliability, and the organiser marks players who did not show up. Our algorithm computes a reputation score, weighting recent games more heavily, adjusting for the number of ratings, and penalising no-shows and late cancellations. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
+5. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill, and reliability, along with an overall rating, and the organiser marks players who did not show up. Our algorithm computes a reputation score, weighting recent games more heavily, adjusting for the number of ratings, and penalising no-shows and late cancellations. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
 
 
 ### **3.2. Use Case Diagram**
@@ -44,29 +42,33 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 #### - Use cases for Feature 1 Authentication: 
 1. Login: A returning user opens the app and signs in by verifying their identity with Google.
 2. Sign out: A logged-in user signs out of their account and is returned to the first screen. 
-3. Account Creation: A new user opens the app and signs up. The user verifies their identity with Google, then provides their personal details and, optionally, their favourite sports, skill level, and a photo.
+3. Account Creation: A new user opens the app and signs up. The user verifies their identity with Google, then provides their first name, last name, and birth year.
 
 #### - Use cases for Feature 2 Game Planning: 
-4. Create Game: A game organiser creates a new game by entering its details, choosing whether to require approval for join requests, and selecting a location on the map.
+4. Create Game: A game organiser creates a new game by entering its details and selecting a location on the map.
 5. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
-6. Accept players to join: A game organiser reviews the join requests for their game, using each player’s rating, history, and badges, and accepts or rejects each one. 
-7. Kick people from Group: A game organiser removes a player from a game they created. 
-8. Invite Friend: A user invites one or more of their friends to a game they created. 
-9. Game Chat: Players who have joined a game chat with the other participants in a temporary chat room, which is closed after the game ends. 
+6. Cancel Game: A game organiser cancels a game they created, and its players are notified.
+7. Accept players to join: A game organiser reviews the join requests for their game, using each player’s rating, history, and badges, and accepts or rejects each one. 
+8. Kick people from Group: A game organiser removes a player from a game they created. 
+9. Invite Friend: A game organiser invites one or more of their friends to a game they created. 
+10. Game Chat: Players who have joined a game chat with the other participants in a temporary chat room, which is closed after the game ends. 
 
 #### - Use cases for Feature 3 Game Discovery: 
-10. Discover Game: A player finds games happening nearby. The system uses the player’s location to show nearby games and their information, and the player can filter the list by sport.
-11. Join Game: A player views the details of a game and sends a request to join it, stating their skill level. 
-12. Leave Game: A player who has joined a game withdraws from it before it starts. 
+11. Discover Game: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
+12. Join Game: A player views the details of a game and sends a request to join it, stating their skill level, how often they play, and an optional message. 
+13. Leave Game: A player who has joined a game withdraws from it before it starts. 
+14. View Upcoming Games: A user views the upcoming games they organise and the games they have joined.
 
 #### - Use cases for Feature 4 Friend System: 
-13. Add Friend: A user searches for another user and sends them a friend request, which the other user can accept or decline. 
-14. Remove Friend: A user removes someone from their list of friends. 
-15. Friend Chat: A user chats with one of their friends. The user selects a friend from their friend list, opens the chat, and sends a message.
+15. Add Friend: A user searches for another user and sends them a friend request, which the other user can accept or decline. 
+16. Remove Friend: A user removes someone from their list of friends. 
+17. Friend Chat: A user chats with one of their friends. The user selects a friend from their friend list, opens the chat, and sends a message.
+18. View Friend Profile: A user views a friend’s profile, including their badges and upcoming games.
 
 #### - Use cases for Feature 5 Player Reputation and Statistics: 
-16. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on sportsmanship, skill, honesty, and reliability, along with an overall rating.
-17. Player Statistics: A user views their player’s statistics, including their reputation score and the badges they have earned. 
+19. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on punctuality, sportsmanship, skill, and reliability, along with an overall rating.
+20. Mark No-shows: After a game has finished, the game organiser marks the players who did not show up.
+21. Player Statistics: A user views their player’s statistics, including their reputation score and the badges they have earned. 
 
 
 
@@ -106,7 +108,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 <a id="uc2r"></a>
 #### **Use Case 2: Create Game**
 
-**Description**: A Game Organiser creates a new game by entering its details, choosing whether to require approval for join requests, and selecting a location on the map.
+**Description**: A Game Organiser creates a new game by entering its details and selecting a location on the map.
 
 **Primary actor(s)**: Game Organiser
 
@@ -116,8 +118,8 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
     
 **Main success scenario**:
 1. Game Organiser selects “Create game”.
-2. System displays the game creation form with fields for the game name, date, time, player count, skill level, description (optional), an “Approve join request” toggle, and a map for selecting the location.
-3. Game Organiser fills in all the details, sets the toggle, and clicks on the map.
+2. System displays the game creation form with fields for the sport, title, date, time, max players, skill level, description (optional), and a map for selecting the location.
+3. Game Organiser fills in all the details and clicks on the map.
 4. System opens the Map API.
 5. Game Organiser selects the game location on the map.
 6. System determines and displays the address of the selected location, then closes the map.
@@ -141,7 +143,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 <a id="uc3r"></a>
 #### **Use Case 3: Discover Game**
 
-**Description**: A player finds games happening nearby. The system uses the player’s location to show nearby games and their information, and the player can filter the list by sport.
+**Description**: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
 
 **Primary actor(s)**: Player 
 
@@ -151,15 +153,15 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 **Main success scenario**: 
 1. Player selects the compass in the navigation bar 
-2. System uses the Map API to get the Player’s location.
-3. System displays the nearby games with their information, and a selector bar at the top with various sports.
+2. System gets the Player’s location from the phone.
+3. System displays the nearby games sorted by distance with their information, and a selector bar at the top with various sports.
 4. Player selects a sport in the selector bar.
 5. System updates the list to show only the games of the selected sport.
 
 
 **Failure scenario(s)**:
-- 2a. System cannot get the Player’s location (e.g. the Map API cannot be reached or location access is denied).
-    - 2a1. System displays an error message and lets the Player try again.
+- 2a. System cannot get the Player’s location (e.g. location is turned off or location access is denied).
+    - 2a1. System displays an error message and lets the Player try again or choose a place on the map.
 - 3a. No games are found nearby.
     - 3a1. System displays a message saying no nearby games were found.
 - 5a. No nearby games are found for the selected sport.
@@ -196,7 +198,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 <a id="uc5r"></a>
 #### **Use Case 5: Rate Players**
 
-**Description**: After a game has finished, a user rates the other players. The user selects a player and rates them on sportsmanship, skill, honesty, and reliability, along with an overall rating.
+**Description**: After a game has finished, a user rates the other players. The user selects a player and rates them on punctuality, sportsmanship, skill, and reliability, along with an overall rating.
 
 **Primary actor(s)**: User
 
@@ -210,7 +212,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 3. User selects “Rate player”.
 4. System displays all the players of the game.
 5. User selects a player.
-6. System displays the rating categories of sportsmanship, skill, honesty, and reliability, each out of 5, as well as an overall rating.
+6. System displays the rating categories of punctuality, sportsmanship, skill, and reliability, each out of 5, as well as an overall rating.
 7. User enters the ratings and clicks “Submit”.
 8. System records the rating and displays a confirmation message.
 
@@ -232,6 +234,8 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 1. **Performance**
     - **Description**: Discover Game should finish loading and display the nearby games in under 5 seconds from when the user selects the compass.
     - **Justification**: In Nielsen’s Response Times: The 3 Important Limits, about 10 seconds is the limit for keeping the user’s attention focused, and delays between 1 and 10 seconds make users feel at the mercy of the computer and explore less freely. Within that range, real user monitoring data from Gomez, cited by Countey (2015), shows that websites loading within 5 seconds keep abandonment to about 20%. This figure is for websites, where a visitor can leave at no cost. SportsNow users have chosen to install the app, so they are more committed and should abandon even less at the same delay. A 5-second target therefore sits well inside Nielsen’s 10-second limit and in the range where abandonment is low. 
+
+<a id="nfr2"></a>
 
 2. **Energy Efficiency**
     - **Description**: Using the app for 10 minutes should reduce the phone’s battery level by no more than 1%.
@@ -298,7 +302,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
     - **Purpose**: Handles player ratings after a game, no-shows, reputation scores, and badges.
     - **Rationale**: The reputation score and badges are computed from ratings, so keeping them apart from games keeps the scoring algorithm in one place. We chose to recompute the score after each game over computing it on every profile view so profiles load quickly.
     - **Interfaces**: *(planned)*
-        1. `POST /api/games/{gameId}/ratings` body `{ rated_user_id, sportsmanship, skill, honesty, reliability, overall }` → `201 { msg: "success" }`
+        1. `POST /api/games/{gameId}/ratings` body `{ rated_user_id, punctuality, sportsmanship, skill, reliability, overall }` → `201 { msg: "success" }`
             - **Purpose**: Records a user's rating of another player after a finished game.
         2. `POST /api/games/{gameId}/no-shows` body `{ user_ids }` → `200 { msg: "success" }`
             - **Purpose**: Lets the organiser mark players who did not show up.
@@ -323,8 +327,8 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Used by Game to close a game's chat room after the game ends.
 
 5. **Social**
-    - **Purpose**: Handles friend search, friend requests, removing friends, and friend recommendations.
-    - **Rationale**: Friendships are used by chat, invites and recommendations, so one component owns them. We chose to recommend friends from shared games, mutual friends and sports in our own query over an external recommendation service, since the data is already in our database.
+    - **Purpose**: Handles friend search, friend requests, removing friends, and viewing friends' profiles.
+    - **Rationale**: Friendships are used by friend chat, game invites and friend profiles, so one component owns them. We chose to keep it apart from User so the User component only handles accounts and profiles.
     - **Interfaces**: *(planned)*
         1. `GET /api/users/search?q=` → `200 { users }`
             - **Purpose**: Searches for users by name.
@@ -336,8 +340,8 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Returns the user's friends.
         5. `DELETE /api/friends/{userId}` → `200 { msg: "success" }`
             - **Purpose**: Removes a friend.
-        6. `GET /api/friends/recommendations` → `200 { users }`
-            - **Purpose**: Returns suggested friends based on shared games, mutual friends, sports, and skill level.
+        6. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }`
+            - **Purpose**: Returns a friend's profile with their badges and upcoming games.
         7. `boolean areFriends(int userId, int otherUserId)`
             - **Purpose**: Used by Message and Game to check that two users are friends before a chat or invite.
 
@@ -448,6 +452,6 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 
 ### **4.7. Design of Non-Functional Requirements**
 1. [**Performance**](#nfr1)
-    - **Implementation**: The front-end sends a single request to the Game component, which gets the nearby games with one MySQL query filtered by location and, if a sport is chosen, by sport. The query reads from indexed columns and returns a limited number of games, and the front-end shows a loading indicator while it waits.
+    - **Implementation**: The front-end sends a single request to the Game component, which gets the nearby games with one MySQL query that filters by distance, sorts them closest first, and returns a limited number of games. The front-end shows a loading indicator while it waits, and filters the list by sport on the phone without sending another request.
 2. [**Energy Efficiency**](#nfr2)
     - **Implementation**: The app requests the user’s location once when Discover Game opens, not continuously, and it doesn’t poll the server in the background. Updates such as join request results arrive as push notifications through Firebase, and chat uses a connection that is open only while the chat screen is shown.
