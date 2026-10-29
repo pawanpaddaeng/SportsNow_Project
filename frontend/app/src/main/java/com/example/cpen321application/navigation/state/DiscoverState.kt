@@ -14,6 +14,7 @@ import com.example.cpen321application.game.model.toDiscoverGame
 import com.example.cpen321application.game.repository.DiscoverGamesResult
 import com.example.cpen321application.game.repository.fetchDiscoverGames
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 // the games shown on Discover and the location they were loaded for
@@ -28,6 +29,7 @@ class DiscoverState(private val context: Context, private val scope: CoroutineSc
     var error by mutableStateOf<String?>(null)
     // place the user picked on the map to search around, null searches around the phone
     var place by mutableStateOf<GameLocation?>(null)
+    private var job: Job? = null
 
     /*  loads the games near the picked place, or near the user when none is picked.
         The phone's location is only looked up again when refreshLocation is set (or
@@ -36,7 +38,7 @@ class DiscoverState(private val context: Context, private val scope: CoroutineSc
     fun load(refreshLocation: Boolean) {
         if (isLoading) return
         isLoading = true
-        scope.launch {
+        job = scope.launch {
             try {
                 val picked = place
                 val point = when {
@@ -71,7 +73,10 @@ class DiscoverState(private val context: Context, private val scope: CoroutineSc
         }
     }
 
+    // also cancels a load in progress so its result can't fill the cleared state
     fun clear() {
+        job?.cancel()
+        isLoading = false
         games.clear()
         location = null
         place = null

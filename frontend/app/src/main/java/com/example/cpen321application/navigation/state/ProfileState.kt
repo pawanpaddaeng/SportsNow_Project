@@ -11,6 +11,7 @@ import com.example.cpen321application.user.repository.UserProfile
 import com.example.cpen321application.user.repository.fetchMyProfile
 import com.example.cpen321application.user.repository.updateMyProfile
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 // the signed in user's profile, for the Profile and Edit Profile screens
@@ -24,11 +25,13 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
     var isSaving by mutableStateOf(false)
         private set
     var saveError by mutableStateOf<String?>(null)
+    private var loadJob: Job? = null
+    private var saveJob: Job? = null
 
     fun refresh() {
         if (isLoading) return
         isLoading = true
-        scope.launch {
+        loadJob = scope.launch {
             try {
                 when (val result = fetchMyProfile(context)) {
                     is ProfileResult.Loaded -> {
@@ -48,7 +51,7 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
         if (isSaving) return
         isSaving = true
         saveError = null
-        scope.launch {
+        saveJob = scope.launch {
             val result = try {
                 updateMyProfile(context, form)
             } finally {
@@ -66,7 +69,12 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
         }
     }
 
+    // also cancels a load or save in progress so its result can't fill the cleared state
     fun clear() {
+        loadJob?.cancel()
+        saveJob?.cancel()
+        isLoading = false
+        isSaving = false
         profile = null
         error = null
         saveError = null
