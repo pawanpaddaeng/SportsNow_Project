@@ -26,11 +26,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.auth.triggerGoogleSignIn
-import com.example.cpen321application.rememberSafeCoroutineScope
-import com.example.cpen321application.network.ServerApi
-import com.example.cpen321application.network.SignUpRequest
-import com.example.cpen321application.network.readAuthResponse
+import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.rememberSafeCoroutineScope
+import com.example.cpen321application.user.dto.SignUpRequest
+import com.example.cpen321application.user.dto.readAuthResponse
+import com.example.cpen321application.user.triggerGoogleSignIn
 import com.google.gson.JsonParseException
 import com.example.cpen321application.ui.theme.*
 import com.example.cpen321application.ui.components.CardRow

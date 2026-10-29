@@ -43,10 +43,10 @@ import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
 import com.example.cpen321application.ui.theme.SportsSurfaceContainer
-import com.example.cpen321application.users.ProfileCheck
-import com.example.cpen321application.users.ProfileForm
-import com.example.cpen321application.users.UserProfile
-import com.example.cpen321application.users.checkProfile
+import com.example.cpen321application.user.ProfileCheck
+import com.example.cpen321application.user.checkProfile
+import com.example.cpen321application.user.repository.ProfileForm
+import com.example.cpen321application.user.repository.UserProfile
 
 @Composable
 fun EditProfileScreen(

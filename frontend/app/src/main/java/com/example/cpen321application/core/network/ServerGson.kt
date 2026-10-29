@@ -1,4 +1,4 @@
-package com.example.cpen321application.network
+package com.example.cpen321application.core.network
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder

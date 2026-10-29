@@ -28,10 +28,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.BuildConfig
-import com.example.cpen321application.rememberSafeCoroutineScope
-import com.example.cpen321application.rememberUnexpectedErrorHandler
-import com.example.cpen321application.runGuarded
-import com.example.cpen321application.location.hasLocationPermission
+import com.example.cpen321application.core.rememberSafeCoroutineScope
+import com.example.cpen321application.core.rememberUnexpectedErrorHandler
+import com.example.cpen321application.core.runGuarded
+import com.example.cpen321application.game.location.hasLocationPermission
 import com.example.cpen321application.ui.theme.*
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.maps.CameraUpdateFactory

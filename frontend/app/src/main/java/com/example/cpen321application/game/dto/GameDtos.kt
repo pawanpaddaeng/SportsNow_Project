@@ -1,5 +1,6 @@
-package com.example.cpen321application.network
+package com.example.cpen321application.game.dto
 
+import com.example.cpen321application.core.network.Required
 import com.google.gson.annotations.SerializedName
 
 /*  a game as the server sends it, the same shape for every endpoint that returns

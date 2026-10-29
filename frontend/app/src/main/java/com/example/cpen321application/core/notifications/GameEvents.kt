@@ -1,4 +1,4 @@
-package com.example.cpen321application.notifications
+package com.example.cpen321application.core.notifications
 
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow

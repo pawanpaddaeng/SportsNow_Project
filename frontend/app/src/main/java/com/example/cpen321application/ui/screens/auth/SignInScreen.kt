@@ -14,11 +14,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import com.example.cpen321application.auth.triggerGoogleSignIn
-import com.example.cpen321application.rememberSafeCoroutineScope
-import com.example.cpen321application.network.LoginRequest
-import com.example.cpen321application.network.ServerApi
-import com.example.cpen321application.network.readAuthResponse
+import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.rememberSafeCoroutineScope
+import com.example.cpen321application.user.dto.LoginRequest
+import com.example.cpen321application.user.dto.readAuthResponse
+import com.example.cpen321application.user.triggerGoogleSignIn
 import com.google.gson.JsonParseException
 import java.io.IOException
 

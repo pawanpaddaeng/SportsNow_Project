@@ -23,8 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.network.GameDto
-import com.example.cpen321application.network.PendingJoinRequestDto
+import com.example.cpen321application.game.dto.GameDto
+import com.example.cpen321application.game.dto.PendingJoinRequestDto
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab

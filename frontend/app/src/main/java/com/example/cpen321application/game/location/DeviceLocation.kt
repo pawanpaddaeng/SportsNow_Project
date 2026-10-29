@@ -1,4 +1,4 @@
-package com.example.cpen321application.location
+package com.example.cpen321application.game.location
 
 import android.Manifest
 import android.content.Context

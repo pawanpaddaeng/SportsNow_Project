@@ -1,5 +1,7 @@
-package com.example.cpen321application.network
+package com.example.cpen321application.user.dto
 
+import com.example.cpen321application.core.network.Required
+import com.example.cpen321application.core.network.readReply
 import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 
@@ -54,3 +56,24 @@ data class RegisterNotifRequest(
  */
 fun readAuthResponse(response: Response<AuthTokenResponse>): AuthTokenResponse? =
     readReply(response, AuthTokenResponse::class.java)
+
+data class UserProfileDto(
+    @SerializedName("user_id") val userId: Int,
+    @field:Required val email: String,
+    @field:Required @SerializedName("f_name") val firstName: String,
+    @field:Required @SerializedName("l_name") val lastName: String,
+    val birthYear: Int,
+    @SerializedName("created_at") val createdAt: String?
+)
+
+data class UpdateProfileRequest(
+    @SerializedName("f_name") val firstName: String,
+    @SerializedName("l_name") val lastName: String,
+    val birthYear: Int
+)
+
+data class ProfileResponse(
+    val msg: String?,
+    val user: UserProfileDto?,
+    val error: String?
+)

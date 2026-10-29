@@ -1,10 +1,11 @@
-package com.example.cpen321application.auth
+package com.example.cpen321application.core.session
 
 import android.content.Context
 import android.util.Log
-import com.example.cpen321application.network.LoginRequest
-import com.example.cpen321application.network.ServerApi
-import com.example.cpen321application.network.readAuthResponse
+import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.user.dto.LoginRequest
+import com.example.cpen321application.user.dto.readAuthResponse
+import com.example.cpen321application.user.triggerSilentGoogleSignIn
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.sync.Mutex

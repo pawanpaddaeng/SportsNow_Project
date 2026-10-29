@@ -1,6 +1,24 @@
-package com.example.cpen321application.network
+package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
+import com.example.cpen321application.game.dto.CreateGameRequest
+import com.example.cpen321application.game.dto.CreateGameResponse
+import com.example.cpen321application.game.dto.DiscoverGamesResponse
+import com.example.cpen321application.game.dto.GameDetailsResponse
+import com.example.cpen321application.game.dto.JoinRequestBody
+import com.example.cpen321application.game.dto.JoinRequestDecisionBody
+import com.example.cpen321application.game.dto.JoinRequestDecisionResponse
+import com.example.cpen321application.game.dto.JoinRequestResponse
+import com.example.cpen321application.game.dto.MyGamesResponse
+import com.example.cpen321application.game.dto.PendingJoinRequestsResponse
+import com.example.cpen321application.user.dto.AuthRequest
+import com.example.cpen321application.user.dto.AuthResponse
+import com.example.cpen321application.user.dto.AuthTokenResponse
+import com.example.cpen321application.user.dto.LoginRequest
+import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.RegisterNotifRequest
+import com.example.cpen321application.user.dto.SignUpRequest
+import com.example.cpen321application.user.dto.UpdateProfileRequest
 import retrofit2.Retrofit
 import retrofit2.Response
 import retrofit2.http.Body

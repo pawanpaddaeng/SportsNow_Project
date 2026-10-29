@@ -1,4 +1,4 @@
-package com.example.cpen321application.auth
+package com.example.cpen321application.user
 
 import android.app.Activity
 import android.content.Context

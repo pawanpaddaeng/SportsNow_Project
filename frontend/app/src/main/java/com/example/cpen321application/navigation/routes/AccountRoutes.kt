@@ -1,4 +1,4 @@
-package com.example.cpen321application.navigation
+package com.example.cpen321application.navigation.routes
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -10,8 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavBackStackEntry
-import com.example.cpen321application.auth.firstName
-import com.example.cpen321application.auth.lastName
+import com.example.cpen321application.core.session.firstName
+import com.example.cpen321application.core.session.lastName
+import com.example.cpen321application.navigation.Routes
+import com.example.cpen321application.navigation.SIGN_IN_MESSAGE_KEY
+import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.ui.screens.auth.SignInScreen
 import com.example.cpen321application.ui.screens.auth.SignUpScreen
 import com.example.cpen321application.ui.screens.profile.EditProfileScreen

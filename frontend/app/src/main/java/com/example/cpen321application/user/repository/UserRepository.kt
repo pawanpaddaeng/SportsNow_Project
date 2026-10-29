@@ -1,12 +1,12 @@
-package com.example.cpen321application.users
+package com.example.cpen321application.user.repository
 
 import android.content.Context
-import com.example.cpen321application.auth.Session
-import com.example.cpen321application.network.ProfileResponse
-import com.example.cpen321application.network.ServerApi
-import com.example.cpen321application.network.UpdateProfileRequest
-import com.example.cpen321application.network.UserProfileDto
-import com.example.cpen321application.network.serverGson
+import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.serverGson
+import com.example.cpen321application.core.session.Session
+import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.UpdateProfileRequest
+import com.example.cpen321application.user.dto.UserProfileDto
 import com.google.gson.JsonParseException
 import retrofit2.Response
 import java.io.IOException

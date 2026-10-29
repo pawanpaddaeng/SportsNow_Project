@@ -1,13 +1,13 @@
-package com.example.cpen321application.notifications
+package com.example.cpen321application.user
 
 import android.content.Context
 import android.util.Log
-import com.example.cpen321application.auth.AuthTokenStore
-import com.example.cpen321application.auth.Session
-import com.example.cpen321application.auth.jwtToken
-import com.example.cpen321application.network.RegisterNotifRequest
-import com.example.cpen321application.network.ServerApi
-import com.example.cpen321application.network.readAuthResponse
+import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.session.AuthTokenStore
+import com.example.cpen321application.core.session.Session
+import com.example.cpen321application.core.session.jwtToken
+import com.example.cpen321application.user.dto.RegisterNotifRequest
+import com.example.cpen321application.user.dto.readAuthResponse
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.gson.JsonParseException
 import kotlinx.coroutines.suspendCancellableCoroutine

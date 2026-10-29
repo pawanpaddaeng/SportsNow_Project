@@ -1,4 +1,4 @@
-package com.example.cpen321application.notifications
+package com.example.cpen321application.core.notifications
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -11,7 +11,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.cpen321application.MainActivity
-import com.example.cpen321application.unexpectedErrorHandler
+import com.example.cpen321application.core.unexpectedErrorHandler
+import com.example.cpen321application.user.NotificationRegistration
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope

@@ -1,4 +1,4 @@
-package com.example.cpen321application
+package com.example.cpen321application.core
 
 import android.util.Log
 import android.widget.Toast
