@@ -29,52 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.game.dto.GameDto
+import com.example.cpen321application.game.model.GameSummary
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.theme.*
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
-import java.util.Locale
-
-/*  short summary of a game used by the cards on the home screen
-    pendingRequests is only used for games the user organizes
- */
-data class GameSummary(
-    val id: String,
-    val sport: String,
-    val title: String,
-    val dateTime: String,
-    val location: String,
-    val playerCount: Int,
-    val maxPlayers: Int,
-    val pendingRequests: Int = 0
-)
-
-// e.g. "Sat, Oct 18 · 3:00 PM" in the phone's time zone
-private val cardDateFormat = DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a", Locale.getDefault())
-
-// turns a game from the server into what the home screen card shows
-fun GameDto.toGameSummary(): GameSummary {
-    val dateTime = try {
-        Instant.parse(startsAt).atZone(ZoneId.systemDefault()).format(cardDateFormat)
-    } catch (e: DateTimeParseException) {
-        startsAt
-    }
-    return GameSummary(
-        id = gameId.toString(),
-        sport = sport.replaceFirstChar { it.titlecase(Locale.getDefault()) },
-        title = title,
-        dateTime = dateTime,
-        location = locationName,
-        playerCount = playerCount,
-        maxPlayers = maxPlayers
-    )
-}
 
 /*  what the Home screen shows. isRefreshing shows a loading bar while the list updates,
     errorMessage is shown above the games when an update failed (the last loaded games stay visible)

@@ -17,11 +17,6 @@ import com.example.cpen321application.core.notifications.createNotificationChann
 import com.example.cpen321application.navigation.AppNavigation
 import com.example.cpen321application.ui.theme.CPEN321ApplicationTheme
 
-/*
-    The main activity class that connects our navigation and
-    screen controller to the phone.
-    Used as provided in the template
- */
 class MainActivity : ComponentActivity() {
     // result ignored: if denied, notifications just aren't shown
     private val notificationPermissionRequest =

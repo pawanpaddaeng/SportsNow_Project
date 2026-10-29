@@ -1,6 +1,5 @@
 package com.example.cpen321application.ui.screens.auth
 
-import android.util.Base64
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,12 +25,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.core.network.ServerApi
 import com.example.cpen321application.core.rememberSafeCoroutineScope
-import com.example.cpen321application.user.dto.SignUpRequest
-import com.example.cpen321application.user.dto.readAuthResponse
+import com.example.cpen321application.user.repository.SignUpDetails
+import com.example.cpen321application.user.repository.SignUpResult
+import com.example.cpen321application.user.repository.readGoogleProfile
+import com.example.cpen321application.user.repository.signUp
 import com.example.cpen321application.user.triggerGoogleSignIn
-import com.google.gson.JsonParseException
 import com.example.cpen321application.ui.theme.*
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
@@ -39,36 +38,22 @@ import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.sportsFieldColors
 import kotlinx.coroutines.launch
-import org.json.JSONException
-import org.json.JSONObject
-import java.io.IOException
 import java.time.Year
 
 // youngest and oldest ages offered in the birth year picker
 private const val MIN_AGE = 19
 private const val MAX_AGE = 100
 
-/*  details collected on the sign up screen,
-    more profile fields will be added here later
- */
-data class SignUpDetails(
-    val idToken: String,
-    val email: String?,
-    val firstName: String,
-    val lastName: String,
-    val birthYear: Int
-)
-
 /*
     Sign up screen for SportsNow:
     The user verifies with Google (which prefills their name), fills in
     their details and presses Create Account, which sends them to the server.
-    onSignedUp gets the details and the server's JWT when the account is created,
+    onSignedUp gets the server's JWT when the account is created,
     onAlreadyExists is called when the Google account already has an account
  */
 @Composable
 fun SignUpScreen(
-    onSignedUp: (details: SignUpDetails, jwtToken: String) -> Unit,
+    onSignedUp: (jwtToken: String) -> Unit,
     onAlreadyExists: () -> Unit,
     onNavigateToSignIn: () -> Unit,
     onBack: () -> Unit,
@@ -124,12 +109,12 @@ fun SignUpScreen(
         errorText = null
         scope.launch {
             val result = try {
-                submitSignUp(details)
+                signUp(details)
             } finally {
                 isSubmitting = false
             }
             when (result) {
-                is SignUpResult.Created -> onSignedUp(details, result.jwtToken)
+                is SignUpResult.Created -> onSignedUp(result.jwtToken)
                 SignUpResult.AlreadyExists -> onAlreadyExists()
                 is SignUpResult.Failed -> errorText = result.message
             }
@@ -406,75 +391,5 @@ private fun BirthYearField(
             color = SportsOnSurfaceVariant,
             fontSize = 12.sp
         )
-    }
-}
-
-// name and email read from the Google id token so the form can be prefilled
-private data class GoogleProfile(
-    val email: String?,
-    val givenName: String?,
-    val familyName: String?
-)
-
-/*  the id token is a JWT, its middle part is base64 encoded JSON with the
-    account's profile claims. Only used for prefilling, the backend still
-    verifies the token itself
- */
-private fun readGoogleProfile(idToken: String): GoogleProfile {
-    val payload = idToken.split(".").getOrNull(1) ?: return GoogleProfile(null, null, null)
-    return try {
-        val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
-        val json = JSONObject(String(Base64.decode(payload, flags)))
-        GoogleProfile(
-            email = json.optString("email").ifBlank { null },
-            givenName = json.optString("given_name").ifBlank { null },
-            familyName = json.optString("family_name").ifBlank { null }
-        )
-    } catch (e: IllegalArgumentException) {
-        // not valid base64
-        GoogleProfile(null, null, null)
-    } catch (e: JSONException) {
-        GoogleProfile(null, null, null)
-    }
-}
-
-// outcome of sending the sign up form to the server
-private sealed interface SignUpResult {
-    data class Created(val jwtToken: String) : SignUpResult
-    data object AlreadyExists : SignUpResult
-    data class Failed(val message: String) : SignUpResult
-}
-
-/*  sends the sign up details to POST api/auth/signup.
-    The server answers msg "signedIn" with a jwt_token when the account is created
-    and msg "already_exists" (status 409) when the Google account already has one
- */
-private suspend fun submitSignUp(details: SignUpDetails): SignUpResult {
-    val email = details.email
-        ?: return SignUpResult.Failed("Could not read the email of your Google account, verify again")
-
-    return try {
-        val response = ServerApi.retrofitService.signUp(
-            SignUpRequest(
-                idToken = details.idToken,
-                email = email,
-                firstName = details.firstName,
-                lastName = details.lastName,
-                birthYear = details.birthYear
-            )
-        )
-        val body = readAuthResponse(response)
-
-        when {
-            body?.msg == "signedIn" && body.jwtToken != null -> SignUpResult.Created(body.jwtToken)
-            body?.msg == "already_exists" || response.code() == 409 -> SignUpResult.AlreadyExists
-            body?.msg == "invalid_token" ->
-                SignUpResult.Failed("Your Google verification expired, verify with Google again")
-            else -> SignUpResult.Failed(body?.error ?: "Could not create account, try again")
-        }
-    } catch (e: IOException) {
-        SignUpResult.Failed("Cannot Reach Server")
-    } catch (e: JsonParseException) {
-        SignUpResult.Failed("Could not create account, try again")
     }
 }

@@ -41,7 +41,6 @@ private object RequiredFieldsFactory : TypeAdapterFactory {
     }
 }
 
-// the Gson for every server reply, it rejects replies missing a @Required field
 val serverGson: Gson = GsonBuilder()
     .registerTypeAdapterFactory(RequiredFieldsFactory)
     .create()

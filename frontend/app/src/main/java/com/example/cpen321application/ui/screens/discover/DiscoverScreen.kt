@@ -27,15 +27,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.game.dto.DiscoverGameDto
 import com.example.cpen321application.game.location.DeviceLocation
+import com.example.cpen321application.game.model.DiscoverGame
+import com.example.cpen321application.game.model.GameLocation
+import com.example.cpen321application.game.spotsLeftLabel
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.components.pillBackground
-import com.example.cpen321application.ui.components.spotsLeftLabel
-import com.example.cpen321application.ui.screens.games.GameLocation
 import com.example.cpen321application.ui.screens.games.SPORTS
 import com.example.cpen321application.ui.screens.games.SelectableChip
 import com.example.cpen321application.ui.theme.*
@@ -48,111 +48,14 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import java.util.Locale
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 // zoom that shows a few kilometres around the user
 private const val MAP_ZOOM = 13f
 private val MAP_HEIGHT = 160.dp
 
-// average walking speed, used for "3 min walk"
-private const val WALKING_METRES_PER_MINUTE = 80.0
-// further than this a walking time isn't useful, only the distance is shown
-private const val MAX_WALK_METRES = 3000
-
-// games starting within this many minutes get a "Starts in 45 min" pill
-private const val STARTS_SOON_MINUTES = 120L
-
 // faded look for games that are already full
 private const val FULL_GAME_ALPHA = 0.5f
-
-private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-private val dayTimeFormat = DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a", Locale.getDefault())
-
-/*  what a Discover card shows, built from the server's reply with toDiscoverGame.
-    sport is the server's value (e.g. "basketball"), used by the sport filter
- */
-data class DiscoverGame(
-    val gameId: Int,
-    val sport: String,
-    val title: String,
-    val whenText: String,
-    val locationName: String,
-    val distanceText: String,
-    val walkText: String?,
-    val spotsLeft: Int,
-    val startsInText: String?,
-    val requestPending: Boolean,
-    val latitude: Double,
-    val longitude: Double
-) {
-    val isFull get() = spotsLeft == 0
-}
-
-// "250 m" under a kilometre (to the nearest 50 m), otherwise "1.4 km"
-internal fun formatDistance(metres: Int): String =
-    if (metres < 1000) {
-        "${((metres / 50.0).roundToInt() * 50).coerceAtLeast(50)} m"
-    } else {
-        String.format(Locale.getDefault(), "%.1f km", metres / 1000.0)
-    }
-
-// "Today · 5:30 PM", "Tomorrow · 9:00 AM" or "Sat, Oct 18 · 3:00 PM" in the phone's time zone
-internal fun formatStartTime(start: Instant, now: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
-    val startDay = start.atZone(zone).toLocalDate()
-    val today = now.atZone(zone).toLocalDate()
-    return when (startDay) {
-        today -> "Today · ${start.atZone(zone).format(timeFormat)}"
-        today.plusDays(1) -> "Tomorrow · ${start.atZone(zone).format(timeFormat)}"
-        else -> start.atZone(zone).format(dayTimeFormat)
-    }
-}
-
-// "Starts in 45 min" or "Starts in 1 h 30 min" for games starting soon, null otherwise
-internal fun formatStartsIn(start: Instant, now: Instant): String? {
-    val minutes = Duration.between(now, start).toMinutes()
-    if (minutes < 0 || minutes > STARTS_SOON_MINUTES) return null
-    val hours = minutes / 60
-    val rest = minutes % 60
-    return when {
-        hours == 0L -> "Starts in $minutes min"
-        rest == 0L -> "Starts in $hours h"
-        else -> "Starts in $hours h $rest min"
-    }
-}
-
-// turns a game from the server into what its Discover card shows
-fun DiscoverGameDto.toDiscoverGame(now: Instant = Instant.now()): DiscoverGame {
-    val start = try {
-        Instant.parse(game.startsAt)
-    } catch (e: DateTimeParseException) {
-        null
-    }
-    return DiscoverGame(
-        gameId = game.gameId,
-        sport = game.sport,
-        title = game.title,
-        whenText = start?.let { formatStartTime(it, now) } ?: game.startsAt,
-        locationName = game.locationName,
-        distanceText = formatDistance(distanceMeters),
-        walkText = if (distanceMeters <= MAX_WALK_METRES) {
-            "${ceil(distanceMeters / WALKING_METRES_PER_MINUTE).toInt().coerceAtLeast(1)} min walk"
-        } else {
-            null
-        },
-        spotsLeft = (game.maxPlayers - game.playerCount).coerceAtLeast(0),
-        startsInText = start?.let { formatStartsIn(it, now) },
-        requestPending = joinRequestStatus == "pending",
-        latitude = game.latitude,
-        longitude = game.longitude
-    )
-}
 
 /*  what the Discover screen shows. location is where the games were searched around,
     null until it is known. place is the place the user picked to search around instead

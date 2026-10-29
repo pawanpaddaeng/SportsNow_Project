@@ -10,8 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavBackStackEntry
-import com.example.cpen321application.core.session.firstName
-import com.example.cpen321application.core.session.lastName
 import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.SIGN_IN_MESSAGE_KEY
 import com.example.cpen321application.navigation.state.AppState
@@ -57,13 +55,8 @@ fun SignInRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Modi
 fun SignUpRoute(app: AppState, modifier: Modifier) {
     val navController = app.navController
     SignUpScreen(
-        onSignedUp = { details, token ->
-            firstName = details.firstName
-            lastName = details.lastName
-            app.completeSignIn(token)
-        },
+        onSignedUp = { token -> app.completeSignIn(token) },
         onAlreadyExists = {
-            // go back to sign in and tell the user to sign in instead
             navController.previousBackStackEntry?.savedStateHandle?.set(
                 SIGN_IN_MESSAGE_KEY,
                 "An account already exists for this Google account. Please sign in."
@@ -78,35 +71,45 @@ fun SignUpRoute(app: AppState, modifier: Modifier) {
 
 @Composable
 fun ProfileRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Modifier) {
-    OnResume(backStackEntry) { app.refreshProfile() }
+    val profileState = app.profileState
+    OnResume(backStackEntry) { profileState.refresh() }
 
     ProfileScreen(
-        profile = app.profile,
+        profile = profileState.profile,
         modifier = modifier,
-        isLoading = app.isLoadingProfile,
-        errorMessage = app.profileError,
+        isLoading = profileState.isLoading,
+        errorMessage = profileState.error,
         onEdit = {
-            app.saveProfileError = null
+            profileState.saveError = null
             app.navController.navigate(Routes.EDIT_PROFILE)
         },
-        onRetry = { app.refreshProfile() },
+        onRetry = { profileState.refresh() },
         onTabSelected = { tab -> app.openTab(tab) }
     )
 }
 
 @Composable
 fun EditProfileRoute(app: AppState, modifier: Modifier) {
-    val current = app.profile
+    val navController = app.navController
+    val profileState = app.profileState
+    val current = profileState.profile
     if (current == null) {
-        LaunchedEffect(Unit) { app.navController.popBackStack() }
+        LaunchedEffect(Unit) { navController.popBackStack() }
     } else {
         EditProfileScreen(
             profile = current,
-            onSave = { form -> app.saveProfile(form) },
-            onCancel = { app.navController.popBackStack() },
+            onSave = { form ->
+                profileState.save(form) {
+                    // the user may have left Edit Profile while it was saving
+                    if (navController.currentDestination?.route == Routes.EDIT_PROFILE) {
+                        navController.popBackStack()
+                    }
+                }
+            },
+            onCancel = { navController.popBackStack() },
             modifier = modifier,
-            isSaving = app.isSavingProfile,
-            errorMessage = app.saveProfileError
+            isSaving = profileState.isSaving,
+            errorMessage = profileState.saveError
         )
     }
 }

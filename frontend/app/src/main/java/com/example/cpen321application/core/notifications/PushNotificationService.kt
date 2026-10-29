@@ -71,7 +71,6 @@ class PushNotificationService : FirebaseMessagingService() {
 
         createNotificationChannel(this)
 
-        // tapping the notification opens the app
         val openApp = PendingIntent.getActivity(
             this,
             0,

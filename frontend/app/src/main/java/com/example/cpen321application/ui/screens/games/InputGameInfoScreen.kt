@@ -26,7 +26,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.game.dto.GameDto
+import com.example.cpen321application.game.model.GameInfoForm
+import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.LabeledTextField
@@ -73,40 +74,6 @@ private val SKILL_LEVELS = listOf(
 
 private val dateFormat = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
 private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-
-// place picked for the game on the Pick Location screen. Serializable so it can be
-// passed back between screens through the navigation SavedStateHandle
-data class GameLocation(
-    val name: String,
-    val address: String,
-    val latitude: Double,
-    val longitude: Double
-) : Serializable
-
-/*  everything entered on the Input Game Info screen. sport and skillLevel use the
-    server's values (e.g. "basketball", "any"), startsAt is the start time in UTC.
-    Serializable so the edit route can keep the loaded game with rememberSaveable
- */
-data class GameInfoForm(
-    val sport: String,
-    val title: String,
-    val startsAt: Instant,
-    val location: GameLocation,
-    val maxPlayers: Int,
-    val skillLevel: String,
-    val description: String?
-) : Serializable
-
-// a game from the server as the form's starting values, for editing it
-fun GameDto.toGameInfoForm() = GameInfoForm(
-    sport = sport,
-    title = title,
-    startsAt = Instant.parse(startsAt),
-    location = GameLocation(locationName, address, latitude, longitude),
-    maxPlayers = maxPlayers,
-    skillLevel = skillLevel,
-    description = description?.takeIf { it.isNotBlank() }
-)
 
 /*  what the Input Game Info screen shows. initial fills in the form (null for a new
     game) and minPlayers stops max players going below the players already in the game.

@@ -14,13 +14,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import com.example.cpen321application.core.network.ServerApi
 import com.example.cpen321application.core.rememberSafeCoroutineScope
-import com.example.cpen321application.user.dto.LoginRequest
-import com.example.cpen321application.user.dto.readAuthResponse
+import com.example.cpen321application.user.repository.LoginResult
+import com.example.cpen321application.user.repository.login
 import com.example.cpen321application.user.triggerGoogleSignIn
-import com.google.gson.JsonParseException
-import java.io.IOException
 
 /*
     Sign in screen for SportsNow:
@@ -53,7 +50,7 @@ fun SignInScreen(
                     statusText = "Google sign in failed. Make sure a Google account " +
                             "is added to this device"
                 } else {
-                    when (val result = submitLogin(googleToken)) {
+                    when (val result = login(googleToken)) {
                         is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
                         LoginResult.NoUser -> noticeText =
                             "No account found for this Google account. Please sign up first."
@@ -195,33 +192,5 @@ private fun SignInPillButton(
         elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 4.dp)
     ) {
         Text(text = text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-// outcome of logging in with the server
-private sealed interface LoginResult {
-    data class SignedIn(val jwtToken: String) : LoginResult
-    data object NoUser : LoginResult
-    data object Failed : LoginResult
-}
-
-/*  sends the Google id token to POST api/auth/login.
-    The server answers msg "signedIn" with a jwt_token when the user exists and
-    msg "no_user" (status 404) when they need to sign up first
- */
-private suspend fun submitLogin(googleToken: String): LoginResult {
-    return try {
-        val response = ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
-        val body = readAuthResponse(response)
-
-        when {
-            body?.msg == "signedIn" && body.jwtToken != null -> LoginResult.SignedIn(body.jwtToken)
-            body?.msg == "no_user" -> LoginResult.NoUser
-            else -> LoginResult.Failed
-        }
-    } catch (e: IOException) {
-        LoginResult.Failed
-    } catch (e: JsonParseException) {
-        LoginResult.Failed
     }
 }

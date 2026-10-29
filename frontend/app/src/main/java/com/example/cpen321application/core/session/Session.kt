@@ -16,12 +16,7 @@ import org.json.JSONObject
 import retrofit2.Response
 import java.io.IOException
 
-//variables to store a logged-in user's name as returned by backend
-var firstName: String? = "Not"
-var lastName: String? = "Logged In"
-
-// JWT from the server after sign up / sign in, sent with future requests.
-// Also saved with AuthTokenStore so the user stays signed in after the app closes
+// JWT from the server after sign up / sign in, also saved with AuthTokenStore
 var jwtToken: String? = null
 
 /*

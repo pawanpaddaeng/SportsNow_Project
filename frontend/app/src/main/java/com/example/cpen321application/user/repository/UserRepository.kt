@@ -1,13 +1,21 @@
 package com.example.cpen321application.user.repository
 
 import android.content.Context
+import android.util.Base64
+import com.example.cpen321application.core.NETWORK_MESSAGE
+import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
-import com.example.cpen321application.core.network.serverGson
+import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
+import com.example.cpen321application.user.dto.LoginRequest
 import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.SignUpRequest
 import com.example.cpen321application.user.dto.UpdateProfileRequest
 import com.example.cpen321application.user.dto.UserProfileDto
+import com.example.cpen321application.user.dto.readAuthResponse
 import com.google.gson.JsonParseException
+import org.json.JSONException
+import org.json.JSONObject
 import retrofit2.Response
 import java.io.IOException
 import java.time.Instant
@@ -16,10 +24,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.Locale
 
-private const val SESSION_ENDED_MESSAGE = "Your session ended, please sign in again"
-private const val NETWORK_MESSAGE = "Couldn't reach the server, try again"
 private const val LOAD_FAILED_MESSAGE = "Couldn't load your profile, try again"
 private const val SAVE_FAILED_MESSAGE = "Couldn't save your profile, try again"
+private const val SIGN_UP_FAILED_MESSAGE = "Could not create account, try again"
 
 private val MEMBER_SINCE_FORMAT = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
 
@@ -38,9 +45,104 @@ data class ProfileForm(
     val birthYear: Int
 )
 
+data class SignUpDetails(
+    val idToken: String,
+    val email: String?,
+    val firstName: String,
+    val lastName: String,
+    val birthYear: Int
+)
+
+// name and email read from the Google id token so the sign up form can be prefilled
+data class GoogleProfile(
+    val email: String?,
+    val givenName: String?,
+    val familyName: String?
+)
+
+sealed interface LoginResult {
+    data class SignedIn(val jwtToken: String) : LoginResult
+    data object NoUser : LoginResult
+    data object Failed : LoginResult
+}
+
+sealed interface SignUpResult {
+    data class Created(val jwtToken: String) : SignUpResult
+    data object AlreadyExists : SignUpResult
+    data class Failed(val message: String) : SignUpResult
+}
+
 sealed interface ProfileResult {
     data class Loaded(val profile: UserProfile) : ProfileResult
     data class Failed(val message: String) : ProfileResult
+}
+
+// the server answers "no_user" (404) when the Google account needs to sign up first
+suspend fun login(googleToken: String): LoginResult {
+    return try {
+        val body = readAuthResponse(ServerApi.retrofitService.login(LoginRequest(idToken = googleToken)))
+        when {
+            body?.msg == "signedIn" && body.jwtToken != null -> LoginResult.SignedIn(body.jwtToken)
+            body?.msg == "no_user" -> LoginResult.NoUser
+            else -> LoginResult.Failed
+        }
+    } catch (e: IOException) {
+        LoginResult.Failed
+    } catch (e: JsonParseException) {
+        LoginResult.Failed
+    }
+}
+
+// the server answers "already_exists" (409) when the Google account already has an account
+suspend fun signUp(details: SignUpDetails): SignUpResult {
+    val email = details.email
+        ?: return SignUpResult.Failed("Could not read the email of your Google account, verify again")
+
+    return try {
+        val response = ServerApi.retrofitService.signUp(
+            SignUpRequest(
+                idToken = details.idToken,
+                email = email,
+                firstName = details.firstName,
+                lastName = details.lastName,
+                birthYear = details.birthYear
+            )
+        )
+        val body = readAuthResponse(response)
+        when {
+            body?.msg == "signedIn" && body.jwtToken != null -> SignUpResult.Created(body.jwtToken)
+            body?.msg == "already_exists" || response.code() == 409 -> SignUpResult.AlreadyExists
+            body?.msg == "invalid_token" ->
+                SignUpResult.Failed("Your Google verification expired, verify with Google again")
+            else -> SignUpResult.Failed(body?.error ?: SIGN_UP_FAILED_MESSAGE)
+        }
+    } catch (e: IOException) {
+        SignUpResult.Failed("Cannot Reach Server")
+    } catch (e: JsonParseException) {
+        SignUpResult.Failed(SIGN_UP_FAILED_MESSAGE)
+    }
+}
+
+/*  the id token is a JWT whose middle part is base64 encoded JSON with the account's
+    profile claims. Only used for prefilling, the backend verifies the token itself
+ */
+fun readGoogleProfile(idToken: String): GoogleProfile {
+    val empty = GoogleProfile(null, null, null)
+    val payload = idToken.split(".").getOrNull(1) ?: return empty
+    return try {
+        val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
+        val json = JSONObject(String(Base64.decode(payload, flags)))
+        GoogleProfile(
+            email = json.optString("email").ifBlank { null },
+            givenName = json.optString("given_name").ifBlank { null },
+            familyName = json.optString("family_name").ifBlank { null }
+        )
+    } catch (e: IllegalArgumentException) {
+        // not valid base64
+        empty
+    } catch (e: JSONException) {
+        empty
+    }
 }
 
 suspend fun fetchMyProfile(context: Context): ProfileResult =
@@ -68,7 +170,7 @@ private suspend fun requestProfile(
     if (response == null) {
         ProfileResult.Failed(SESSION_ENDED_MESSAGE)
     } else {
-        toProfileResult(readProfileReply(response), failureMessage)
+        toProfileResult(readReply(response, ProfileResponse::class.java), failureMessage)
     }
 } catch (e: IOException) {
     ProfileResult.Failed(NETWORK_MESSAGE)
@@ -84,15 +186,6 @@ private fun toProfileResult(reply: ProfileResponse?, failureMessage: String): Pr
         else -> ProfileResult.Failed(failureMessage)
     }
 }
-
-private fun readProfileReply(response: Response<ProfileResponse>): ProfileResponse? =
-    response.body() ?: try {
-        serverGson.fromJson(response.errorBody()?.string(), ProfileResponse::class.java)
-    } catch (e: JsonParseException) {
-        null
-    } catch (e: IOException) {
-        null
-    }
 
 fun UserProfileDto.toUserProfile(): UserProfile = UserProfile(
     userId = userId,

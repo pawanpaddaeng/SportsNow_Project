@@ -23,90 +23,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.game.dto.GameDto
-import com.example.cpen321application.game.dto.PendingJoinRequestDto
+import com.example.cpen321application.game.model.JoinRequestItem
+import com.example.cpen321application.game.model.JoinRequestsHeader
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
-import com.example.cpen321application.ui.components.spotsLeftLabel
 import com.example.cpen321application.ui.theme.*
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
-import java.util.Locale
-
-private val headerDayFormat = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
-
-// how the popup's "How often do you play?" answers read on a request card
-private val FREQUENCY_TEXT = mapOf(
-    "rarely" to "plays rarely",
-    "monthly" to "plays monthly",
-    "weekly" to "plays weekly",
-    "several_per_week" to "plays several times a week"
-)
-
-// the game at the top of the screen: "Volleyball Night" and "Fri, Oct 17 · 8/12 players · 4 spots left"
-data class JoinRequestsHeader(val title: String, val subtitle: String, val isFull: Boolean)
-
-// a request card: who asked, "Intermediate · plays weekly · requested 2h ago" and their message
-data class JoinRequestItem(
-    val requestId: Int,
-    val name: String,
-    val initial: String,
-    val details: String,
-    val message: String?
-)
-
-fun GameDto.toJoinRequestsHeader(): JoinRequestsHeader {
-    val day = try {
-        Instant.parse(startsAt).atZone(ZoneId.systemDefault()).format(headerDayFormat)
-    } catch (e: DateTimeParseException) {
-        startsAt
-    }
-    val spotsLeft = (maxPlayers - playerCount).coerceAtLeast(0)
-    return JoinRequestsHeader(
-        title = title,
-        subtitle = "$day · $playerCount/$maxPlayers players · ${spotsLeftLabel(spotsLeft).lowercase()}",
-        isFull = spotsLeft == 0
-    )
-}
-
-// "just now", "5 min ago", "2h ago", "yesterday" or "3 days ago"
-internal fun formatRequestedAgo(createdAt: Instant, now: Instant): String {
-    val minutes = Duration.between(createdAt, now).toMinutes().coerceAtLeast(0)
-    val hours = minutes / 60
-    val days = hours / 24
-    return when {
-        minutes < 1 -> "just now"
-        hours < 1 -> "$minutes min ago"
-        days < 1 -> "${hours}h ago"
-        days == 1L -> "yesterday"
-        else -> "$days days ago"
-    }
-}
-
-fun PendingJoinRequestDto.toJoinRequestItem(now: Instant = Instant.now()): JoinRequestItem {
-    val requested = try {
-        "requested ${formatRequestedAgo(Instant.parse(createdAt), now)}"
-    } catch (e: DateTimeParseException) {
-        null
-    }
-    val details = listOfNotNull(
-        skillLevel.replaceFirstChar { it.titlecase(Locale.getDefault()) },
-        playFrequency?.let { FREQUENCY_TEXT[it] },
-        requested
-    ).joinToString(" · ")
-    return JoinRequestItem(
-        requestId = requestId,
-        name = "${user.firstName} ${user.lastName}".trim(),
-        initial = user.firstName.take(1).uppercase(Locale.getDefault()),
-        details = details,
-        message = message?.takeIf { it.isNotBlank() }
-    )
-}
 
 /*  what the Join Requests screen shows. header is null until the game loads. isLoading
     shows a loading bar, errorMessage a problem (with Retry when the actions' onRetry is

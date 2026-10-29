@@ -14,17 +14,14 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
-//helper to ensure proper context is passed to credential manager
+// Credential Manager needs an Activity context
 fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
 
-/*
-    Sign in function that handles signing in with Google and returns
-    the Google id token if sign in was successful
- */
+// shows Google sign in and returns the Google id token, or null if it failed
 suspend fun triggerGoogleSignIn(context: Context): String? {
     val activityContext = context.findActivity()
         ?: throw IllegalStateException("Google Sign-In requires an Activity Context")
@@ -80,7 +77,6 @@ suspend fun triggerGoogleSignIn(context: Context): String? {
                 null
             }
         } catch (e: GetCredentialException) {
-            // Handle failures and return null
             print("EROR: $e")
             null
         }
