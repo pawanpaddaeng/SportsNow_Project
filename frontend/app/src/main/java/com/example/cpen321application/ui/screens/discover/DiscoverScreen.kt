@@ -1,61 +1,33 @@
 package com.example.cpen321application.ui.screens.discover
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.game.SPORTS
 import com.example.cpen321application.game.location.DeviceLocation
 import com.example.cpen321application.game.model.DiscoverGame
 import com.example.cpen321application.game.model.GameLocation
-import com.example.cpen321application.game.spotsLeftLabel
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
-import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.RetryMessage
-import com.example.cpen321application.ui.components.pillBackground
-import com.example.cpen321application.ui.screens.games.SPORTS
-import com.example.cpen321application.ui.screens.games.SelectableChip
+import com.example.cpen321application.ui.components.SelectableChip
 import com.example.cpen321application.ui.theme.*
-import com.google.android.gms.maps.GoogleMapOptions
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
 import java.util.Locale
-
-// zoom that shows a few kilometres around the user
-private const val MAP_ZOOM = 13f
-private val MAP_HEIGHT = 160.dp
-
-// faded look for games that are already full
-private const val FULL_GAME_ALPHA = 0.5f
 
 /*  what the Discover screen shows. location is where the games were searched around,
     null until it is known. place is the place the user picked to search around instead
@@ -72,8 +44,8 @@ data class DiscoverUiState(
     val errorMessage: String? = null
 )
 
-/*  what the Discover screen's controls do. Tapping the map opens the map picker
-    (onChangeLocation) and onUseMyLocation goes back to searching near the user
+/*  tapping the map opens the map picker (onChangeLocation) and onUseMyLocation
+    goes back to searching near the user
  */
 data class DiscoverActions(
     val onRetry: () -> Unit = {},
@@ -86,8 +58,7 @@ data class DiscoverActions(
 
 /*
     Discover screen from the Figma mockup (Use Case 3, Discover Game): the games near
-    the user on a map and as a list, closest first, with a sport filter at the top.
-    The actions connect it to other screens through AppNavigation
+    the user on a map and as a list, closest first, with a sport filter at the top
  */
 @Composable
 fun DiscoverScreen(state: DiscoverUiState, actions: DiscoverActions, modifier: Modifier = Modifier) {
@@ -179,124 +150,6 @@ private fun Header(place: GameLocation?, isLoading: Boolean, onRefresh: () -> Un
     }
 }
 
-/*  where the games are searched around: the map with "Showing games near" and the
-    place under it, like the location field when creating a game. Tapping it opens the
-    map picker. With a picked place, "Use my location" goes back to the user's location
- */
-@Composable
-private fun SearchArea(
-    location: DeviceLocation?,
-    place: GameLocation?,
-    games: List<DiscoverGame>,
-    onChangeLocation: () -> Unit,
-    onUseMyLocation: () -> Unit,
-    onGameClick: (DiscoverGame) -> Unit
-) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .border(1.dp, SportsOutlineVariant, shape)
-            .clickable(onClick = onChangeLocation)
-    ) {
-        if (location != null) {
-            GamesMap(
-                location = location,
-                isPickedPlace = place != null,
-                games = games,
-                onMapClick = onChangeLocation,
-                onGameClick = onGameClick
-            )
-        }
-        CardRow {
-            Icon(imageVector = Icons.Filled.Place, contentDescription = null, tint = Color(0xFFD93025))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Showing games near", color = SportsOnSurfaceVariant, fontSize = 12.sp)
-                Text(
-                    text = place?.name ?: if (location != null) "Your location" else "Choose a location",
-                    color = SportsOnSurface,
-                    fontSize = 16.sp
-                )
-                if (place != null && place.address.isNotBlank()) {
-                    Text(text = place.address, color = SportsOnSurfaceVariant, fontSize = 12.sp)
-                }
-            }
-            Text(text = "Change", color = SportsPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-        if (place != null) {
-            TextButton(onClick = onUseMyLocation, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
-                Icon(
-                    imageVector = Icons.Filled.LocationOn,
-                    contentDescription = null,
-                    tint = SportsPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Use my location", color = SportsPrimary)
-            }
-        }
-    }
-}
-
-/*  map around the search point with a pin per game (faded when full) and a pin for
-    the search point: azure for the user, red for a picked place. Lite mode draws it as
-    a still image, cheaper inside a scrolling list. Tapping a game's pin opens it,
-    tapping elsewhere calls onMapClick
- */
-@Composable
-private fun GamesMap(
-    location: DeviceLocation,
-    isPickedPlace: Boolean,
-    games: List<DiscoverGame>,
-    onMapClick: () -> Unit,
-    onGameClick: (DiscoverGame) -> Unit
-) {
-    val userPoint = LatLng(location.latitude, location.longitude)
-    val key = "${location.latitude},${location.longitude}"
-    val cameraState = rememberCameraPositionState(key = key) {
-        position = CameraPosition.fromLatLngZoom(userPoint, MAP_ZOOM)
-    }
-
-    GoogleMap(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(MAP_HEIGHT),
-        cameraPositionState = cameraState,
-        googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            mapToolbarEnabled = false,
-            scrollGesturesEnabled = false,
-            zoomGesturesEnabled = false
-        ),
-        // also stops lite mode from opening the Google Maps app on a tap
-        onMapClick = { onMapClick() }
-    ) {
-        Marker(
-            state = rememberMarkerState(key = "you_$key", position = userPoint),
-            title = if (isPickedPlace) "Search area" else "You",
-            icon = BitmapDescriptorFactory.defaultMarker(
-                if (isPickedPlace) BitmapDescriptorFactory.HUE_RED else BitmapDescriptorFactory.HUE_AZURE
-            )
-        )
-        games.forEach { game ->
-            Marker(
-                state = rememberMarkerState(
-                    key = "game_${game.gameId}",
-                    position = LatLng(game.latitude, game.longitude)
-                ),
-                title = game.title,
-                alpha = if (game.isFull) FULL_GAME_ALPHA else 1f,
-                onClick = {
-                    onGameClick(game)
-                    true
-                }
-            )
-        }
-    }
-}
-
 // "All", "Basketball", "Soccer", ... scrolling row, one selected at a time
 @Composable
 private fun SportFilter(selectedSport: String?, onSelect: (String?) -> Unit) {
@@ -362,89 +215,5 @@ private fun EmptyMessage(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-    )
-}
-
-// "1. Volleyball Drop-in" card with time, place, distance and status pills
-@Composable
-private fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (game.isFull) FULL_GAME_ALPHA else 1f)
-            .clip(shape)
-            .background(SportsSurfaceContainer)
-            .border(1.dp, SportsOutlineVariant, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // sport initial as the avatar
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(SportsPrimaryContainer)
-            ) {
-                Text(
-                    text = game.sport.take(1).uppercase(Locale.getDefault()),
-                    color = SportsOnPrimaryContainer,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(text = "$rank. ${game.title}", color = SportsOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                Text(text = game.whenText, color = SportsOnSurfaceVariant, fontSize = 14.sp)
-                Text(text = game.locationName, color = SportsOnSurfaceVariant, fontSize = 12.sp)
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(text = game.distanceText, color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                if (game.walkText != null) {
-                    Text(text = game.walkText, color = SportsOnSurfaceVariant, fontSize = 12.sp)
-                }
-            }
-        }
-
-        StatusPills(game)
-    }
-}
-
-// "3 spots left", "Request pending" and "Starts in 45 min" under a game card
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StatusPills(game: DiscoverGame) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(text = spotsLeftLabel(game.spotsLeft))
-        if (game.requestPending) {
-            Pill(text = "Request pending", textColor = SportsPrimary, borderColor = SportsPrimary)
-        }
-        if (game.startsInText != null && !game.isFull) {
-            Pill(
-                text = game.startsInText,
-                background = SportsPrimaryContainer,
-                textColor = SportsOnPrimaryContainer,
-                borderColor = null
-            )
-        }
-    }
-}
-
-@Composable
-private fun Pill(
-    text: String,
-    background: Color = Color.White,
-    textColor: Color = SportsOnSurfaceVariant,
-    borderColor: Color? = SportsOutlineVariant
-) {
-    Text(
-        text = text,
-        color = textColor,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier.pillBackground(background, borderColor, horizontalPadding = 10.dp)
     )
 }

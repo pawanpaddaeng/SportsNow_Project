@@ -1,52 +1,35 @@
 package com.example.cpen321application.ui.screens.games
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.game.SKILL_LEVELS
+import com.example.cpen321application.game.SPORTS
 import com.example.cpen321application.game.model.GameInfoForm
 import com.example.cpen321application.game.model.GameLocation
-import com.example.cpen321application.ui.components.CardRow
-import com.example.cpen321application.ui.components.FieldLabel
+import com.example.cpen321application.ui.components.ChipGroup
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.PickerField
 import com.example.cpen321application.ui.theme.*
-import com.google.android.gms.maps.GoogleMapOptions
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
 import java.io.Serializable
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -56,21 +39,6 @@ private const val MAX_PLAYERS = 100
 private const val DEFAULT_PLAYERS = 10
 private const val MAX_TITLE_LENGTH = 100
 private const val MAX_DESCRIPTION_LENGTH = 1000
-
-// label shown on the chip and the value sent to the server, also the Discover filter
-internal val SPORTS = listOf(
-    "Basketball" to "basketball",
-    "Soccer" to "soccer",
-    "Volleyball" to "volleyball",
-    "Tennis" to "tennis",
-    "Other" to "other"
-)
-private val SKILL_LEVELS = listOf(
-    "Any" to "any",
-    "Beginner" to "beginner",
-    "Intermediate" to "intermediate",
-    "Advanced" to "advanced"
-)
 
 private val dateFormat = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
 private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
@@ -92,9 +60,8 @@ data class InputGameInfoUiState(
     val location: GameLocation? = null
 )
 
-/*  what the Input Game Info screen's controls do. onSubmit gets the filled in form,
-    onPickLocation should open the map location picker and pass the result back
-    through the state's location
+/*  onSubmit gets the filled in form, onPickLocation should open the map location
+    picker and pass the result back through the state's location
  */
 data class InputGameInfoActions(
     val onSubmit: (GameInfoForm) -> Unit,
@@ -120,7 +87,6 @@ private data class GameInfoDraft(
 
     // the form as it would be sent, null while something required is missing or the start is in the past
     fun toForm(location: GameLocation?): GameInfoForm? {
-        // null too when the start is in the past
         val start = startsAt?.takeUnless { it.isBefore(Instant.now()) }
         if (sport == null || title.isBlank() || start == null) {
             return null
@@ -157,9 +123,8 @@ private data class GameInfoDraft(
 
 /*
     Input Game Info screen from the Create Game Figma mockup, used to create and to edit
-    a game: the create and edit routes in AppNavigation both show it. Every game needs
-    the organizer's approval to join, so there is no approval toggle. When editing, the
-    button is only enabled once something changed
+    a game. Every game needs the organizer's approval to join, so there is no approval
+    toggle. When editing, the button is only enabled once something changed
  */
 @Composable
 fun InputGameInfoScreen(state: InputGameInfoUiState, actions: InputGameInfoActions, modifier: Modifier = Modifier) {
@@ -293,6 +258,7 @@ private fun SettingsFields(draft: GameInfoDraft, onChange: (GameInfoDraft) -> Un
     MaxPlayersStepper(
         value = draft.maxPlayers,
         min = lowestMaxPlayers,
+        max = MAX_PLAYERS,
         onValueChange = { onChange(draft.copy(maxPlayers = it)) }
     )
 
@@ -313,32 +279,6 @@ private fun SettingsFields(draft: GameInfoDraft, onChange: (GameInfoDraft) -> Un
         minLines = 3,
         capitalization = KeyboardCapitalization.Sentences
     )
-}
-
-// replaces the mockup's approval toggle: approval is always required
-@Composable
-private fun ApprovalNote() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Info,
-            contentDescription = null,
-            tint = SportsPrimary,
-            modifier = Modifier.size(20.dp)
-        )
-        Text(
-            text = "Players send a join request and need your approval before they join.",
-            color = SportsOnSurfaceVariant,
-            fontSize = 13.sp
-        )
-    }
 }
 
 // "Create Game" / "Save Changes" button, a spinner while the form is being sent
@@ -366,7 +306,6 @@ private fun SubmitButton(label: String, enabled: Boolean, isSubmitting: Boolean,
     }
 }
 
-// back button and the screen's title
 @Composable
 private fun TopBar(title: String, onBack: () -> Unit) {
     Row(
@@ -389,229 +328,4 @@ private fun TopBar(title: String, onBack: () -> Unit) {
             fontWeight = FontWeight.SemiBold
         )
     }
-}
-
-// row of selectable chips with a label above, at most one option is selected
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun ChipGroup(
-    label: String,
-    options: List<Pair<String, String>>,
-    selected: String?,
-    onSelect: (String) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel(label)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { (text, value) ->
-                SelectableChip(text = text, selected = value == selected, onClick = { onSelect(value) })
-            }
-        }
-    }
-}
-
-// chip from the mockups, a check mark and blue fill when selected
-@Composable
-internal fun SelectableChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text) },
-        leadingIcon = if (selected) {
-            { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-        } else {
-            null
-        },
-        shape = RoundedCornerShape(8.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = SportsPrimaryContainer,
-            selectedLabelColor = SportsOnPrimaryContainer,
-            selectedLeadingIconColor = SportsOnPrimaryContainer,
-            labelColor = SportsOnSurfaceVariant
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = selected,
-            borderColor = SportsOutlineVariant,
-            selectedBorderColor = SportsPrimaryContainer
-        )
-    )
-}
-
-/*  shows the picked place with a small map preview, tapping it opens the
-    Pick Location screen
- */
-@Composable
-private fun LocationField(location: GameLocation?, onClick: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        FieldLabel("Location *")
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, SportsOutline, RoundedCornerShape(8.dp))
-                .clickable(onClick = onClick)
-        ) {
-            if (location != null) {
-                LocationPreviewMap(location = location, onClick = onClick)
-            }
-            CardRow {
-                Icon(
-                    imageVector = Icons.Filled.Place,
-                    contentDescription = null,
-                    tint = Color(0xFFD93025)
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = location?.name ?: "Choose a location",
-                        color = if (location != null) SportsOnSurface else SportsOnSurfaceVariant,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = location?.address ?: "Pick the place on a map",
-                        color = SportsOnSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                }
-                Text(
-                    text = if (location != null) "Change" else "Choose",
-                    color = SportsPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-    }
-}
-
-/*  small non-interactive map with a marker on the place. Lite mode draws it as a
-    still image, which is cheaper inside a scrolling screen. Also used by Game Details
- */
-@Composable
-internal fun LocationPreviewMap(location: GameLocation, onClick: () -> Unit, height: Dp = 120.dp) {
-    val point = LatLng(location.latitude, location.longitude)
-    val key = "${location.latitude},${location.longitude}"
-    val cameraState = rememberCameraPositionState(key = key) {
-        position = CameraPosition.fromLatLngZoom(point, 16f)
-    }
-    GoogleMap(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(height),
-        cameraPositionState = cameraState,
-        googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            mapToolbarEnabled = false,
-            scrollGesturesEnabled = false,
-            zoomGesturesEnabled = false
-        ),
-        onMapClick = { onClick() }
-    ) {
-        Marker(state = rememberMarkerState(key = key, position = point))
-    }
-}
-
-/*  "Max players  (−) 10 (+)" row. min is the lowest allowed value, when editing
-    it's the number of players already in the game
- */
-@Composable
-private fun MaxPlayersStepper(value: Int, min: Int, onValueChange: (Int) -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = "Max players",
-            color = SportsOnSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
-        OutlinedIconButton(
-            onClick = { onValueChange(value - 1) },
-            enabled = value > min,
-            modifier = Modifier.size(36.dp)
-        ) {
-            // the core icon set has no minus icon
-            Text(text = "−", fontSize = 20.sp, color = SportsOnSurface)
-        }
-        Text(
-            text = value.toString(),
-            color = SportsOnSurface,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .widthIn(min = 28.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        FilledIconButton(
-            onClick = { onValueChange(value + 1) },
-            enabled = value < MAX_PLAYERS,
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledIconButtonColors(containerColor = SportsPrimary),
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = "More players", tint = Color.White)
-        }
-    }
-}
-
-// calendar dialog that only allows today or later
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GameDatePickerDialog(
-    initialDate: LocalDate?,
-    onDateSelected: (LocalDate) -> Unit,
-    onDismiss: () -> Unit
-) {
-    // the date picker works with UTC midnight in milliseconds
-    val todayMillis = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-    val state = rememberDatePickerState(
-        initialSelectedDateMillis = initialDate?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= todayMillis
-        }
-    )
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                state.selectedDateMillis?.let {
-                    onDateSelected(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate())
-                }
-                onDismiss()
-            }) { Text("OK") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    ) {
-        DatePicker(state = state)
-    }
-}
-
-// clock dialog for the start time
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GameTimePickerDialog(
-    initialTime: LocalTime?,
-    onTimeSelected: (LocalTime) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val state = rememberTimePickerState(
-        initialHour = initialTime?.hour ?: 18,
-        initialMinute = initialTime?.minute ?: 0,
-        is24Hour = false
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                onTimeSelected(LocalTime.of(state.hour, state.minute))
-                onDismiss()
-            }) { Text("OK") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        text = { TimePicker(state = state) }
-    )
 }

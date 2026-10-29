@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,109 +16,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cpen321application.core.rememberSafeCoroutineScope
-import com.example.cpen321application.user.repository.SignUpDetails
-import com.example.cpen321application.user.repository.SignUpResult
-import com.example.cpen321application.user.repository.readGoogleProfile
-import com.example.cpen321application.user.repository.signUp
-import com.example.cpen321application.user.triggerGoogleSignIn
-import com.example.cpen321application.ui.theme.*
+import com.example.cpen321application.ui.components.BirthYearField
 import com.example.cpen321application.ui.components.CardRow
-import com.example.cpen321application.ui.components.FieldLabel
-import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.LabeledTextField
-import com.example.cpen321application.ui.components.sportsFieldColors
-import kotlinx.coroutines.launch
-import java.time.Year
+import com.example.cpen321application.ui.components.cardBackground
+import com.example.cpen321application.ui.theme.*
 
-// youngest and oldest ages offered in the birth year picker
-private const val MIN_AGE = 19
-private const val MAX_AGE = 100
+/*  what the Sign Up screen shows. email is the verified Google account's email, null
+    until the user verifies. errorText is shown above Create Account
+ */
+data class SignUpUiState(
+    val email: String?,
+    val isVerified: Boolean,
+    val firstName: String,
+    val lastName: String,
+    val birthYear: Int?,
+    val isVerifying: Boolean = false,
+    val isSubmitting: Boolean = false,
+    val errorText: String? = null
+) {
+    val canCreate get() = isVerified && firstName.isNotBlank() && lastName.isNotBlank() &&
+        birthYear != null && !isSubmitting
+}
+
+data class SignUpActions(
+    val onVerify: () -> Unit,
+    val onFirstNameChange: (String) -> Unit,
+    val onLastNameChange: (String) -> Unit,
+    val onBirthYearChange: (Int) -> Unit,
+    val onCreateAccount: () -> Unit,
+    val onNavigateToSignIn: () -> Unit,
+    val onBack: () -> Unit
+)
 
 /*
-    Sign up screen for SportsNow:
-    The user verifies with Google (which prefills their name), fills in
-    their details and presses Create Account, which sends them to the server.
-    onSignedUp gets the server's JWT when the account is created,
-    onAlreadyExists is called when the Google account already has an account
+    Sign up screen for SportsNow: the user verifies with Google (which prefills their
+    name), fills in their details and presses Create Account
  */
 @Composable
-fun SignUpScreen(
-    onSignedUp: (jwtToken: String) -> Unit,
-    onAlreadyExists: () -> Unit,
-    onNavigateToSignIn: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val scope = rememberSafeCoroutineScope()
-
-    var idToken by remember { mutableStateOf<String?>(null) }
-    var email by remember { mutableStateOf<String?>(null) }
-    var firstNameText by remember { mutableStateOf("") }
-    var lastNameText by remember { mutableStateOf("") }
-    var birthYear by remember { mutableStateOf<Int?>(null) }
-    var isVerifying by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
-
-    val canCreate = idToken != null && firstNameText.isNotBlank() &&
-            lastNameText.isNotBlank() && birthYear != null && !isSubmitting
-
-    // verifies with Google and prefills the form with the name on the Google account
-    fun verify() {
-        isVerifying = true
-        errorText = null
-        scope.launch {
-            val token = try {
-                triggerGoogleSignIn(context)
-            } finally {
-                isVerifying = false
-            }
-            if (token == null) {
-                errorText = "Google verification failed. Try again."
-            } else {
-                val profile = readGoogleProfile(token)
-                idToken = token
-                email = profile.email
-                if (firstNameText.isBlank()) firstNameText = profile.givenName ?: ""
-                if (lastNameText.isBlank()) lastNameText = profile.familyName ?: ""
-            }
-        }
-    }
-
-    // sends the form to the server, only called once canCreate is true
-    fun createAccount() {
-        val details = SignUpDetails(
-            idToken = idToken!!,
-            email = email,
-            firstName = firstNameText.trim(),
-            lastName = lastNameText.trim(),
-            birthYear = birthYear!!
-        )
-        isSubmitting = true
-        errorText = null
-        scope.launch {
-            val result = try {
-                signUp(details)
-            } finally {
-                isSubmitting = false
-            }
-            when (result) {
-                is SignUpResult.Created -> onSignedUp(result.jwtToken)
-                SignUpResult.AlreadyExists -> onAlreadyExists()
-                is SignUpResult.Failed -> errorText = result.message
-            }
-        }
-    }
-
+fun SignUpScreen(state: SignUpUiState, actions: SignUpActions, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -129,37 +67,46 @@ fun SignUpScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SignUpHeader(onBack = onBack)
+        SignUpHeader(onBack = actions.onBack)
 
         GoogleVerificationCard(
-            email = email,
-            isVerified = idToken != null,
-            isVerifying = isVerifying,
-            onVerify = { verify() }
+            email = state.email,
+            isVerified = state.isVerified,
+            isVerifying = state.isVerifying,
+            onVerify = actions.onVerify
         )
 
-        NameAndBirthYearFields(
-            firstName = firstNameText,
-            lastName = lastNameText,
-            birthYear = birthYear,
-            onFirstNameChange = { firstNameText = it },
-            onLastNameChange = { lastNameText = it },
-            onBirthYearChange = { birthYear = it }
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LabeledTextField(
+                    label = "First name *",
+                    value = state.firstName,
+                    onValueChange = actions.onFirstNameChange,
+                    modifier = Modifier.weight(1f)
+                )
+                LabeledTextField(
+                    label = "Last name *",
+                    value = state.lastName,
+                    onValueChange = actions.onLastNameChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            BirthYearField(birthYear = state.birthYear, onYearSelected = actions.onBirthYearChange)
+        }
 
-        if (errorText != null) {
+        if (state.errorText != null) {
             Text(
-                text = errorText!!,
+                text = state.errorText,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
         }
 
         CreateAccountFooter(
-            enabled = canCreate,
-            isSubmitting = isSubmitting,
-            onCreate = { createAccount() },
-            onNavigateToSignIn = onNavigateToSignIn
+            enabled = state.canCreate,
+            isSubmitting = state.isSubmitting,
+            onCreate = actions.onCreateAccount,
+            onNavigateToSignIn = actions.onNavigateToSignIn
         )
     }
 }
@@ -197,38 +144,6 @@ private fun SignUpHeader(onBack: () -> Unit) {
         fontSize = 22.sp,
         fontWeight = FontWeight.SemiBold
     )
-}
-
-// profile fields, new fields get added to this column
-@Composable
-private fun NameAndBirthYearFields(
-    firstName: String,
-    lastName: String,
-    birthYear: Int?,
-    onFirstNameChange: (String) -> Unit,
-    onLastNameChange: (String) -> Unit,
-    onBirthYearChange: (Int) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LabeledTextField(
-                label = "First name *",
-                value = firstName,
-                onValueChange = onFirstNameChange,
-                modifier = Modifier.weight(1f)
-            )
-            LabeledTextField(
-                label = "Last name *",
-                value = lastName,
-                onValueChange = onLastNameChange,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        BirthYearField(
-            birthYear = birthYear,
-            onYearSelected = onBirthYearChange
-        )
-    }
 }
 
 // Create Account button (a spinner while sending) and the link back to sign in
@@ -337,59 +252,5 @@ private fun GoogleVerificationCard(
                 Text(text = "Verify", color = SportsPrimary, fontWeight = FontWeight.Medium)
             }
         }
-    }
-}
-
-// read only field that opens a dropdown of birth years
-@Composable
-private fun BirthYearField(
-    birthYear: Int?,
-    onYearSelected: (Int) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val currentYear = Year.now().value
-    val years = remember(currentYear) { (currentYear - MIN_AGE downTo currentYear - MAX_AGE).toList() }
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        FieldLabel("Birth year *")
-        Box {
-            OutlinedTextField(
-                value = birthYear?.toString() ?: "",
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                placeholder = { Text("Select year") },
-                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
-                shape = RoundedCornerShape(8.dp),
-                colors = sportsFieldColors(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            // covers the field so a tap anywhere opens the menu
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clickable { expanded = true }
-            )
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.heightIn(max = 280.dp)
-            ) {
-                years.forEach { year ->
-                    DropdownMenuItem(
-                        text = { Text(year.toString()) },
-                        onClick = {
-                            onYearSelected(year)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-        Text(
-            text = "Only your age range is shown to other players.",
-            color = SportsOnSurfaceVariant,
-            fontSize = 12.sp
-        )
     }
 }

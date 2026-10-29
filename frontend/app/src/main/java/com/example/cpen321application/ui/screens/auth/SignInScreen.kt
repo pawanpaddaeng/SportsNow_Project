@@ -9,60 +9,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import com.example.cpen321application.core.rememberSafeCoroutineScope
-import com.example.cpen321application.user.repository.LoginResult
-import com.example.cpen321application.user.repository.login
-import com.example.cpen321application.user.triggerGoogleSignIn
 
 /*
-    Sign in screen for SportsNow:
-    Sign In verifies the user with Google and logs in with the backend, then
-    calls onSignedIn with the server's JWT. Sign Up calls onNavigateToSignUp
-    to go to the sign up page
+    Sign in screen for SportsNow: Sign In calls onSignIn, which verifies the user with
+    Google and logs in with the backend. errorText is shown in red, otherwise noticeText
+    (e.g. no account yet, or sent back from sign up because the account already exists)
  */
 @Composable
 fun SignInScreen(
-    onSignedIn: (jwtToken: String) -> Unit,
+    isSigningIn: Boolean,
+    onSignIn: () -> Unit,
     onNavigateToSignUp: () -> Unit,
     modifier: Modifier = Modifier,
-    infoMessage: String? = null
+    errorText: String? = null,
+    noticeText: String? = null
 ) {
-    val context = LocalContext.current
-    val scope = rememberSafeCoroutineScope()
-    var statusText by remember { mutableStateOf<String?>(null) }
-    var noticeText by remember { mutableStateOf<String?>(null) }
-    var isSigningIn by remember { mutableStateOf(false) }
-
-    // verifies with Google, then logs in with the server
-    fun signIn() {
-        isSigningIn = true
-        statusText = null
-        noticeText = null
-        scope.launch {
-            try {
-                val googleToken = triggerGoogleSignIn(context)
-                if (googleToken == null) {
-                    statusText = "Google sign in failed. Make sure a Google account " +
-                            "is added to this device"
-                } else {
-                    when (val result = login(googleToken)) {
-                        is LoginResult.SignedIn -> onSignedIn(result.jwtToken)
-                        LoginResult.NoUser -> noticeText =
-                            "No account found for this Google account. Please sign up first."
-                        LoginResult.Failed -> statusText = "Unexpected error occurred. Try again."
-                    }
-                }
-            } finally {
-                isSigningIn = false
-            }
-        }
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -80,15 +44,14 @@ fun SignInScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // e.g. no account yet, or sent back from sign up because the account already exists
-        SignInMessage(isSigningIn = isSigningIn, errorText = statusText, noticeText = noticeText ?: infoMessage)
+        SignInMessage(isSigningIn = isSigningIn, errorText = errorText, noticeText = noticeText)
         SignInHeading()
 
         Spacer(modifier = Modifier.height(24.dp))
         SignInPillButton(
             text = "Sign In",
             enabled = !isSigningIn,
-            onClick = { signIn() }
+            onClick = onSignIn
         )
 
         OrDivider()
@@ -135,7 +98,6 @@ private fun SignInMessage(isSigningIn: Boolean, errorText: String?, noticeText: 
     }
 }
 
-// "Sign Into the SportsNow Account" with the line under it
 @Composable
 private fun SignInHeading() {
     Text(
