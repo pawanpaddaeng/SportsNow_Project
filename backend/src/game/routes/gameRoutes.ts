@@ -1,5 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { getAuthUser, requireAuth } from '../auth/middleware';
+import { asyncRoute } from '../../core/http/asyncRoute';
+import { invalidRequest } from '../../core/http/responses';
+import { logError, logInfo } from '../../core/logger';
+import { type PushMessage, sendPushToUsers } from '../../core/notifications/push';
+import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import {
   cancelGame,
   createGame,
@@ -14,14 +18,10 @@ import {
   updateGame,
 } from '../db/games';
 import { countPendingJoinRequests, getJoinRequestStatus } from '../db/joinRequests';
-import { asyncRoute } from '../http/asyncRoute';
-import { invalidRequest } from '../http/responses';
-import { logError, logInfo } from '../logger';
-import { type PushMessage, sendPushToUsers } from '../notifications/push';
 import { parseCoordinates } from '../validation/coordinates';
 import { parseNewGame, type CreateGameBody } from '../validation/newGame';
 import { discoverGameJson, gameJson, gamePlayerJson } from './gameJson';
-import { gameChangeError, readBackGame, requireGameId, sendError } from './shared';
+import { gameChangeError, readBackGame, requireGameId, sendError } from './gameErrors';
 
 type ViewerRole = 'organizer' | 'player' | 'viewer';
 

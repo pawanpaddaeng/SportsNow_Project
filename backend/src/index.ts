@@ -1,6 +1,6 @@
 import { createApp } from './app';
-import { env } from './config/env';
-import { logInfo } from './logger';
+import { env } from './core/config/env';
+import { logInfo } from './core/logger';
 
 const app = createApp();
 

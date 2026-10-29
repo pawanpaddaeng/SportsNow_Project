@@ -1,6 +1,6 @@
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
-import { deleteDeviceTokens, getDeviceTokens } from '../db/deviceTokens';
+import { deleteDeviceTokens, getDeviceTokens } from './deviceTokens';
 import { logError } from '../logger';
 
 // Firebase errors meaning a token will never work again, so it can be deleted

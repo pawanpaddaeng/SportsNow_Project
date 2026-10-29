@@ -1,4 +1,4 @@
-import { executeWrite, selectRows } from './mysql';
+import { executeWrite, selectRows } from '../../core/db/mysql';
 
 export interface User {
   userId: number;

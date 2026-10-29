@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { getAuthUser, requireAuth } from '../auth/middleware';
 import { findUserById, updateUserProfile, userJson } from '../db/users';
-import { asyncRoute } from '../http/asyncRoute';
-import { invalidRequest } from '../http/responses';
+import { asyncRoute } from '../../core/http/asyncRoute';
+import { invalidRequest } from '../../core/http/responses';
 import { parseProfileFields, type ProfileBody } from '../validation/profile';
 
 // the signed in user's profile

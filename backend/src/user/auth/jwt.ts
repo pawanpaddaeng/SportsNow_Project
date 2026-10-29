@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env';
+import { env } from '../../core/config/env';
 
 // how long a token stays valid before the app has to sign in again
 const TOKEN_LIFETIME = '30d';

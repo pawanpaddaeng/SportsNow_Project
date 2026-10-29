@@ -1,6 +1,6 @@
 import type { PoolConnection } from 'mysql2/promise';
 import type { JoinRequestStatus } from './joinRequests';
-import { executeWrite, pool, selectRows } from './mysql';
+import { executeWrite, pool, selectRows } from '../../core/db/mysql';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
 

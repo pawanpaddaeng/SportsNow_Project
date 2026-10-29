@@ -1,4 +1,4 @@
-import { executeWrite, selectRows } from './mysql';
+import { executeWrite, selectRows } from '../db/mysql';
 
 // longest FCM token accepted, matches the device_tokens.token column
 export const MAX_FCM_TOKEN_LENGTH = 512;

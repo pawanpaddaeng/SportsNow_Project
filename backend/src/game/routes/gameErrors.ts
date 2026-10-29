@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import { type Game, type GameChangeProblem, getGameById } from '../db/games';
-import { invalidRequest } from '../http/responses';
-import { logError } from '../logger';
+import { invalidRequest } from '../../core/http/responses';
+import { logError } from '../../core/logger';
 
 // largest games.game_id (INT UNSIGNED)
 const MAX_GAME_ID = 4294967295;

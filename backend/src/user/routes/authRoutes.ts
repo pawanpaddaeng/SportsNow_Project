@@ -2,11 +2,11 @@ import { Router, type Request, type Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { createAuthToken } from '../auth/jwt';
 import { getAuthUser, requireAuth } from '../auth/middleware';
-import { MAX_FCM_TOKEN_LENGTH, saveDeviceToken } from '../db/deviceTokens';
+import { asyncRoute } from '../../core/http/asyncRoute';
+import { invalidRequest } from '../../core/http/responses';
+import { logError, logInfo } from '../../core/logger';
+import { MAX_FCM_TOKEN_LENGTH, saveDeviceToken } from '../../core/notifications/deviceTokens';
 import { createUser, findUserByGoogleId, isDuplicateEntryError, userExists } from '../db/users';
-import { asyncRoute } from '../http/asyncRoute';
-import { invalidRequest } from '../http/responses';
-import { logError, logInfo } from '../logger';
 import { parseProfileFields } from '../validation/profile';
 
 interface SignUpRequestBody {

@@ -1,5 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { getAuthUser, requireAuth } from '../auth/middleware';
+import { asyncRoute } from '../../core/http/asyncRoute';
+import { invalidRequest } from '../../core/http/responses';
+import { logInfo } from '../../core/logger';
+import { sendPushToUser } from '../../core/notifications/push';
+import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import { getGameById } from '../db/games';
 import {
   createJoinRequest,
@@ -8,10 +12,6 @@ import {
   type JoinRequestDecisionProblem,
   type JoinRequestProblem,
 } from '../db/joinRequests';
-import { asyncRoute } from '../http/asyncRoute';
-import { invalidRequest } from '../http/responses';
-import { logInfo } from '../logger';
-import { sendPushToUser } from '../notifications/push';
 import { parseJoinRequest, type JoinRequestBody } from '../validation/joinRequest';
 import { gameJson, pendingJoinRequestJson } from './gameJson';
 import {
@@ -24,7 +24,7 @@ import {
   requireGameId,
   responseFor,
   sendError,
-} from './shared';
+} from './gameErrors';
 
 // responses for a join request that can't be made, a missing, cancelled or started game as for edits
 const JOIN_REQUEST_ERRORS: Record<JoinRequestProblem, ErrorResponse> = {

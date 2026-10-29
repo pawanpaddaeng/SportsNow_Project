@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { findUserById, type User } from '../db/users';
-import { asyncRoute } from '../http/asyncRoute';
-import { invalidRequest } from '../http/responses';
+import { asyncRoute } from '../../core/http/asyncRoute';
+import { invalidRequest } from '../../core/http/responses';
 import { verifyAuthToken } from './jwt';
 
 // reads the JWT from "Authorization: Bearer <token>", or from jwt_token in the json body
