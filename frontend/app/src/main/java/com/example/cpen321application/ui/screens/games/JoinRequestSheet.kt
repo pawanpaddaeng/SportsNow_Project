@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.game.model.GameDetails
+import com.example.cpen321application.ui.components.ChipGroup
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.sportsFieldColors
 import com.example.cpen321application.ui.theme.*

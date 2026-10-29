@@ -8,18 +8,24 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.cpen321application.auth.Session
-import com.example.cpen321application.notifications.GameEvents
+import com.example.cpen321application.core.notifications.GameEvents
+import com.example.cpen321application.core.session.Session
+import com.example.cpen321application.navigation.routes.CreateGameRoute
+import com.example.cpen321application.navigation.routes.DiscoverRoute
+import com.example.cpen321application.navigation.routes.EditGameRoute
+import com.example.cpen321application.navigation.routes.EditProfileRoute
+import com.example.cpen321application.navigation.routes.GameDetailsRoute
+import com.example.cpen321application.navigation.routes.HomeRoute
+import com.example.cpen321application.navigation.routes.JoinRequestsRoute
+import com.example.cpen321application.navigation.routes.PickLocationRoute
+import com.example.cpen321application.navigation.routes.ProfileRoute
+import com.example.cpen321application.navigation.routes.SignInRoute
+import com.example.cpen321application.navigation.routes.SignUpRoute
+import com.example.cpen321application.navigation.state.rememberAppState
 
-// the {gameId} argument of the game routes
 private val gameIdArgument = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
 
-/*
-    App navigation composable:
-    Deals with the screens in ui/screens and handles
-    their interactions with each other, such as switching.
-    The shared state lives in AppState, each route's screen in AccountRoutes and GameRoutes
- */
+// connects each route to its screen, the shared state lives in AppState
 @Composable
 fun AppNavigation(modifier: Modifier = Modifier) {
     val app = rememberAppState()
@@ -33,7 +39,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     // a join request was approved while the app is open: the game now belongs on Home
     LaunchedEffect(Unit) {
         GameEvents.events.collect { event ->
-            if (event.type == "join_request_approved") app.refreshGames()
+            if (event.type == "join_request_approved") app.homeState.refresh()
         }
     }
 

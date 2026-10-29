@@ -32,15 +32,6 @@ import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
 import com.example.cpen321application.ui.theme.SportsSurfaceContainer
 
-// small pieces shared by several screens
-
-// "Full", "1 spot left" or "4 spots left"
-fun spotsLeftLabel(spotsLeft: Int): String = when (spotsLeft) {
-    0 -> "Full"
-    1 -> "1 spot left"
-    else -> "$spotsLeft spots left"
-}
-
 // full width rounded card filled with color
 fun Modifier.cardBackground(color: Color): Modifier =
     fillMaxWidth()

@@ -1,9 +1,9 @@
 import express, { type Express } from 'express';
-import { handleRouteErrors } from './http/asyncRoute';
-import { authRouter } from './routes/auth';
-import { gamesRouter } from './routes/games';
-import { joinRequestsRouter } from './routes/joinRequests';
-import { usersRouter } from './routes/users';
+import { handleRouteErrors } from './core/http/asyncRoute';
+import { gamesRouter } from './game/routes/gameRoutes';
+import { joinRequestsRouter } from './game/routes/joinRequestRoutes';
+import { authRouter } from './user/routes/authRoutes';
+import { usersRouter } from './user/routes/userRoutes';
 
 export function createApp(): Express {
   const app = express();

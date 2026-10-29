@@ -30,8 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.example.cpen321application.users.MAX_PROFILE_AGE
-import com.example.cpen321application.users.MIN_PROFILE_AGE
+import com.example.cpen321application.user.MAX_PROFILE_AGE
+import com.example.cpen321application.user.MIN_PROFILE_AGE
 import java.time.Year
 
 // small label shown above a form field, as in the mockups

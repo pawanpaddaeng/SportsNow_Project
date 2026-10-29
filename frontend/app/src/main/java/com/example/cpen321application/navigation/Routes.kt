@@ -1,6 +1,5 @@
 package com.example.cpen321application.navigation
 
-// navigation routes, one per screen
 object Routes {
     const val SIGN_IN = "sign_in"
     const val SIGN_UP = "sign_up"

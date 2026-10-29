@@ -33,7 +33,7 @@
 
         <!-- shows Firebase push notifications while the app is open -->
         <service
-            android:name=".notifications.PushNotificationService"
+            android:name=".core.notifications.PushNotificationService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

@@ -13,15 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.example.cpen321application.core.notifications.createNotificationChannel
 import com.example.cpen321application.navigation.AppNavigation
-import com.example.cpen321application.notifications.createNotificationChannel
 import com.example.cpen321application.ui.theme.CPEN321ApplicationTheme
 
-/*
-    The main activity class that connects our navigation and
-    screen controller to the phone.
-    Used as provided in the template
- */
 class MainActivity : ComponentActivity() {
     // result ignored: if denied, notifications just aren't shown
     private val notificationPermissionRequest =
