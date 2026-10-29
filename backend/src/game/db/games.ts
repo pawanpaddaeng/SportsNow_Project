@@ -1,5 +1,4 @@
-import type { PoolConnection } from 'mysql2/promise';
-import { executeWrite, inTransaction, selectRows } from '../../core/db/mysql';
+import { executeWrite, inTransaction, type Queryable, selectRows } from '../../core/db/mysql';
 import type { JoinRequestStatus } from './joinRequests';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
@@ -236,7 +235,7 @@ interface LockedGameRow {
     join can't change it in between, and checks the user may still change it
  */
 export async function lockGameForChange(
-  connection: PoolConnection,
+  connection: Queryable,
   gameId: number,
   userId: number,
 ): Promise<{ ok: true; game: LockedGameRow } | { ok: false; problem: GameChangeProblem }> {

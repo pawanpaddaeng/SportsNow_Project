@@ -1,4 +1,4 @@
-import mysql, { type PoolConnection } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
 import { env } from '../config/env';
 
 // One pool for the whole app; mysql2 reuses connections from it.
@@ -34,9 +34,19 @@ export async function executeWrite(sql: string, params: SqlValue[], db: Queryabl
   return result;
 }
 
-// runs work in a transaction on its own connection, rolling back if it throws
-export async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  const connection = await pool.getConnection();
+// the parts of a pool connection a transaction uses
+interface TransactionConnection extends Queryable {
+  beginTransaction(): Promise<void>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  release(): void;
+}
+
+/*  runs work in a transaction on its own connection, rolling back if it throws.
+    work only sees Queryable, so code outside this file never depends on mysql2's types
+ */
+export async function inTransaction<T>(work: (connection: Queryable) => Promise<T>): Promise<T> {
+  const connection = (await pool.getConnection()) as TransactionConnection;
   try {
     await connection.beginTransaction();
     const result = await work(connection);
