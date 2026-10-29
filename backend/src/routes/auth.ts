@@ -5,7 +5,8 @@ import { getAuthUser, requireAuth } from '../auth/middleware';
 import { MAX_FCM_TOKEN_LENGTH, saveDeviceToken } from '../db/deviceTokens';
 import { createUser, findUserByGoogleId, isDuplicateEntryError, userExists } from '../db/users';
 import { asyncRoute } from '../http/asyncRoute';
-import { logInfo } from '../logger';
+import { invalidRequest } from '../http/responses';
+import { logError, logInfo } from '../logger';
 import { parseProfileFields } from '../validation/profile';
 
 interface SignUpRequestBody {
@@ -35,7 +36,7 @@ async function verifyGoogleToken(client: OAuth2Client, idToken: string): Promise
     if (!payload?.sub) return null;
     return { googleId: payload.sub, email: payload.email ?? null, emailVerified: payload.email_verified !== false };
   } catch (error) {
-    console.error('Token verification failed:', error);
+    logError('Token verification failed:', error);
     return null;
   }
 }
@@ -57,13 +58,11 @@ export function authRouter(): Router {
       logInfo('Received a sign up request');
 
       if (typeof id_token !== 'string' || id_token === '' || typeof email !== 'string' || email === '') {
-        return res.status(400).json({ msg: 'invalid_request', error: 'id_token and email are required' });
+        return invalidRequest(res, 'id_token and email are required');
       }
 
       const profile = parseProfileFields(req.body);
-      if(!profile.ok) {
-        return res.status(400).json({ msg: 'invalid_request', error: profile.error });
-      }
+      if(!profile.ok) return invalidRequest(res, profile.error);
 
       const account = await verifyGoogleToken(googleClient, id_token);
       if (!account) return res.status(401).json(INVALID_GOOGLE_TOKEN);
@@ -73,7 +72,7 @@ export function authRouter(): Router {
 
       // the email must belong to the Google account that signed the token
       if (email.trim().toLowerCase() !== account.email.toLowerCase()) {
-        return res.status(400).json({ msg: 'invalid_request', error: 'email does not match the Google account' });
+        return invalidRequest(res, 'email does not match the Google account');
       }
 
       if (await userExists(account.googleId)) {
@@ -104,7 +103,7 @@ export function authRouter(): Router {
       logInfo('Received a login request');
 
       if (typeof id_token !== 'string' || id_token === '') {
-        return res.status(400).json({ msg: 'invalid_request', error: 'id_token is required' });
+        return invalidRequest(res, 'id_token is required');
       }
 
       const account = await verifyGoogleToken(googleClient, id_token);
@@ -128,10 +127,7 @@ export function authRouter(): Router {
       const user = getAuthUser(res);
 
       if (typeof fcmToken !== 'string' || fcmToken.trim() === '' || fcmToken.length > MAX_FCM_TOKEN_LENGTH) {
-        return res.status(400).json({
-          msg: 'invalid_request',
-          error: `fcm_token is required (max ${MAX_FCM_TOKEN_LENGTH} characters)`,
-        });
+        return invalidRequest(res, `fcm_token is required (max ${MAX_FCM_TOKEN_LENGTH} characters)`);
       }
 
       await saveDeviceToken(fcmToken.trim(), user.userId);

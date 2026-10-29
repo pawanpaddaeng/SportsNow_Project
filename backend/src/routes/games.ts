@@ -2,30 +2,34 @@ import { Router, type Request, type Response } from 'express';
 import { getAuthUser, requireAuth } from '../auth/middleware';
 import {
   cancelGame,
-  countPendingJoinRequests,
   createGame,
-  discoverGameJson,
+  findOrganizer,
   type Game,
-  gameJson,
-  gamePlayerJson,
+  type GamePlayer,
   getDiscoverGames,
   getGameById,
   getGamePlayers,
   getGamesForUser,
-  getJoinRequestStatus,
   getUsersToNotify,
   updateGame,
 } from '../db/games';
-import { findUserById } from '../db/users';
+import { countPendingJoinRequests, getJoinRequestStatus } from '../db/joinRequests';
 import { asyncRoute } from '../http/asyncRoute';
-import { logInfo } from '../logger';
-import { type PushMessage, sendPushToUser, sendPushToUsers } from '../notifications/push';
+import { invalidRequest } from '../http/responses';
+import { logError, logInfo } from '../logger';
+import { type PushMessage, sendPushToUsers } from '../notifications/push';
 import { parseCoordinates } from '../validation/coordinates';
 import { parseNewGame, type CreateGameBody } from '../validation/newGame';
-import { gameChangeError, logNotificationError, readBackGame, requireGameId, sendError } from './shared';
+import { discoverGameJson, gameJson, gamePlayerJson } from './gameJson';
+import { gameChangeError, readBackGame, requireGameId, sendError } from './shared';
 
-// how long after creating a game the debug notification is sent
-const DEBUG_NOTIFICATION_DELAY_MS = 5000;
+type ViewerRole = 'organizer' | 'player' | 'viewer';
+
+// the signed in user's relation to the game, decides what the app shows
+function viewerRole(game: Game, players: GamePlayer[], userId: number): ViewerRole {
+  if (game.organizerId === userId) return 'organizer';
+  return players.some((player) => player.userId === userId) ? 'player' : 'viewer';
+}
 
 /*  tells the game's players and pending requesters (except the organizer) about a
     change. Best effort: the app gets its reply without waiting, failures are only logged
@@ -34,7 +38,7 @@ function notifyGameUsers(gameId: number, organizerId: number, message: PushMessa
   getUsersToNotify(gameId, organizerId)
     .then((userIds) => sendPushToUsers(userIds, message))
     .then((devices) => { logInfo(`Game ${gameId} "${message.title}" notification sent to ${devices} device(s)`); })
-    .catch((error: unknown) => { console.error(`Notifying players of game ${gameId} failed:`, error); });
+    .catch((error: unknown) => { logError(`Notifying players of game ${gameId} failed:`, error); });
 }
 
 // what an edit changed, in words for the notification, e.g. ["time", "location"]
@@ -59,32 +63,18 @@ export function gamesRouter(): Router {
 
   /*  create game: makes the game described in the body for the signed in user, who
       becomes its organizer and first player. Responds with the stored game, or
-      400 invalid_request with the problem if a field is missing or invalid.
-      Also sends the organizer a push notification after a few seconds to test notifications
+      400 invalid_request with the problem if a field is missing or invalid
    */
   router.post('/api/games', requireAuth, asyncRoute('Could not create game, try again later',
     async (req: Request<Record<string, never>, unknown, CreateGameBody | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const parsed = parseNewGame(req.body, user.userId);
-      if (!parsed.ok) {
-        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
-      }
-      const game = parsed.value;
+      if (!parsed.ok) return invalidRequest(res, parsed.error);
 
-      const gameId = await createGame(game);
+      const gameId = await createGame(parsed.value);
       logInfo(`Game created id: ${gameId}`);
       // read it back so the app gets the stored values (times, player count, status, ...)
       const created = await readBackGame(gameId, 'creating it');
-
-      // debugging: notify the organizer shortly after to check push notifications work
-      setTimeout(() => {
-        sendPushToUser(user.userId, {
-          title: 'Game created',
-          body: `${game.title} at ${game.locationName} was created`,
-          data: { type: 'game_created', gameId: String(gameId) },
-        }).then((devices) => { logInfo(`Debug game notification sent to ${devices} device(s)`); })
-          .catch(logNotificationError);
-      }, DEBUG_NOTIFICATION_DELAY_MS);
 
       return res.status(201).json({ msg: 'success', game: gameJson(created) });
     }));
@@ -116,12 +106,7 @@ export function gamesRouter(): Router {
     async (req: Request, res: Response) => {
       const user = getAuthUser(res);
       const point = parseCoordinates(req.query.lat, req.query.lng);
-      if (!point) {
-        return res.status(400).json({
-          msg: 'invalid_request',
-          error: 'lat (-90 to 90) and lng (-180 to 180) are required numbers',
-        });
-      }
+      if (!point) return invalidRequest(res, 'lat (-90 to 90) and lng (-180 to 180) are required numbers');
 
       const games = await getDiscoverGames(user.userId, point.latitude, point.longitude);
       if (games.length === 0) {
@@ -147,20 +132,11 @@ export function gamesRouter(): Router {
       if (!game) return sendError(res, gameChangeError('not_found'));
 
       const players = await getGamePlayers(gameId);
-      // the organizer is always a player, look them up only if that ever isn't the case
-      const organizerPlayer = players.find((player) => player.userId === game.organizerId);
-      const organizerUser = organizerPlayer ? null : await findUserById(game.organizerId);
-      const organizer = organizerPlayer ?? (organizerUser && {
-        userId: organizerUser.userId,
-        firstName: organizerUser.firstName,
-        lastName: organizerUser.lastName,
-      });
+      const organizer = await findOrganizer(game, players);
       if (!organizer) {
         throw new Error(`Organizer ${game.organizerId} of game ${gameId} not found`);
       }
-
-      const isPlayer = players.some((player) => player.userId === user.userId);
-      const role = game.organizerId === user.userId ? 'organizer' : (isPlayer ? 'player' : 'viewer');
+      const role = viewerRole(game, players, user.userId);
 
       return res.status(200).json({
         msg: 'success',
@@ -185,9 +161,7 @@ export function gamesRouter(): Router {
       const gameId = requireGameId(req.params.gameId, res);
       if (gameId === null) return;
       const parsed = parseNewGame(req.body, user.userId);
-      if (!parsed.ok) {
-        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
-      }
+      if (!parsed.ok) return invalidRequest(res, parsed.error);
       const keepEndsAt = req.body?.ends_at === undefined;
 
       const before = await getGameById(gameId);
@@ -196,13 +170,10 @@ export function gamesRouter(): Router {
       const result = await updateGame(gameId, user.userId, parsed.value, keepEndsAt);
       if (!result.ok) {
         if (result.problem === 'too_few_players') {
-          return res.status(400).json({
-            msg: 'invalid_request',
-            error: `max_players can't be below the ${result.playerCount} players already in the game`,
-          });
+          return invalidRequest(res, `max_players can't be below the ${result.playerCount} players already in the game`);
         }
         if (result.problem === 'ends_before_start') {
-          return res.status(400).json({ msg: 'invalid_request', error: 'starts_at must be before the game ends' });
+          return invalidRequest(res, 'starts_at must be before the game ends');
         }
         return sendError(res, gameChangeError(result.problem));
       }

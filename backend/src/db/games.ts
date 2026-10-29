@@ -1,4 +1,5 @@
 import type { PoolConnection } from 'mysql2/promise';
+import type { JoinRequestStatus } from './joinRequests';
 import { executeWrite, pool, selectRows } from './mysql';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
@@ -24,14 +25,27 @@ function toUtcDatetime(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// runs work in a transaction on its own connection, rolling back if it throws
+export async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 /*  creates the game and adds the organizer as its first player in one
     transaction, so a game never exists without its organizer. Returns game_id
  */
 export async function createGame(game: NewGame): Promise<number> {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-
+  return inTransaction(async (connection) => {
     const result = await executeWrite(
       `INSERT INTO games (organizer_id, title, sport, description, starts_at, ends_at,
                           location_name, address, latitude, longitude, max_players, skill_level)
@@ -49,15 +63,8 @@ export async function createGame(game: NewGame): Promise<number> {
       [result.insertId, game.organizerId],
       connection,
     );
-
-    await connection.commit();
     return result.insertId;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+  });
 }
 
 export type GameStatus = 'scheduled' | 'cancelled';
@@ -198,15 +205,6 @@ export async function getDiscoverGames(userId: number, latitude: number, longitu
   }));
 }
 
-// JSON shape of a Discover game sent to the app
-export function discoverGameJson(entry: DiscoverGame) {
-  return {
-    game: gameJson(entry.game),
-    distance_m: entry.distanceMeters,
-    join_request_status: entry.joinRequestStatus,
-  };
-}
-
 function toGame(row: GameRow): Game {
   return {
     gameId: row.game_id,
@@ -273,22 +271,6 @@ export async function lockGameForChange(
   if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
   if (Number(game.has_started) === 1) return { ok: false, problem: 'started' };
   return { ok: true, game };
-}
-
-// runs work in a transaction on its own connection, rolling back if it throws
-export async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const result = await work(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
 }
 
 /*  replaces the organizer's game details with changes (organizerId is ignored, the
@@ -384,6 +366,10 @@ interface GamePlayerRow {
   last_name: string;
 }
 
+function toPlayer(row: GamePlayerRow): GamePlayer {
+  return { userId: row.user_id, firstName: row.first_name, lastName: row.last_name };
+}
+
 // everyone in the game (organizer included), in the order they joined
 export async function getGamePlayers(gameId: number): Promise<GamePlayer[]> {
   const rows = await selectRows<GamePlayerRow>(
@@ -394,66 +380,18 @@ export async function getGamePlayers(gameId: number): Promise<GamePlayer[]> {
      ORDER BY p.joined_at, u.user_id`,
     [gameId],
   );
-  return rows.map((row) => ({ userId: row.user_id, firstName: row.first_name, lastName: row.last_name }));
+  return rows.map(toPlayer);
 }
 
-interface CountRow {
-  count: number;
-}
-
-// join requests still waiting for the organizer, for the badge on Game Details
-export async function countPendingJoinRequests(gameId: number): Promise<number> {
-  const rows = await selectRows<CountRow>(
-    "SELECT COUNT(*) AS count FROM join_requests WHERE game_id = ? AND status = 'pending'",
-    [gameId],
-  );
-  return Number(rows[0]?.count ?? 0);
-}
-
-export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
-
-interface JoinRequestStatusRow {
-  status: JoinRequestStatus;
-}
-
-// status of the user's request to join the game, or null if they never asked
-export async function getJoinRequestStatus(gameId: number, userId: number): Promise<JoinRequestStatus | null> {
-  const rows = await selectRows<JoinRequestStatusRow>(
-    'SELECT status FROM join_requests WHERE game_id = ? AND user_id = ? LIMIT 1',
-    [gameId, userId],
-  );
-  return rows[0]?.status ?? null;
-}
-
-// JSON shape of a player sent to the app
-export function gamePlayerJson(player: GamePlayer) {
-  return {
-    user_id: player.userId,
-    first_name: player.firstName,
-    last_name: player.lastName,
-  };
-}
-
-/*  JSON shape of a game sent to the app. Use this for every endpoint that
-    returns games (create, get my games, ...) so the app has one game model
+/*  the game's organizer. They're added as a player when the game is created, so
+    they're normally in players and only looked up separately if that ever isn't so
  */
-export function gameJson(game: Game) {
-  return {
-    game_id: game.gameId,
-    organizer_id: game.organizerId,
-    title: game.title,
-    sport: game.sport,
-    description: game.description,
-    starts_at: game.startsAt,
-    ends_at: game.endsAt,
-    location_name: game.locationName,
-    address: game.address,
-    latitude: game.latitude,
-    longitude: game.longitude,
-    max_players: game.maxPlayers,
-    player_count: game.playerCount,
-    skill_level: game.skillLevel,
-    status: game.status,
-    created_at: game.createdAt,
-  };
+export async function findOrganizer(game: Game, players: GamePlayer[]): Promise<GamePlayer | null> {
+  const player = players.find((p) => p.userId === game.organizerId);
+  if (player) return player;
+  const rows = await selectRows<GamePlayerRow>(
+    'SELECT user_id, first_name, last_name FROM users WHERE user_id = ? LIMIT 1',
+    [game.organizerId],
+  );
+  return rows[0] ? toPlayer(rows[0]) : null;
 }

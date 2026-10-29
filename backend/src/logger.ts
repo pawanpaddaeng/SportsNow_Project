@@ -7,3 +7,8 @@ function oneLine(message: string): string {
 export function logInfo(message: string): void {
   console.info(oneLine(message));
 }
+
+// writes an error message to the server log on one line, followed by the error itself
+export function logError(message: string, error: unknown): void {
+  console.error(oneLine(message), error);
+}

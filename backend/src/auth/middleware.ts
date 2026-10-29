@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { findUserById, type User } from '../db/users';
 import { asyncRoute } from '../http/asyncRoute';
+import { invalidRequest } from '../http/responses';
 import { verifyAuthToken } from './jwt';
 
 // reads the JWT from "Authorization: Bearer <token>", or from jwt_token in the json body
@@ -27,7 +28,7 @@ function readToken(req: Request): string | null {
 async function checkAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = readToken(req);
   if (!token) {
-    res.status(400).json({ msg: 'invalid_request', error: 'jwt_token is required' });
+    invalidRequest(res, 'jwt_token is required');
     return;
   }
 

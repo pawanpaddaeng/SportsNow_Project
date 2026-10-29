@@ -1,12 +1,14 @@
 import type { Response } from 'express';
 import { type Game, type GameChangeProblem, getGameById } from '../db/games';
+import { invalidRequest } from '../http/responses';
+import { logError } from '../logger';
 
 // largest games.game_id (INT UNSIGNED)
 const MAX_GAME_ID = 4294967295;
 
 // notifications are best effort, a failure is only logged
 export function logNotificationError(error: unknown): void {
-  console.error('Sending a notification failed:', error);
+  logError('Sending a notification failed:', error);
 }
 
 // the game id from a route like /api/games/:gameId, or null if it isn't a valid id
@@ -18,9 +20,7 @@ export function readGameId(raw: string): number | null {
 // the route's game id, or null after answering 400 invalid_request when it isn't a valid id
 export function requireGameId(raw: string, res: Response): number | null {
   const gameId = readGameId(raw);
-  if (gameId === null) {
-    res.status(400).json({ msg: 'invalid_request', error: 'gameId must be a positive whole number' });
-  }
+  if (gameId === null) invalidRequest(res, 'gameId must be a positive whole number');
   return gameId;
 }
 

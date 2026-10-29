@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { logError } from '../logger';
 
 /*  an error a route didn't expect, e.g. the database is down. message is shown to
     the app, failure is the original error for the server log
@@ -32,6 +33,6 @@ export function handleRouteErrors(error: unknown, req: Request, res: Response, n
     next(error);
     return;
   }
-  console.error(`${req.method} ${req.path} failed:`, error.failure);
+  logError(`${req.method} ${req.path} failed:`, error.failure);
   res.status(500).json({ msg: 'server_error', error: error.message });
 }

@@ -1,5 +1,7 @@
-import { type GameChangeProblem, inTransaction, type JoinRequestStatus, lockGameForChange } from './games';
+import { type GameChangeProblem, inTransaction, lockGameForChange } from './games';
 import { executeWrite, selectRows } from './mysql';
+
+export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 
 export type RequestSkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'competitive';
 export type PlayFrequency = 'rarely' | 'monthly' | 'weekly' | 'several_per_week';
@@ -151,16 +153,30 @@ export async function getPendingJoinRequests(gameId: number): Promise<PendingJoi
   }));
 }
 
-// JSON shape of a pending request sent to the organizer's app
-export function pendingJoinRequestJson(request: PendingJoinRequest) {
-  return {
-    request_id: request.requestId,
-    user: { user_id: request.userId, first_name: request.firstName, last_name: request.lastName },
-    skill_level: request.skillLevel,
-    play_frequency: request.playFrequency,
-    message: request.message,
-    created_at: request.createdAt,
-  };
+interface CountRow {
+  count: number;
+}
+
+// join requests still waiting for the organizer, for the badge on Game Details
+export async function countPendingJoinRequests(gameId: number): Promise<number> {
+  const rows = await selectRows<CountRow>(
+    "SELECT COUNT(*) AS count FROM join_requests WHERE game_id = ? AND status = 'pending'",
+    [gameId],
+  );
+  return Number(rows[0]?.count ?? 0);
+}
+
+interface JoinRequestStatusRow {
+  status: JoinRequestStatus;
+}
+
+// status of the user's request to join the game, or null if they never asked
+export async function getJoinRequestStatus(gameId: number, userId: number): Promise<JoinRequestStatus | null> {
+  const rows = await selectRows<JoinRequestStatusRow>(
+    'SELECT status FROM join_requests WHERE game_id = ? AND user_id = ? LIMIT 1',
+    [gameId, userId],
+  );
+  return rows[0]?.status ?? null;
 }
 
 // why the organizer can't answer a request: a problem with the game, or with the request itself

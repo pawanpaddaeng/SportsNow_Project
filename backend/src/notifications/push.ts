@@ -1,6 +1,7 @@
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { deleteDeviceTokens, getDeviceTokens } from '../db/deviceTokens';
+import { logError } from '../logger';
 
 // Firebase errors meaning a token will never work again, so it can be deleted
 const DEAD_TOKEN_ERRORS = new Set([
@@ -54,7 +55,7 @@ export async function sendPushToUser(userId: number, message: PushMessage): Prom
 
     return Number(result.successCount);
   } catch (error) {
-    console.error(`Sending push notification to user ${userId} failed:`, error);
+    logError(`Sending push notification to user ${userId} failed:`, error);
     return 0;
   }
 }

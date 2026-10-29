@@ -1,18 +1,19 @@
 import { Router, type Request, type Response } from 'express';
 import { getAuthUser, requireAuth } from '../auth/middleware';
-import { gameJson, getGameById } from '../db/games';
+import { getGameById } from '../db/games';
 import {
   createJoinRequest,
   decideJoinRequest,
   getPendingJoinRequests,
   type JoinRequestDecisionProblem,
   type JoinRequestProblem,
-  pendingJoinRequestJson,
 } from '../db/joinRequests';
 import { asyncRoute } from '../http/asyncRoute';
+import { invalidRequest } from '../http/responses';
 import { logInfo } from '../logger';
 import { sendPushToUser } from '../notifications/push';
 import { parseJoinRequest, type JoinRequestBody } from '../validation/joinRequest';
+import { gameJson, pendingJoinRequestJson } from './gameJson';
 import {
   type ErrorResponse,
   GAME_CHANGE_ERRORS,
@@ -62,9 +63,7 @@ export function joinRequestsRouter(): Router {
       const gameId = requireGameId(req.params.gameId, res);
       if (gameId === null) return;
       const parsed = parseJoinRequest(req.body);
-      if (!parsed.ok) {
-        return res.status(400).json({ msg: 'invalid_request', error: parsed.error });
-      }
+      if (!parsed.ok) return invalidRequest(res, parsed.error);
 
       const result = await createJoinRequest(gameId, user.userId, parsed.value);
       if (!result.ok) return sendError(res, responseFor(JOIN_REQUEST_ERRORS, result.problem));
@@ -120,11 +119,11 @@ export function joinRequestsRouter(): Router {
       // request ids are INT UNSIGNED like game ids, so they're read the same way
       const requestId = readGameId(req.params.requestId);
       if (gameId === null || requestId === null) {
-        return res.status(400).json({ msg: 'invalid_request', error: 'gameId and requestId must be positive whole numbers' });
+        return invalidRequest(res, 'gameId and requestId must be positive whole numbers');
       }
       const decision = req.body?.decision;
       if (decision !== 'approve' && decision !== 'decline') {
-        return res.status(400).json({ msg: 'invalid_request', error: 'decision must be "approve" or "decline"' });
+        return invalidRequest(res, 'decision must be "approve" or "decline"');
       }
       const approve = decision === 'approve';
 
