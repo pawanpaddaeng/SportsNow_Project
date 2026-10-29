@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise';
+import mysql, { type PoolConnection } from 'mysql2/promise';
 import { env } from '../config/env';
 
 // One pool for the whole app; mysql2 reuses connections from it.
@@ -32,4 +32,20 @@ export async function selectRows<T>(sql: string, params: SqlValue[], db: Queryab
 export async function executeWrite(sql: string, params: SqlValue[], db: Queryable = pool): Promise<WriteResult> {
   const [result] = (await db.execute(sql, params)) as [WriteResult, unknown];
   return result;
+}
+
+// runs work in a transaction on its own connection, rolling back if it throws
+export async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }

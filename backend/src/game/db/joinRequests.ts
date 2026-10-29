@@ -1,5 +1,5 @@
-import { type GameChangeProblem, inTransaction, lockGameForChange } from './games';
-import { executeWrite, selectRows } from '../../core/db/mysql';
+import { executeWrite, inTransaction, selectRows } from '../../core/db/mysql';
+import { type GameChangeProblem, lockGameForChange } from './games';
 
 export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 

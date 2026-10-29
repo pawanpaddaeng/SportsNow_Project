@@ -1,5 +1,5 @@
 import type { NewJoinRequest, PlayFrequency, RequestSkillLevel } from '../db/joinRequests';
-import type { ParseResult } from './newGame';
+import type { ParseResult } from '../../core/validation';
 
 // values accepted from the app, matching the join request popup
 export const REQUEST_SKILL_LEVELS: readonly RequestSkillLevel[] = ['beginner', 'intermediate', 'advanced', 'competitive'];

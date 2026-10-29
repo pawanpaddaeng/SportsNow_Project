@@ -1,6 +1,6 @@
 import type { PoolConnection } from 'mysql2/promise';
+import { executeWrite, inTransaction, selectRows } from '../../core/db/mysql';
 import type { JoinRequestStatus } from './joinRequests';
-import { executeWrite, pool, selectRows } from '../../core/db/mysql';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
 
@@ -23,22 +23,6 @@ export interface NewGame {
 // games stores times as UTC DATETIME values ("YYYY-MM-DD HH:MM:SS")
 function toUtcDatetime(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-// runs work in a transaction on its own connection, rolling back if it throws
-export async function inTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const result = await work(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
 }
 
 /*  creates the game and adds the organizer as its first player in one

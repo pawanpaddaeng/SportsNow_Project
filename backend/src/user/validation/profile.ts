@@ -1,4 +1,4 @@
-import type { ParseResult } from '../../game/validation/newGame';
+import type { ParseResult } from '../../core/validation';
 
 export const MIN_AGE = 19;
 export const MAX_AGE = 100;

@@ -1,3 +1,4 @@
+import type { ParseResult } from '../../core/validation';
 import type { NewGame, SkillLevel } from '../db/games';
 
 // values accepted from the app, matching the Create Game screen
@@ -31,8 +32,6 @@ export interface CreateGameBody {
   max_players?: unknown;
   skill_level?: unknown;
 }
-
-export type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
 function fail(error: string): { ok: false; error: string } {
   return { ok: false, error };
