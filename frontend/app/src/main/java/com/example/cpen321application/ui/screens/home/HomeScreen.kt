@@ -32,8 +32,9 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameSummary
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.GameStateTag
+import com.example.cpen321application.ui.components.Pill
 import com.example.cpen321application.ui.components.cardBackground
-import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Home screen shows. isRefreshing shows a loading bar while the list updates,
@@ -250,24 +251,9 @@ private fun GameCard(game: GameSummary, onClick: () -> Unit) {
                 val label = if (game.pendingRequests == 1) "1 request" else "${game.pendingRequests} requests"
                 Pill(text = label, background = MaterialTheme.colorScheme.error, textColor = Color.White)
             }
+            GameStateTag(game.state)
         }
     }
-}
-
-@Composable
-private fun Pill(
-    text: String,
-    background: Color,
-    textColor: Color,
-    borderColor: Color? = null
-) {
-    Text(
-        text = text,
-        color = textColor,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier.pillBackground(background, borderColor)
-    )
 }
 
 // dashed outline button under the organized games

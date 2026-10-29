@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS games (
     max_players   SMALLINT UNSIGNED NOT NULL,
     skill_level   ENUM('any', 'beginner', 'intermediate', 'advanced') NOT NULL DEFAULT 'any',
 
-    -- cancelled games stay so players can see what happened; past games are
-    -- found with starts_at, so there is no "completed" status
-    status        ENUM('scheduled', 'cancelled') NOT NULL DEFAULT 'scheduled',
+    -- scheduled, cancelled or completed. "In progress" is not a status: it's a
+    -- scheduled game that has started (has_started, worked out from starts_at)
+    status        ENUM('scheduled', 'cancelled', 'completed') NOT NULL DEFAULT 'scheduled',
 
     created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

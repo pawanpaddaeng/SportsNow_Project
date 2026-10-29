@@ -50,7 +50,7 @@ export async function createGame(game: NewGame): Promise<number> {
   });
 }
 
-export type GameStatus = 'scheduled' | 'cancelled';
+export type GameStatus = 'scheduled' | 'cancelled' | 'completed';
 
 // a game as read back from the database, with how many players are in it
 export interface Game {
@@ -70,6 +70,9 @@ export interface Game {
   playerCount: number;
   skillLevel: SkillLevel;
   status: GameStatus;
+  // starts_at has passed by the database's clock. A started game stays 'scheduled'
+  // (shown as in progress) until the organizer marks it completed
+  hasStarted: boolean;
   createdAt: string;
 }
 
@@ -90,6 +93,7 @@ interface GameRow {
   player_count: number;
   skill_level: SkillLevel;
   status: GameStatus;
+  has_started: number;
   // TIMESTAMP column read as seconds since 1970 so time zones can't shift it
   created_at_unix: number;
 }
@@ -98,6 +102,11 @@ interface GameRow {
 // connection's time zone can't shift them
 const ISO_UTC = "'%Y-%m-%dT%H:%i:%sZ'";
 
+/*  whether game g has started, by the database's clock. The one place "started" is
+    decided: the rules use it and every game sent to the app carries it as has_started
+ */
+const HAS_STARTED = 'g.starts_at <= UTC_TIMESTAMP()';
+
 // columns selected for a game, shared by every query that returns games
 const GAME_COLUMNS = `
   g.game_id, g.organizer_id, g.title, g.sport, g.description,
@@ -105,8 +114,13 @@ const GAME_COLUMNS = `
   DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
   g.location_name, g.address, g.latitude, g.longitude,
   g.max_players, g.skill_level, g.status,
+  ${HAS_STARTED} AS has_started,
   UNIX_TIMESTAMP(g.created_at) AS created_at_unix,
   (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count`;
+
+// join requests of game g still waiting for the organizer, the badge on Home and Game Details
+export const PENDING_REQUESTS_COUNT =
+  "(SELECT COUNT(*) FROM join_requests r WHERE r.game_id = g.game_id AND r.status = 'pending')";
 
 export async function getGameById(gameId: number): Promise<Game | null> {
   const rows = await selectRows<GameRow>(
@@ -117,29 +131,41 @@ export async function getGameById(gameId: number): Promise<Game | null> {
   return row ? toGame(row) : null;
 }
 
+// a game the user organizes, with the join requests waiting for them (the badge on Home)
+export interface OrganizedGame {
+  game: Game;
+  pendingRequests: number;
+}
+
 export interface UserGames {
   // games the user created
-  organized: Game[];
+  organized: OrganizedGame[];
   // games the user is a player in but didn't create
   joined: Game[];
 }
 
-/*  every game the user organized or joined, soonest first. Includes past and
-    cancelled games, each has its status and times so the app can group them
+interface UserGameRow extends GameRow {
+  pending_requests: number;
+}
+
+/*  every game the user is still in, organized or joined, soonest first. Includes past,
+    cancelled and completed games, each has its status and times so the app can tag them.
+    The organizer is a player of their game until they leave it after cancelling or
+    completing it, so membership alone decides which games are listed
  */
 export async function getGamesForUser(userId: number): Promise<UserGames> {
-  const rows = await selectRows<GameRow>(
-    `SELECT ${GAME_COLUMNS}
+  const rows = await selectRows<UserGameRow>(
+    `SELECT ${GAME_COLUMNS}, ${PENDING_REQUESTS_COUNT} AS pending_requests
      FROM games g
-     WHERE g.organizer_id = ?
-        OR EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?)
+     WHERE EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?)
      ORDER BY g.starts_at, g.game_id`,
-    [userId, userId],
+    [userId],
   );
-  const games = rows.map(toGame);
   return {
-    organized: games.filter((game) => game.organizerId === userId),
-    joined: games.filter((game) => game.organizerId !== userId),
+    organized: rows
+      .filter((row) => row.organizer_id === userId)
+      .map((row) => ({ game: toGame(row), pendingRequests: Number(row.pending_requests) })),
+    joined: rows.filter((row) => row.organizer_id !== userId).map(toGame),
   };
 }
 
@@ -173,7 +199,7 @@ export async function getDiscoverGames(userId: number, latitude: number, longitu
              WHERE r.game_id = g.game_id AND r.user_id = ?) AS join_request_status
      FROM games g
      WHERE g.status = 'scheduled'
-       AND g.starts_at > UTC_TIMESTAMP()
+       AND NOT (${HAS_STARTED})
        AND g.organizer_id <> ?
        AND NOT EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?)
      HAVING distance_m <= ${MAX_DISCOVER_DISTANCE_M}
@@ -205,6 +231,7 @@ function toGame(row: GameRow): Game {
     playerCount: Number(row.player_count),
     skillLevel: row.skill_level,
     status: row.status,
+    hasStarted: Number(row.has_started) === 1,
     // same format as the other times, without milliseconds
     createdAt: new Date(Number(row.created_at_unix) * 1000).toISOString().replace('.000Z', 'Z'),
   };
@@ -221,6 +248,20 @@ export type UpdateGameResult =
   // the new start is not before the game's existing end time
   | { ok: false; problem: 'ends_before_start' };
 
+// what a change to a game checks first, read from its locked row
+export interface LockedGame {
+  organizerId: number;
+  title: string;
+  status: GameStatus;
+  // UTC ISO 8601, like Game.endsAt
+  endsAt: string | null;
+  hasStarted: boolean;
+  maxPlayers: number;
+  playerCount: number;
+  // whether the user passed to lockGame is one of its players
+  isPlayer: boolean;
+}
+
 interface LockedGameRow {
   organizer_id: number;
   title: string;
@@ -229,30 +270,51 @@ interface LockedGameRow {
   has_started: number;
   max_players: number;
   player_count: number;
+  is_player: number;
 }
 
-/*  locks the game's row until the transaction ends so a concurrent edit, cancel or
-    join can't change it in between, and checks the user may still change it
+/*  locks the game's row until the transaction ends so a concurrent edit, cancel,
+    completion, join or leave can't change it in between. Every change to a game
+    locks it through here. Returns null if no game has the id
+ */
+export async function lockGame(connection: Queryable, gameId: number, userId: number): Promise<LockedGame | null> {
+  const rows = await selectRows<LockedGameRow>(
+    `SELECT g.organizer_id, g.title, g.status, g.max_players,
+            DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
+            ${HAS_STARTED} AS has_started,
+            (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count,
+            EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?) AS is_player
+     FROM games g WHERE g.game_id = ? FOR UPDATE`,
+    [userId, gameId],
+    connection,
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    organizerId: row.organizer_id,
+    title: row.title,
+    status: row.status,
+    endsAt: row.ends_at,
+    hasStarted: Number(row.has_started) === 1,
+    maxPlayers: row.max_players,
+    playerCount: Number(row.player_count),
+    isPlayer: Number(row.is_player) === 1,
+  };
+}
+
+/*  locks the game (see lockGame) and checks the user may still change it: they
+    organize it and it's neither cancelled nor started (a completed game has started)
  */
 export async function lockGameForChange(
   connection: Queryable,
   gameId: number,
   userId: number,
-): Promise<{ ok: true; game: LockedGameRow } | { ok: false; problem: GameChangeProblem }> {
-  const rows = await selectRows<LockedGameRow>(
-    `SELECT g.organizer_id, g.title, g.status, g.max_players,
-            DATE_FORMAT(g.ends_at, ${ISO_UTC}) AS ends_at,
-            g.starts_at <= UTC_TIMESTAMP() AS has_started,
-            (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count
-     FROM games g WHERE g.game_id = ? FOR UPDATE`,
-    [gameId],
-    connection,
-  );
-  const game = rows[0];
+): Promise<{ ok: true; game: LockedGame } | { ok: false; problem: GameChangeProblem }> {
+  const game = await lockGame(connection, gameId, userId);
   if (!game) return { ok: false, problem: 'not_found' };
-  if (game.organizer_id !== userId) return { ok: false, problem: 'not_organizer' };
+  if (game.organizerId !== userId) return { ok: false, problem: 'not_organizer' };
   if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
-  if (Number(game.has_started) === 1) return { ok: false, problem: 'started' };
+  if (game.hasStarted) return { ok: false, problem: 'started' };
   return { ok: true, game };
 }
 
@@ -271,13 +333,13 @@ export async function updateGame(
     const locked = await lockGameForChange(connection, gameId, userId);
     if (!locked.ok) return locked;
 
-    const playerCount = Number(locked.game.player_count);
+    const { playerCount } = locked.game;
     if (changes.maxPlayers < playerCount) {
       return { ok: false, problem: 'too_few_players', playerCount };
     }
 
     const endsAt = keepEndsAt
-      ? (locked.game.ends_at ? new Date(locked.game.ends_at) : null)
+      ? (locked.game.endsAt ? new Date(locked.game.endsAt) : null)
       : changes.endsAt;
     if (endsAt && endsAt.getTime() <= changes.startsAt.getTime()) {
       return { ok: false, problem: 'ends_before_start' };
@@ -316,6 +378,77 @@ export async function cancelGame(gameId: number, userId: number): Promise<Cancel
       connection,
     );
     return { ok: true };
+  });
+}
+
+// why the organizer can't mark a game completed: as for edits, or it hasn't started or is already completed
+export type CompleteGameProblem = Exclude<GameChangeProblem, 'started'> | 'not_started' | 'completed';
+
+export type CompleteGameResult = { ok: true } | { ok: false; problem: CompleteGameProblem };
+
+/*  the organizer marks their game completed once it has started. Players can then
+    leave it, the organizer included. The game stays locked until the end so a
+    concurrent cancel or leave can't change it in between
+ */
+export async function completeGame(gameId: number, userId: number): Promise<CompleteGameResult> {
+  return inTransaction(async (connection) => {
+    const game = await lockGame(connection, gameId, userId);
+    if (!game) return { ok: false, problem: 'not_found' };
+    if (game.organizerId !== userId) return { ok: false, problem: 'not_organizer' };
+    if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
+    if (game.status === 'completed') return { ok: false, problem: 'completed' };
+    if (!game.hasStarted) return { ok: false, problem: 'not_started' };
+
+    await executeWrite(
+      "UPDATE games SET status = 'completed' WHERE game_id = ?",
+      [gameId],
+      connection,
+    );
+    return { ok: true };
+  });
+}
+
+/*  why the user can't leave a game: it's gone, they aren't in it, or they organize it
+    and it's still on (they cancel it instead) or started (they mark it completed first)
+ */
+export type LeaveGameProblem = 'not_found' | 'not_player' | 'organizer_must_cancel' | 'organizer_must_complete';
+
+export type LeaveGameResult =
+  // organizerId, title and status so the organizer can be told when a player leaves a game that's on
+  | { ok: true; organizerId: number; title: string; status: GameStatus }
+  | { ok: false; problem: LeaveGameProblem };
+
+/*  removes the user from the game's players. A player can leave at any time, even
+    mid-game. The organizer can only leave once the game is cancelled or completed.
+    Leaving a game that's cancelled or completed just takes it off their Home screen.
+    Leaving before the game starts marks the player's approved join request cancelled
+    so they can ask to join again. The game stays locked until the end so a concurrent
+    approval, edit, cancel or completion can't change it in between
+ */
+export async function leaveGame(gameId: number, userId: number): Promise<LeaveGameResult> {
+  return inTransaction(async (connection) => {
+    const game = await lockGame(connection, gameId, userId);
+    if (!game) return { ok: false, problem: 'not_found' };
+    if (!game.isPlayer) return { ok: false, problem: 'not_player' };
+    if (game.status === 'scheduled' && game.organizerId === userId) {
+      return { ok: false, problem: game.hasStarted ? 'organizer_must_complete' : 'organizer_must_cancel' };
+    }
+
+    await executeWrite(
+      'DELETE FROM game_players WHERE game_id = ? AND user_id = ?',
+      [gameId, userId],
+      connection,
+    );
+    // once the game started the request stays approved as a record that they played
+    if (game.status === 'scheduled' && !game.hasStarted) {
+      await executeWrite(
+        `UPDATE join_requests SET status = 'cancelled'
+         WHERE game_id = ? AND user_id = ? AND status = 'approved'`,
+        [gameId, userId],
+        connection,
+      );
+    }
+    return { ok: true, organizerId: game.organizerId, title: game.title, status: game.status };
   });
 }
 

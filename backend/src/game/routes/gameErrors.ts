@@ -1,5 +1,11 @@
 import type { Response } from 'express';
-import { type Game, type GameChangeProblem, getGameById } from '../db/games';
+import {
+  type CompleteGameProblem,
+  type Game,
+  type GameChangeProblem,
+  getGameById,
+  type LeaveGameProblem,
+} from '../db/games';
 import { invalidRequest } from '../../core/http/responses';
 import { logError } from '../../core/logger';
 
@@ -63,3 +69,26 @@ export const GAME_CHANGE_ERRORS: Record<GameChangeProblem, ErrorResponse> = {
 export function gameChangeError(problem: GameChangeProblem): ErrorResponse {
   return responseFor(GAME_CHANGE_ERRORS, problem);
 }
+
+// responses for a game the organizer can't mark completed, the rest as for edits
+export const COMPLETE_GAME_ERRORS: Record<CompleteGameProblem, ErrorResponse> = {
+  not_found: GAME_CHANGE_ERRORS.not_found,
+  not_organizer: GAME_CHANGE_ERRORS.not_organizer,
+  cancelled: GAME_CHANGE_ERRORS.cancelled,
+  not_started: { status: 409, body: { msg: 'game_not_started', error: "This game hasn't started yet" } },
+  completed: { status: 409, body: { msg: 'game_completed', error: 'This game was already completed' } },
+};
+
+// responses for a game the user can't leave, a missing game as for edits
+export const LEAVE_GAME_ERRORS: Record<LeaveGameProblem, ErrorResponse> = {
+  not_found: GAME_CHANGE_ERRORS.not_found,
+  not_player: { status: 409, body: { msg: 'not_player', error: "You're not in this game" } },
+  organizer_must_cancel: {
+    status: 409,
+    body: { msg: 'organizer_must_cancel', error: 'You organize this game, cancel it before leaving' },
+  },
+  organizer_must_complete: {
+    status: 409,
+    body: { msg: 'organizer_must_complete', error: 'You organize this game, mark it completed before leaving' },
+  },
+};

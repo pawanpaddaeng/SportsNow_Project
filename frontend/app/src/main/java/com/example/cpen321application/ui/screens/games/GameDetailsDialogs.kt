@@ -20,22 +20,74 @@ import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 
 // the Game Details screen's dialogs
 
-// "Cancel this game?" with Cancel Game and Keep Game
+// what a confirmation dialog says: its question, what happens, and its two buttons
+private data class ConfirmText(
+    val title: String,
+    val body: String,
+    val confirm: String,
+    val dismiss: String,
+    // red confirm button for actions that take something away
+    val destructive: Boolean = true
+)
+
+/*  what confirming the action does to this game. A player leaving before the game starts
+    gives up their spot, or leaves mid-game once it started. Anyone leaving a cancelled or
+    completed game just stops seeing it on Home
+ */
+private fun confirmText(action: GameAction, details: GameDetails): ConfirmText = when (action) {
+    GameAction.Cancel -> ConfirmText(
+        title = "Cancel this game?",
+        body = "${details.title} will be cancelled for everyone. Players and anyone who asked to join " +
+            "will be notified. This can't be undone.",
+        confirm = "Cancel Game",
+        dismiss = "Keep Game"
+    )
+    GameAction.Complete -> ConfirmText(
+        title = "Mark this game completed?",
+        body = "${details.title} will be marked completed for everyone and its players will be notified. " +
+            "This can't be undone.",
+        confirm = "Mark Completed",
+        dismiss = "Not Yet",
+        destructive = false
+    )
+    GameAction.Leave -> ConfirmText(
+        title = "Leave this game?",
+        body = when {
+            details.isCancelled || details.isCompleted -> "${details.title} will be removed from your games."
+            details.hasStarted ->
+                "You'll leave ${details.title} while it's in progress and the organizer will be notified."
+            else -> "You'll give up your spot in ${details.title} and the organizer will be notified. " +
+                "To play again you'll need to send a new join request."
+        },
+        confirm = "Leave Game",
+        dismiss = "Stay"
+    )
+}
+
+// asks the user to confirm a Game Details action before it's sent
 @Composable
-internal fun ConfirmCancelDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun ConfirmActionDialog(
+    action: GameAction,
+    details: GameDetails,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val text = confirmText(action, details)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Cancel this game?") },
-        text = {
-            Text("$title will be cancelled for everyone. Players and anyone who asked to join will be notified. This can't be undone.")
-        },
+        title = { Text(text.title) },
+        text = { Text(text.body) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Cancel Game", color = MaterialTheme.colorScheme.error)
+                if (text.destructive) {
+                    Text(text.confirm, color = MaterialTheme.colorScheme.error)
+                } else {
+                    Text(text.confirm)
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Keep Game") }
+            TextButton(onClick = onDismiss) { Text(text.dismiss) }
         }
     )
 }

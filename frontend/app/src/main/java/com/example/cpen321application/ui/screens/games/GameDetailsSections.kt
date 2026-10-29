@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,13 +31,15 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.game.model.GameRole
+import com.example.cpen321application.game.model.GameState
 import com.example.cpen321application.game.spotsLeftLabel
 import com.example.cpen321application.ui.components.CardRow
+import com.example.cpen321application.ui.components.GameStateTag
 import com.example.cpen321application.ui.components.LabelValueRow
 import com.example.cpen321application.ui.components.LocationPreviewMap
+import com.example.cpen321application.ui.components.Pill
 import com.example.cpen321application.ui.components.SurfaceCard
 import com.example.cpen321application.ui.components.cardBackground
-import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.theme.*
 
 // the Game Details screen's sections, from the hero to the players
@@ -49,19 +50,20 @@ private const val MAX_AVATARS = 5
 // width of the labels in the When / Skill level card, so the values line up
 private val INFO_LABEL_WIDTH = 96.dp
 
-// sport and status pills, the title and who organizes it
+/*  sport and status pills, the title and who organizes it. The state tag matches Home's;
+    upcoming games show "You're in" or the spots left instead, like the mockups
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun Hero(details: GameDetails) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill(text = details.sport, background = SportsPrimaryContainer, textColor = SportsOnPrimaryContainer)
+            if (details.state != GameState.Upcoming) GameStateTag(details.state)
             when {
-                details.isCancelled ->
-                    Pill(text = "Cancelled", background = MaterialTheme.colorScheme.error, textColor = Color.White)
-                details.role == GameRole.Player ->
+                details.role == GameRole.Player && !details.isCancelled && !details.isCompleted ->
                     Pill(text = "You're in", background = SportsPrimary, textColor = Color.White, showCheck = true)
-                details.role == GameRole.Viewer && !details.hasStarted -> Pill(
+                details.role == GameRole.Viewer && details.state == GameState.Upcoming -> Pill(
                     text = spotsLeftLabel(details.spotsLeft),
                     background = SportsSurfaceContainer,
                     textColor = SportsOnSurfaceVariant,
@@ -228,25 +230,5 @@ internal fun Avatar(
             .then(if (borderColor != null) Modifier.border(2.dp, borderColor, CircleShape) else Modifier)
     ) {
         Text(text = text, color = textColor, fontSize = fontSize.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun Pill(
-    text: String,
-    background: Color,
-    textColor: Color,
-    borderColor: Color? = null,
-    showCheck: Boolean = false
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.pillBackground(background, borderColor)
-    ) {
-        if (showCheck) {
-            Icon(Icons.Filled.Check, contentDescription = null, tint = textColor, modifier = Modifier.size(14.dp))
-        }
-        Text(text = text, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }

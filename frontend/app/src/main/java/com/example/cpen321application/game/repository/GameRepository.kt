@@ -49,7 +49,7 @@ private fun GameInfoForm.toRequest() = CreateGameRequest(
 private fun userError(msg: String?, error: String?): String? =
     error.takeIf { msg != null && msg != "server_error" }
 
-// sends a create, edit or cancel request and reads the reply
+// sends a create, edit, cancel, complete or leave request and reads the reply
 private suspend fun changeGame(
     context: Context,
     failureMessage: String,
@@ -87,6 +87,20 @@ suspend fun cancelGame(context: Context, gameId: Int): GameChangeResult =
         ServerApi.retrofitService.cancelGame(authorization = authorization, gameId = gameId)
     }
 
+// the organizer marks their started game completed, the server notifies the game's players
+suspend fun completeGame(context: Context, gameId: Int): GameChangeResult =
+    changeGame(context, "Could not complete the game, try again") { authorization ->
+        ServerApi.retrofitService.completeGame(authorization = authorization, gameId = gameId)
+    }
+
+/*  takes the user out of the game: a player at any time, the organizer once it's
+    cancelled or completed. The server explains why it can't
+ */
+suspend fun leaveGame(context: Context, gameId: Int): GameChangeResult =
+    changeGame(context, "Could not leave the game, try again") { authorization ->
+        ServerApi.retrofitService.leaveGame(authorization = authorization, gameId = gameId)
+    }
+
 sealed interface GameDetailsResult {
     data class Loaded(val details: GameDetailsResponse, val game: GameDto) : GameDetailsResult
     // the game was deleted or the id is wrong, retrying won't help
@@ -121,12 +135,13 @@ sealed interface EditableGame {
     data class Unavailable(val message: String) : EditableGame
 }
 
-// only the organizer can edit a game, and not once it's cancelled
+// only the organizer can edit a game, and not once it's cancelled or completed
 suspend fun loadEditableGame(context: Context, gameId: Int): EditableGame =
     when (val result = fetchGameDetails(context, gameId)) {
         is GameDetailsResult.Loaded -> when {
             result.details.viewerRole != "organizer" -> EditableGame.Unavailable("Only the organizer can edit this game.")
             result.game.status == "cancelled" -> EditableGame.Unavailable("This game was cancelled.")
+            result.game.status == "completed" -> EditableGame.Unavailable("This game was completed.")
             // the form is null when the game's values can't fill it
             else -> runCatching { result.game.toGameInfoForm() }.getOrNull()
                 ?.let { EditableGame.Loaded(form = it, playerCount = result.game.playerCount) }

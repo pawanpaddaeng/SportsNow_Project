@@ -22,11 +22,14 @@ import com.example.cpen321application.game.repository.GameChangeResult
 import com.example.cpen321application.game.repository.GameDetailsResult
 import com.example.cpen321application.game.repository.JoinRequestResult
 import com.example.cpen321application.game.repository.cancelGame
+import com.example.cpen321application.game.repository.completeGame
 import com.example.cpen321application.game.repository.fetchGameDetails
+import com.example.cpen321application.game.repository.leaveGame
 import com.example.cpen321application.game.repository.sendJoinRequest
 import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.screens.games.GameAction
 import com.example.cpen321application.ui.screens.games.GameDetailsActions
 import com.example.cpen321application.ui.screens.games.GameDetailsScreen
 import com.example.cpen321application.ui.screens.games.GameDetailsUiState
@@ -45,7 +48,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var notFound by remember { mutableStateOf(false) }
-    var isCancelling by remember { mutableStateOf(false) }
+    var busyAction by remember { mutableStateOf<GameAction?>(null) }
     var showJoinSheet by remember { mutableStateOf(false) }
     // opened from a Discover card: highlight Discover and go back there after a join request
     val openedFromDiscover = remember {
@@ -77,19 +80,32 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
         }
     }
 
-    // the screen asks the organizer to confirm before calling this
-    fun cancel() {
-        isCancelling = true
+    /*  sends an action the user confirmed on the screen, with progress on its button, then
+        says it worked or shows the server's problem. After cancelling or completing the
+        game reloads; after leaving the user is no longer in it, so go back (Home and
+        Discover reload when shown)
+     */
+    fun runAction(action: GameAction) {
+        busyAction = action
         app.scope.launch {
             val result = try {
-                cancelGame(context, gameId)
+                when (action) {
+                    GameAction.Cancel -> cancelGame(context, gameId)
+                    GameAction.Complete -> completeGame(context, gameId)
+                    GameAction.Leave -> leaveGame(context, gameId)
+                }
             } finally {
-                isCancelling = false
+                busyAction = null
             }
             when (result) {
                 is GameChangeResult.Done -> {
-                    Toast.makeText(context, "Game cancelled", Toast.LENGTH_SHORT).show()
-                    loadDetails()
+                    val doneMessage = when (action) {
+                        GameAction.Cancel -> "Game cancelled"
+                        GameAction.Complete -> "Game completed"
+                        GameAction.Leave -> "You left the game"
+                    }
+                    Toast.makeText(context, doneMessage, Toast.LENGTH_SHORT).show()
+                    if (action == GameAction.Leave) navController.popBackStack() else loadDetails()
                 }
                 is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
             }
@@ -109,7 +125,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             details = details,
             isLoading = isLoading,
             errorMessage = error,
-            isCancelling = isCancelling,
+            busyAction = busyAction,
             selectedTab = if (openedFromDiscover) BottomTab.Discover else BottomTab.Home
         ),
         actions = GameDetailsActions(
@@ -118,9 +134,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onEdit = { navController.navigate(Routes.editGame(gameId)) },
             onDirections = { location -> openDirections(context, location) },
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
-            onCancelGame = { cancel() },
-            // placeholder until leaving a game is built
-            onLeaveGame = { Toast.makeText(context, "Leaving a game isn't available yet", Toast.LENGTH_SHORT).show() },
+            onGameAction = { action -> runAction(action) },
             onRequestToJoin = { showJoinSheet = true },
             onTabSelected = { tab -> app.openTab(tab) }
         ),

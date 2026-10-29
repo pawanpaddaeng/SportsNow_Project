@@ -80,6 +80,18 @@ interface NetworkConnection {
         @Path("gameId") gameId: Int
     ) : Response<CreateGameResponse>
 
+    @POST("api/games/{gameId}/complete")
+    suspend fun completeGame(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int
+    ) : Response<CreateGameResponse>
+
+    @POST("api/games/{gameId}/leave")
+    suspend fun leaveGame(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int
+    ) : Response<CreateGameResponse>
+
     @GET("api/games/{gameId}")
     suspend fun getGameDetails(
         @Header("Authorization") authorization: String,
