@@ -31,7 +31,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 ### **3.2. Use Case Diagram**
-![Use Case Diagram](images/UCD_ver2.png)
+![Use Case Diagram](images/UCD_ver3.png)
 
 ### **3.3. Actors Description**
 1. User: A user is anyone with a SportsNow account. A user signs up, logs in, signs out, manages friends, chats with friends, rates players, and views player statistics.
@@ -41,34 +41,37 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 ### **3.4. Use Case Description**
 #### - Use cases for Feature 1 Authentication: 
 1. Login: A returning user opens the app and signs in by verifying their identity with Google.
-2. Sign out: A logged-in user signs out of their account and is returned to the first screen. 
+2. Logout: A logged-in user signs out of their account and is returned to the first screen. 
 3. Account Creation: A new user opens the app and signs up. The user verifies their identity with Google, then provides their first name, last name, and birth year.
 
-#### - Use cases for Feature 2 Game Planning: 
-4. Create Game: A game organiser creates a new game by entering its details and selecting a location on the map.
-5. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
-6. Cancel Game: A game organiser cancels a game they created, and its players are notified.
-7. Accept players to join: A game organiser reviews the join requests for their game, using each player’s rating, history, and badges, and accepts or rejects each one. 
-8. Kick people from Group: A game organiser removes a player from a game they created. 
-9. Invite Friend: A game organiser invites one or more of their friends to a game they created. 
-10. Game Chat: Players who have joined a game chat with the other participants in a temporary chat room, which is closed after the game ends. 
+#### - Use cases for Feature 2 Friend System: 
+4. Add Friends: A user searches for another user and sends them a friend request, which the other user can accept or decline. 
+5. Remove Friends: A user removes someone from their list of friends. 
+6. Friend Chat: A user chats with one of their friends. The user selects a friend from their friend list, opens the chat, and sends a message.
+7. View Friend Profile: A user views a friend’s profile, including their badges and upcoming games.
 
 #### - Use cases for Feature 3 Game Discovery: 
-11. Discover Game: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
-12. Join Game: A player views the details of a game and sends a request to join it, stating their skill level, how often they play, and an optional message. 
-13. Leave Game: A player who has joined a game withdraws from it before it starts. 
-14. View Upcoming Games: A user views the upcoming games they organise and the games they have joined.
+8. Discover Game: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
+9. Join Game: A player views the details of a game and sends a request to join it, stating their skill level, how often they play, and an optional message. 
+10. Game Chat: Players who have joined a game chat with the other participants in a temporary chat room, which is closed after the game ends. 
+11. Leave Game: A player who has joined a game withdraws from it before it starts. 
+12. View Upcoming Games: A user views the upcoming games they organise and the games they have joined.
 
-#### - Use cases for Feature 4 Friend System: 
-15. Add Friend: A user searches for another user and sends them a friend request, which the other user can accept or decline. 
-16. Remove Friend: A user removes someone from their list of friends. 
-17. Friend Chat: A user chats with one of their friends. The user selects a friend from their friend list, opens the chat, and sends a message.
-18. View Friend Profile: A user views a friend’s profile, including their badges and upcoming games.
+#### - Use cases for Feature 4 Player Reputation and Statistics: 
+13. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on punctuality, sportsmanship, skill, and reliability, along with an overall rating.
+14. Mark No-shows: After a game has finished, the game organiser marks the players who did not show up.
+15. Player Statistics: A user views their player’s statistics, including their reputation score and the badges they have earned. 
 
-#### - Use cases for Feature 5 Player Reputation and Statistics: 
-19. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on punctuality, sportsmanship, skill, and reliability, along with an overall rating.
-20. Mark No-shows: After a game has finished, the game organiser marks the players who did not show up.
-21. Player Statistics: A user views their player’s statistics, including their reputation score and the badges they have earned. 
+#### - Use cases for Feature 5 Game Planning: 
+16. Create Game: A game organiser creates a new game by entering its details and selecting a location on the map.
+17. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
+18. Cancel Game: A game organiser cancels a game they created, and its players are notified.
+19. Accept Players to Join: A game organiser reviews the join requests for their game, using each player’s rating, history, and badges, and accepts or rejects each one. 
+20. Kick People from Group: A game organiser removes a player from a game they created. 
+21. Invite Friend: A game organiser invites one or more of their friends to a game they created. 
+
+
+
 
 
 
