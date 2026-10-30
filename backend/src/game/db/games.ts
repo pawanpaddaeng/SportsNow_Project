@@ -462,6 +462,44 @@ export async function leaveGame(gameId: number, userId: number): Promise<LeaveGa
   });
 }
 
+/*  why the organizer can't remove a player: as for edits (only their own game, until it
+    starts), or the player is the organizer themselves or isn't in the game
+ */
+export type RemovePlayerProblem = GameChangeProblem | 'organizer_self' | 'player_not_found';
+
+export type RemovePlayerResult =
+  // title so the removed player can be told which game
+  | { ok: true; title: string }
+  | { ok: false; problem: RemovePlayerProblem };
+
+/*  the organizer removes a player from their game before it starts. The player's
+    approved join request is marked declined, so they can send a new request later.
+    The game stays locked until the end so a concurrent approval, edit, cancel or
+    leave can't change it in between
+ */
+export async function removePlayer(gameId: number, organizerId: number, playerId: number): Promise<RemovePlayerResult> {
+  return inTransaction(async (connection) => {
+    const locked = await lockGameForChange(connection, gameId, organizerId);
+    if (!locked.ok) return locked;
+    if (playerId === organizerId) return { ok: false, problem: 'organizer_self' };
+
+    const removed = await executeWrite(
+      'DELETE FROM game_players WHERE game_id = ? AND user_id = ?',
+      [gameId, playerId],
+      connection,
+    );
+    if (removed.affectedRows === 0) return { ok: false, problem: 'player_not_found' };
+
+    await executeWrite(
+      `UPDATE join_requests SET status = 'declined', responded_at = CURRENT_TIMESTAMP
+       WHERE game_id = ? AND user_id = ? AND status = 'approved'`,
+      [gameId, playerId],
+      connection,
+    );
+    return { ok: true, title: locked.game.title };
+  });
+}
+
 interface UserIdRow {
   user_id: number;
 }

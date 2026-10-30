@@ -28,7 +28,8 @@ fun gameState(status: String, hasStarted: Boolean): GameState = when {
     else -> GameState.Upcoming
 }
 
-data class GamePlayer(val firstName: String, val lastName: String) {
+// userId lets the organizer remove the player
+data class GamePlayer(val userId: Int, val firstName: String, val lastName: String) {
     val fullName get() = "$firstName $lastName".trim()
     val initial get() = firstName.take(1).uppercase()
 }
@@ -110,12 +111,13 @@ fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
         },
         sport = game.sport.capitalized(),
         title = game.title,
-        organizer = organizer?.let { GamePlayer(it.firstName, it.lastName) } ?: GamePlayer("Unknown", ""),
+        organizer = organizer?.let { GamePlayer(it.userId, it.firstName, it.lastName) }
+            ?: GamePlayer(game.organizerId, "Unknown", ""),
         whenText = start?.let { formatGameTime(it, end) } ?: game.startsAt,
         skillLevel = game.skillLevel.capitalized(),
         location = game.toLocation(),
         description = game.description?.takeIf { it.isNotBlank() },
-        players = players.orEmpty().map { GamePlayer(it.firstName, it.lastName) },
+        players = players.orEmpty().map { GamePlayer(it.userId, it.firstName, it.lastName) },
         playerCount = game.playerCount,
         maxPlayers = game.maxPlayers,
         pendingRequests = pendingRequests ?: 0,

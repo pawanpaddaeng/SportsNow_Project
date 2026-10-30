@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
+import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.GameRole
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
@@ -25,19 +26,20 @@ enum class GameAction { Cancel, Complete, Leave }
 
 /*  what the Game Details screen shows. details is null until the game loads; isLoading
     shows a spinner and errorMessage a problem. busyAction shows progress on that
-    action's button. selectedTab is highlighted in the bottom bar: Discover when the game
-    was opened from there, otherwise Home
+    action's button, removingPlayerId on that player's Remove button. selectedTab is
+    highlighted in the bottom bar: Discover when the game was opened from there, otherwise Home
  */
 data class GameDetailsUiState(
     val details: GameDetails?,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val busyAction: GameAction? = null,
+    val removingPlayerId: Int? = null,
     val selectedTab: BottomTab = BottomTab.Home
 )
 
 /*  onRetry is null when retrying won't help. onGameAction (cancel, complete or leave)
-    is only called after the user confirms
+    and onRemovePlayer are only called after the user confirms
  */
 data class GameDetailsActions(
     val onBack: () -> Unit,
@@ -47,14 +49,16 @@ data class GameDetailsActions(
     val onJoinRequests: () -> Unit = {},
     val onOpenChat: () -> Unit = {},
     val onGameAction: (GameAction) -> Unit = {},
+    val onRemovePlayer: (GamePlayer) -> Unit = {},
     val onRequestToJoin: () -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
 /*
     Game Details screen from the Figma mockups, one screen for the three versions:
-    the organizer sees Edit, pending join requests and Cancel Game (Mark as Completed once
-    it started, Leave Game once it's cancelled or completed), a joined player sees
+    the organizer sees Edit, pending join requests, Remove next to each player until the
+    game starts, and Cancel Game (Mark as Completed once it started, Leave Game once it's
+    cancelled or completed), a joined player sees
     "You're in" and Leave Game, anyone else sees the spots left and Request to Join
  */
 @Composable
@@ -63,6 +67,8 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
     var showPlayers by remember { mutableStateOf(false) }
     // the action whose confirmation dialog is open
     var confirmAction by remember { mutableStateOf<GameAction?>(null) }
+    // the player the organizer is asked to confirm removing
+    var confirmRemove by remember { mutableStateOf<GamePlayer?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -106,7 +112,25 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
     }
 
     if (showPlayers && details != null) {
-        PlayersDialog(details = details, onDismiss = { showPlayers = false })
+        PlayersDialog(
+            details = details,
+            removingPlayerId = state.removingPlayerId,
+            onRemove = { player -> confirmRemove = player },
+            onDismiss = { showPlayers = false }
+        )
+    }
+
+    val playerToRemove = confirmRemove
+    if (playerToRemove != null && details != null) {
+        ConfirmRemovePlayerDialog(
+            player = playerToRemove,
+            gameTitle = details.title,
+            onConfirm = {
+                confirmRemove = null
+                actions.onRemovePlayer(playerToRemove)
+            },
+            onDismiss = { confirmRemove = null }
+        )
     }
 
     val pendingAction = confirmAction

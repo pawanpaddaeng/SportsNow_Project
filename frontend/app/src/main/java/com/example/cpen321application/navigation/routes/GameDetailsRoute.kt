@@ -17,6 +17,7 @@ import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.core.notifications.GameEvents
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
+import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.toGameDetails
 import com.example.cpen321application.game.repository.GameChangeResult
 import com.example.cpen321application.game.repository.GameDetailsResult
@@ -25,6 +26,7 @@ import com.example.cpen321application.game.repository.cancelGame
 import com.example.cpen321application.game.repository.completeGame
 import com.example.cpen321application.game.repository.fetchGameDetails
 import com.example.cpen321application.game.repository.leaveGame
+import com.example.cpen321application.game.repository.removePlayer
 import com.example.cpen321application.game.repository.sendJoinRequest
 import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.state.AppState
@@ -49,6 +51,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     var error by remember { mutableStateOf<String?>(null) }
     var notFound by remember { mutableStateOf(false) }
     var busyAction by remember { mutableStateOf<GameAction?>(null) }
+    var removingPlayerId by remember { mutableStateOf<Int?>(null) }
     var showJoinSheet by remember { mutableStateOf(false) }
     // opened from a Discover card: highlight Discover and go back there after a join request
     val openedFromDiscover = remember {
@@ -112,6 +115,25 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
         }
     }
 
+    // the organizer confirmed removing this player, the game reloads to show who's left
+    fun removeFromGame(player: GamePlayer) {
+        removingPlayerId = player.userId
+        app.scope.launch {
+            val result = try {
+                removePlayer(context, gameId, player.userId)
+            } finally {
+                removingPlayerId = null
+            }
+            when (result) {
+                is GameChangeResult.Done -> {
+                    Toast.makeText(context, "${player.fullName} was removed", Toast.LENGTH_SHORT).show()
+                    loadDetails()
+                }
+                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     // reloads whenever the screen is shown, e.g. coming back after editing the game
     OnResume(backStackEntry) { loadDetails() }
 
@@ -126,6 +148,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             isLoading = isLoading,
             errorMessage = error,
             busyAction = busyAction,
+            removingPlayerId = removingPlayerId,
             selectedTab = if (openedFromDiscover) BottomTab.Discover else BottomTab.Home
         ),
         actions = GameDetailsActions(
@@ -135,6 +158,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onDirections = { location -> openDirections(context, location) },
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
             onGameAction = { action -> runAction(action) },
+            onRemovePlayer = { player -> removeFromGame(player) },
             onRequestToJoin = { showJoinSheet = true },
             onTabSelected = { tab -> app.openTab(tab) }
         ),

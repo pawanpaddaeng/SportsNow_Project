@@ -49,7 +49,7 @@ private fun GameInfoForm.toRequest() = CreateGameRequest(
 private fun userError(msg: String?, error: String?): String? =
     error.takeIf { msg != null && msg != "server_error" }
 
-// sends a create, edit, cancel, complete or leave request and reads the reply
+// sends a create, edit, cancel, complete, leave or remove player request and reads the reply
 private suspend fun changeGame(
     context: Context,
     failureMessage: String,
@@ -99,6 +99,12 @@ suspend fun completeGame(context: Context, gameId: Int): GameChangeResult =
 suspend fun leaveGame(context: Context, gameId: Int): GameChangeResult =
     changeGame(context, "Could not leave the game, try again") { authorization ->
         ServerApi.retrofitService.leaveGame(authorization = authorization, gameId = gameId)
+    }
+
+// the organizer removes a player before the game starts, the server notifies them
+suspend fun removePlayer(context: Context, gameId: Int, userId: Int): GameChangeResult =
+    changeGame(context, "Could not remove the player, try again") { authorization ->
+        ServerApi.retrofitService.removePlayer(authorization = authorization, gameId = gameId, userId = userId)
     }
 
 sealed interface GameDetailsResult {

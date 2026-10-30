@@ -5,6 +5,7 @@ import {
   type GameChangeProblem,
   getGameById,
   type LeaveGameProblem,
+  type RemovePlayerProblem,
 } from '../db/games';
 import { invalidRequest } from '../../core/http/responses';
 import { logError } from '../../core/logger';
@@ -77,6 +78,16 @@ export const COMPLETE_GAME_ERRORS: Record<CompleteGameProblem, ErrorResponse> = 
   cancelled: GAME_CHANGE_ERRORS.cancelled,
   not_started: { status: 409, body: { msg: 'game_not_started', error: "This game hasn't started yet" } },
   completed: { status: 409, body: { msg: 'game_completed', error: 'This game was already completed' } },
+};
+
+// responses for a player the organizer can't remove, the game's problems as for edits
+export const REMOVE_PLAYER_ERRORS: Record<RemovePlayerProblem, ErrorResponse> = {
+  ...GAME_CHANGE_ERRORS,
+  organizer_self: {
+    status: 409,
+    body: { msg: 'organizer_self', error: "You can't remove yourself, cancel the game instead" },
+  },
+  player_not_found: { status: 404, body: { msg: 'player_not_found', error: 'This player is not in the game' } },
 };
 
 // responses for a game the user can't leave, a missing game as for edits

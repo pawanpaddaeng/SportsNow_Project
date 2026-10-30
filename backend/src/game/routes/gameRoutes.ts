@@ -17,6 +17,7 @@ import {
   getGamesForUser,
   getUsersToNotify,
   leaveGame,
+  removePlayer,
   updateGame,
 } from '../db/games';
 import { countPendingJoinRequests, getJoinRequestStatus } from '../db/joinRequests';
@@ -29,6 +30,8 @@ import {
   LEAVE_GAME_ERRORS,
   logNotificationError,
   readBackGame,
+  readGameId,
+  REMOVE_PLAYER_ERRORS,
   requireGameId,
   responseFor,
   sendError,
@@ -70,7 +73,7 @@ function describeChanges(before: Game, after: Game): string[] {
   return changes;
 }
 
-// creating, listing, discovering, viewing, editing, cancelling, completing and leaving games
+// creating, listing, discovering, viewing, editing, cancelling, completing and leaving games, and removing players
 export function gamesRouter(): Router {
   const router = Router();
 
@@ -298,6 +301,39 @@ export function gamesRouter(): Router {
       }
 
       return res.status(200).json({ msg: 'success', game: gameJson(game), game_deleted: false });
+    }));
+
+  /*  remove player: the organizer takes a player out of their game before it starts.
+      The player can send a new join request later, and is notified. Responds with the
+      game after removing them.
+      Errors: 400 invalid_request, 403 forbidden, 404 not_found / player_not_found,
+      409 game_cancelled / game_started / organizer_self
+   */
+  router.delete('/api/games/:gameId/players/:userId', requireAuth, asyncRoute('Could not remove the player, try again later',
+    async (req: Request<{ gameId: string; userId: string }>, res: Response) => {
+      const user = getAuthUser(res);
+      const gameId = readGameId(req.params.gameId);
+      // user ids are INT UNSIGNED like game ids, so they're read the same way
+      const playerId = readGameId(req.params.userId);
+      if (gameId === null || playerId === null) {
+        return invalidRequest(res, 'gameId and userId must be positive whole numbers');
+      }
+
+      const result = await removePlayer(gameId, user.userId, playerId);
+      if (!result.ok) return sendError(res, responseFor(REMOVE_PLAYER_ERRORS, result.problem));
+
+      const game = await readBackGame(gameId, 'removing a player');
+      logInfo(`Player ${playerId} removed from game id: ${gameId}`);
+
+      // best effort, the app gets its reply without waiting for the notification
+      sendPushToUser(playerId, {
+        title: 'Removed from game',
+        body: `The organizer removed you from ${result.title}`,
+        data: { type: 'removed_from_game', gameId: String(gameId) },
+      }).then((devices) => { logInfo(`Player removed notification sent to ${devices} device(s)`); })
+        .catch(logNotificationError);
+
+      return res.status(200).json({ msg: 'success', game: gameJson(game) });
     }));
 
   return router;

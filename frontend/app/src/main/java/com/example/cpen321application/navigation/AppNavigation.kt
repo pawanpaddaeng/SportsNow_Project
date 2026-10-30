@@ -36,10 +36,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         Session.signInRequired.collect { app.returnToSignIn() }
     }
 
-    // a join request was approved while the app is open: the game now belongs on Home
+    // a join request was approved, or the user was removed from a game, while the app is
+    // open: the game now belongs on Home, or no longer does
     LaunchedEffect(Unit) {
         GameEvents.events.collect { event ->
-            if (event.type == "join_request_approved") app.homeState.refresh()
+            if (event.type == "join_request_approved" || event.type == "removed_from_game") app.homeState.refresh()
         }
     }
 
