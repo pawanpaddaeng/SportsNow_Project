@@ -102,12 +102,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             }
             when (result) {
                 is GameChangeResult.Done -> {
-                    val doneMessage = when (action) {
-                        GameAction.Cancel -> "Game cancelled"
-                        GameAction.Complete -> "Game completed"
-                        GameAction.Leave -> "You left the game"
-                    }
-                    Toast.makeText(context, doneMessage, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, action.doneMessage, Toast.LENGTH_SHORT).show()
                     if (action == GameAction.Leave) navController.popBackStack() else loadDetails()
                 }
                 is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()

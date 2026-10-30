@@ -3,10 +3,11 @@ import request from 'supertest';
 import { createApp } from '../../../src/app';
 import * as gamesDb from '../../../src/game/db/games';
 import * as push from '../../../src/core/notifications/push';
+import type * as MockEnv from '../mockEnv';
 import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
-jest.mock('../../../src/core/config/env', () => jest.requireActual('../mockEnv'));
+jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
 
 const GAME_ID = 42;
 const PLAYER_ID = 2;

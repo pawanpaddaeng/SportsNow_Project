@@ -302,20 +302,36 @@ export async function lockGame(connection: Queryable, gameId: number, userId: nu
   };
 }
 
-/*  locks the game (see lockGame) and checks the user may still change it: they
-    organize it and it's neither cancelled nor started (a completed game has started)
+// why the organizer can't act on a game at all: it's gone, it isn't theirs, or it's cancelled
+export type OrganizedGameProblem = 'not_found' | 'not_organizer' | 'cancelled';
+
+/*  locks the game (see lockGame) and checks the user organizes it and it isn't
+    cancelled, the checks before an edit, cancel or completion
+ */
+async function lockOrganizedGame(
+  connection: Queryable,
+  gameId: number,
+  userId: number,
+): Promise<{ ok: true; game: LockedGame } | { ok: false; problem: OrganizedGameProblem }> {
+  const game = await lockGame(connection, gameId, userId);
+  if (!game) return { ok: false, problem: 'not_found' };
+  if (game.organizerId !== userId) return { ok: false, problem: 'not_organizer' };
+  if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
+  return { ok: true, game };
+}
+
+/*  locks the game and checks the user may still change it: they organize it and it's
+    neither cancelled nor started (a completed game has started)
  */
 export async function lockGameForChange(
   connection: Queryable,
   gameId: number,
   userId: number,
 ): Promise<{ ok: true; game: LockedGame } | { ok: false; problem: GameChangeProblem }> {
-  const game = await lockGame(connection, gameId, userId);
-  if (!game) return { ok: false, problem: 'not_found' };
-  if (game.organizerId !== userId) return { ok: false, problem: 'not_organizer' };
-  if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
-  if (game.hasStarted) return { ok: false, problem: 'started' };
-  return { ok: true, game };
+  const locked = await lockOrganizedGame(connection, gameId, userId);
+  if (!locked.ok) return locked;
+  if (locked.game.hasStarted) return { ok: false, problem: 'started' };
+  return locked;
 }
 
 /*  replaces the organizer's game details with changes (organizerId is ignored, the
@@ -382,7 +398,7 @@ export async function cancelGame(gameId: number, userId: number): Promise<Cancel
 }
 
 // why the organizer can't mark a game completed: as for edits, or it hasn't started or is already completed
-export type CompleteGameProblem = Exclude<GameChangeProblem, 'started'> | 'not_started' | 'completed';
+export type CompleteGameProblem = OrganizedGameProblem | 'not_started' | 'completed';
 
 export type CompleteGameResult = { ok: true } | { ok: false; problem: CompleteGameProblem };
 
@@ -392,12 +408,10 @@ export type CompleteGameResult = { ok: true } | { ok: false; problem: CompleteGa
  */
 export async function completeGame(gameId: number, userId: number): Promise<CompleteGameResult> {
   return inTransaction(async (connection) => {
-    const game = await lockGame(connection, gameId, userId);
-    if (!game) return { ok: false, problem: 'not_found' };
-    if (game.organizerId !== userId) return { ok: false, problem: 'not_organizer' };
-    if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
-    if (game.status === 'completed') return { ok: false, problem: 'completed' };
-    if (!game.hasStarted) return { ok: false, problem: 'not_started' };
+    const locked = await lockOrganizedGame(connection, gameId, userId);
+    if (!locked.ok) return locked;
+    if (locked.game.status === 'completed') return { ok: false, problem: 'completed' };
+    if (!locked.game.hasStarted) return { ok: false, problem: 'not_started' };
 
     await executeWrite(
       "UPDATE games SET status = 'completed' WHERE game_id = ?",

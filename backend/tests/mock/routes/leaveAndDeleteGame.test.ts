@@ -3,10 +3,11 @@ import request from 'supertest';
 import { createApp } from '../../../src/app';
 import * as mysql from '../../../src/core/db/mysql';
 import { pool, type SqlValue } from '../../../src/core/db/mysql';
+import type * as MockEnv from '../mockEnv';
 import { cleanUpAfterTests, signIn, testOrganizer } from '../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
-jest.mock('../../../src/core/config/env', () => jest.requireActual('../mockEnv'));
+jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
 
 const GAME_ID = 42;
 
@@ -59,16 +60,11 @@ describe('Mocked: POST /api/games/{gameId}/leave (last player)', () => {
       release: jest.fn(),
     };
     jest.spyOn(pool, 'getConnection').mockResolvedValue(connection as never);
-    // SELECTs: the locked game row for leaveGame, or the game row for reading it back
-    jest.spyOn(mysql, 'selectRows').mockImplementation(((sql: string, params: SqlValue[]) => {
-      if (!db.game) return Promise.resolve([]);
-      const playerCount = db.players.length;
-      if (sql.includes('FOR UPDATE')) {
-        const isPlayer = db.players.includes(Number(params[0])) ? 1 : 0;
-        return Promise.resolve([{ ...db.game, player_count: playerCount, is_player: isPlayer }]);
-      }
-      return Promise.resolve([{ ...db.game, player_count: playerCount }]);
-    }) as unknown as typeof mysql.selectRows);
+    // the only SELECT is leaveGame locking the game row, with the organizer as its player
+    // (the route doesn't read a deleted game back)
+    jest.spyOn(mysql, 'selectRows').mockImplementation((() =>
+      Promise.resolve([{ ...db.game, player_count: db.players.length, is_player: 1 }])
+    ) as unknown as typeof mysql.selectRows);
     // writes: removing a player from game_players, and deleting the game itself
     jest.spyOn(mysql, 'executeWrite').mockImplementation((sql: string, params: SqlValue[]) => {
       if (sql.includes('DELETE FROM game_players')) {

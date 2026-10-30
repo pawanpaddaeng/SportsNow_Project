@@ -57,6 +57,13 @@ function notifyGameUsers(gameId: number, organizerId: number, message: PushMessa
     .catch((error: unknown) => { logError(`Notifying players of game ${gameId} failed:`, error); });
 }
 
+// tells one user about their game, best effort: the app gets its reply without waiting for it
+function notifyUser(userId: number, message: PushMessage): void {
+  sendPushToUser(userId, message)
+    .then((devices) => { logInfo(`"${message.title}" notification sent to ${devices} device(s)`); })
+    .catch(logNotificationError);
+}
+
 // what an edit changed, in words for the notification, e.g. ["time", "location"]
 function describeChanges(before: Game, after: Game): string[] {
   const changes: string[] = [];
@@ -291,13 +298,11 @@ export function gamesRouter(): Router {
       logInfo(`User left game id: ${gameId}`);
 
       if (result.status === 'scheduled') {
-        // best effort, the app gets its reply without waiting for the notification
-        sendPushToUser(result.organizerId, {
+        notifyUser(result.organizerId, {
           title: 'Player left',
           body: `${user.firstName} left ${result.title}`,
           data: { type: 'player_left', gameId: String(gameId) },
-        }).then((devices) => { logInfo(`Player left notification sent to ${devices} device(s)`); })
-          .catch(logNotificationError);
+        });
       }
 
       return res.status(200).json({ msg: 'success', game: gameJson(game), game_deleted: false });
@@ -325,13 +330,11 @@ export function gamesRouter(): Router {
       const game = await readBackGame(gameId, 'removing a player');
       logInfo(`Player ${playerId} removed from game id: ${gameId}`);
 
-      // best effort, the app gets its reply without waiting for the notification
-      sendPushToUser(playerId, {
+      notifyUser(playerId, {
         title: 'Removed from game',
         body: `The organizer removed you from ${result.title}`,
         data: { type: 'removed_from_game', gameId: String(gameId) },
-      }).then((devices) => { logInfo(`Player removed notification sent to ${devices} device(s)`); })
-        .catch(logNotificationError);
+      });
 
       return res.status(200).json({ msg: 'success', game: gameJson(game) });
     }));

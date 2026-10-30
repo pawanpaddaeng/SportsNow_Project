@@ -21,8 +21,12 @@ import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.theme.*
 
-// the Game Details actions that wait for the server, each with its own button
-enum class GameAction { Cancel, Complete, Leave }
+// the Game Details actions that wait for the server, each with its own button and what's shown once it's done
+enum class GameAction(val doneMessage: String) {
+    Cancel("Game cancelled"),
+    Complete("Game completed"),
+    Leave("You left the game")
+}
 
 /*  what the Game Details screen shows. details is null until the game loads; isLoading
     shows a spinner and errorMessage a problem. busyAction shows progress on that

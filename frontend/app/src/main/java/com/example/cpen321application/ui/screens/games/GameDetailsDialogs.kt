@@ -57,11 +57,11 @@ private fun confirmText(action: GameAction, details: GameDetails): ConfirmText =
     )
     GameAction.Leave -> ConfirmText(
         title = "Leave this game?",
-        body = when {
-            details.isCancelled || details.isCompleted -> "${details.title} will be removed from your games."
-            details.hasStarted ->
+        body = when (details.state) {
+            GameState.Cancelled, GameState.Completed -> "${details.title} will be removed from your games."
+            GameState.InProgress ->
                 "You'll leave ${details.title} while it's in progress and the organizer will be notified."
-            else -> "You'll give up your spot in ${details.title} and the organizer will be notified. " +
+            GameState.Upcoming -> "You'll give up your spot in ${details.title} and the organizer will be notified. " +
                 "To play again you'll need to send a new join request."
         },
         confirm = "Leave Game",
@@ -120,23 +120,28 @@ internal fun PlayersDialog(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Avatar(text = player.initial, size = 32.dp, fontSize = 13)
                         Text(text = player.fullName, color = SportsOnSurface, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                        when {
-                            player.userId == details.organizer.userId ->
-                                Text(text = "Organizer", color = SportsOnSurfaceVariant, fontSize = 12.sp)
-                            canRemove && removingPlayerId == player.userId -> CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.error,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            canRemove -> TextButton(onClick = { onRemove(player) }, enabled = removingPlayerId == null) {
-                                Text("Remove", color = MaterialTheme.colorScheme.error)
-                            }
+                        if (player.userId == details.organizer.userId) {
+                            Text(text = "Organizer", color = SportsOnSurfaceVariant, fontSize = 12.sp)
+                        } else if (canRemove) {
+                            RemoveButton(removingPlayerId = removingPlayerId, player = player, onRemove = onRemove)
                         }
                     }
                 }
             }
         }
     )
+}
+
+// Remove next to a player, a spinner while they're being removed, disabled while another one is
+@Composable
+private fun RemoveButton(removingPlayerId: Int?, player: GamePlayer, onRemove: (GamePlayer) -> Unit) {
+    if (removingPlayerId == player.userId) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.error, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+    } else {
+        TextButton(onClick = { onRemove(player) }, enabled = removingPlayerId == null) {
+            Text("Remove", color = MaterialTheme.colorScheme.error)
+        }
+    }
 }
 
 // "Remove this player?" with Remove and Keep, they can still ask to join again later
