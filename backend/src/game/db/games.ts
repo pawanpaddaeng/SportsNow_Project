@@ -414,16 +414,19 @@ export async function completeGame(gameId: number, userId: number): Promise<Comp
 export type LeaveGameProblem = 'not_found' | 'not_player' | 'organizer_must_cancel' | 'organizer_must_complete';
 
 export type LeaveGameResult =
-  // organizerId, title and status so the organizer can be told when a player leaves a game that's on
-  | { ok: true; organizerId: number; title: string; status: GameStatus }
+  // organizerId, title and status so the organizer can be told when a player leaves a game that's on.
+  // deleted when the user was the last player, so the game no longer exists
+  | { ok: true; organizerId: number; title: string; status: GameStatus; deleted: boolean }
   | { ok: false; problem: LeaveGameProblem };
 
 /*  removes the user from the game's players. A player can leave at any time, even
     mid-game. The organizer can only leave once the game is cancelled or completed.
     Leaving a game that's cancelled or completed just takes it off their Home screen.
     Leaving before the game starts marks the player's approved join request cancelled
-    so they can ask to join again. The game stays locked until the end so a concurrent
-    approval, edit, cancel or completion can't change it in between
+    so they can ask to join again. When the last player leaves the game is deleted,
+    with its players and join requests. That can only be a cancelled or completed game,
+    since the organizer stays a player until then. The game stays locked until the end
+    so a concurrent approval, edit, cancel or completion can't change it in between
  */
 export async function leaveGame(gameId: number, userId: number): Promise<LeaveGameResult> {
   return inTransaction(async (connection) => {
@@ -448,7 +451,14 @@ export async function leaveGame(gameId: number, userId: number): Promise<LeaveGa
         connection,
       );
     }
-    return { ok: true, organizerId: game.organizerId, title: game.title, status: game.status };
+
+    // the locked count still includes the user who just left
+    const deleted = game.playerCount <= 1;
+    if (deleted) {
+      // join_requests and any game_players rows go with it (ON DELETE CASCADE)
+      await executeWrite('DELETE FROM games WHERE game_id = ?', [gameId], connection);
+    }
+    return { ok: true, organizerId: game.organizerId, title: game.title, status: game.status, deleted };
   });
 }
 

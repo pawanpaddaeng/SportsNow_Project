@@ -262,8 +262,10 @@ export function gamesRouter(): Router {
   /*  leave game: the signed in user stops being a player. Players can leave at any
       time, even mid-game. The organizer can only leave once the game is cancelled or
       completed (until then they cancel it, or mark it completed once it started).
-      Leaving a cancelled or completed game takes it off their Home screen. Responds with
-      the game after leaving and tells the organizer when a player leaves a game that's on.
+      Leaving a cancelled or completed game takes it off their Home screen, and the last
+      player to leave deletes it. Responds with the game after leaving, or game null and
+      game_deleted true when it was deleted, and tells the organizer when a player leaves
+      a game that's on.
       Errors: 400 invalid_request, 404 not_found,
       409 not_player / organizer_must_cancel / organizer_must_complete
    */
@@ -275,6 +277,12 @@ export function gamesRouter(): Router {
 
       const result = await leaveGame(gameId, user.userId);
       if (!result.ok) return sendError(res, responseFor(LEAVE_GAME_ERRORS, result.problem));
+
+      // the last player left a cancelled or completed game, nobody is left to tell
+      if (result.deleted) {
+        logInfo(`Last player left, game deleted id: ${gameId}`);
+        return res.status(200).json({ msg: 'success', game: null, game_deleted: true });
+      }
 
       const game = await readBackGame(gameId, 'leaving it');
       logInfo(`User left game id: ${gameId}`);
@@ -289,7 +297,7 @@ export function gamesRouter(): Router {
           .catch(logNotificationError);
       }
 
-      return res.status(200).json({ msg: 'success', game: gameJson(game) });
+      return res.status(200).json({ msg: 'success', game: gameJson(game), game_deleted: false });
     }));
 
   return router;

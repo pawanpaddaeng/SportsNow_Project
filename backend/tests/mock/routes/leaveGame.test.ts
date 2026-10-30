@@ -88,7 +88,13 @@ describe('Mocked: POST /api/games/{gameId}/leave', () => {
       Promise.resolve(gameId === game.gameId ? { ...game, playerCount: players.length } : null));
     const leaveGame = jest.spyOn(gamesDb, 'leaveGame').mockImplementation((_gameId, userId) => {
       players.splice(players.indexOf(userId), 1);
-      return Promise.resolve({ ok: true, organizerId: game.organizerId, title: game.title, status: game.status });
+      return Promise.resolve({
+        ok: true,
+        organizerId: game.organizerId,
+        title: game.title,
+        status: game.status,
+        deleted: players.length === 0,
+      });
     });
     expect(players).toContain(player.userId);
 

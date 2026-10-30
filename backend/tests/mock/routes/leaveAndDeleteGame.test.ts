@@ -43,8 +43,6 @@ afterAll(async () => {
 
 // Interface POST /api/games/{gameId}/leave
 describe('Mocked: POST /api/games/{gameId}/leave (last player)', () => {
-  // NOTE: expected to FAIL until the backend deletes a game when its last player leaves.
-  //   Leaving never deletes a game yet, so the game is still there at the end.
   // Mocked behavior: the database itself is replaced by an in-memory games row and
   //   game_players list, so the real leaveGame runs its real queries against them.
   //   pool.getConnection gives a fake connection for the transaction. Sign in is mocked

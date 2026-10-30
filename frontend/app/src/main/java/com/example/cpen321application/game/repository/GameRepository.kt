@@ -25,8 +25,8 @@ import java.io.IOException
 const val COULD_NOT_LOAD_GAME ="Couldn't load this game, try again"
 
 sealed interface GameChangeResult {
-    // the game as the server stored it
-    data class Done(val game: GameDto) : GameChangeResult
+    // the game as the server stored it, null when leaving deleted it (the user was the last player)
+    data class Done(val game: GameDto?) : GameChangeResult
     data class Failed(val message: String) : GameChangeResult
 }
 
@@ -61,7 +61,7 @@ private suspend fun changeGame(
         val reply = readReply(response, CreateGameResponse::class.java)
         val game = reply?.game
         when {
-            reply?.msg == "success" && game != null -> GameChangeResult.Done(game)
+            reply?.msg == "success" && (game != null || reply.gameDeleted == true) -> GameChangeResult.Done(game)
             else -> GameChangeResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
         }
     } catch (e: IOException) {

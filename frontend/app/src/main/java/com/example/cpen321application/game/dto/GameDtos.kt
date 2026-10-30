@@ -83,7 +83,9 @@ data class GameDetailsResponse(
 data class CreateGameResponse(
     val msg: String?,
     val game: GameDto?,
-    val error: String?
+    val error: String?,
+    // only sent by leave: true when the user was the last player and the game was deleted
+    @SerializedName("game_deleted") val gameDeleted: Boolean? = null
 )
 
 /*  a game on the Discover screen: the game, how far it is from the user in metres
