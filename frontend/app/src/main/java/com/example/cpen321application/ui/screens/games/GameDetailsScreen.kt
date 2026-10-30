@@ -171,7 +171,12 @@ private fun LoadedDetails(
     InfoCard(details)
     LocationCard(location = details.location, onDirections = { actions.onDirections(details.location) })
 
-    if (details.role == GameRole.Organizer && details.pendingRequests > 0 && !details.isCancelled && !details.isCompleted) {
+    // only the organizer answers requests, and only while the game is still open
+    val isOrganizer = details.role == GameRole.Organizer
+    val hasPendingRequests = details.pendingRequests > 0
+    val isGameOpen = !details.isCancelled && !details.isCompleted
+    val showJoinRequestsBanner = isOrganizer && hasPendingRequests && isGameOpen
+    if (showJoinRequestsBanner) {
         JoinRequestsBanner(count = details.pendingRequests, onClick = actions.onJoinRequests)
     }
 

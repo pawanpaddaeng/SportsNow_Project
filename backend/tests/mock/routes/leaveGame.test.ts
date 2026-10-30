@@ -1,49 +1,18 @@
 import request from 'supertest';
 
 import { createApp } from '../../../src/app';
-import { createAuthToken } from '../../../src/user/auth/jwt';
 import * as gamesDb from '../../../src/game/db/games';
-import { type Game } from '../../../src/game/db/games';
-import { pool } from '../../../src/core/db/mysql';
-import * as usersDb from '../../../src/user/db/users';
-import { type User } from '../../../src/user/db/users';
 import * as push from '../../../src/core/notifications/push';
+import { cleanUpAfterTests, signIn, testGame, testPlayer } from '../helpers';
 
-// the server reads its settings from the environment when it loads; with every
-// database call mocked it needs no real ones (jest.mock runs before the imports)
-jest.mock('../../../src/core/config/env', () => ({
-  env: {
-    port: 3000,
-    mysqlUrl: 'mysql://test:test@localhost:3306/test',
-    mysqlUser: 'test',
-    mysqlPassword: 'test',
-    mysqlDatabase: 'test',
-    jwtSecret: 'test-jwt-secret',
-  },
-}));
+// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
+jest.mock('../../../src/core/config/env', () => jest.requireActual('../mockEnv'));
 
 const GAME_ID = 42;
 const ORGANIZER_ID = 1;
 const OTHER_PLAYER_ID = 3;
 
-const player: User = {
-  userId: 2,
-  googleId: 'google-player',
-  email: 'player@example.com',
-  firstName: 'Paul',
-  lastName: 'Player',
-  birthYear: 1998,
-  // before the token is made, so requireAuth accepts it
-  createdAt: new Date('2026-01-01T00:00:00Z'),
-};
-
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface POST /api/games/{gameId}/leave
 describe('Mocked: POST /api/games/{gameId}/leave', () => {
@@ -57,33 +26,15 @@ describe('Mocked: POST /api/games/{gameId}/leave', () => {
   //   and the game still exists
   // Expected output: { msg: "success", game } with the game's player_count down by one
   test('Player leaves a game that has another player', async () => {
-    // 1. sign in: requireAuth looks the player up (not what this test checks)
-    jest.spyOn(usersDb, 'findUserById').mockResolvedValue(player);
-    const token = createAuthToken(player.userId);
+    // 1. sign in as the player (not what this test checks)
+    const player = testPlayer();
+    const token = signIn(player);
     // the organizer is told a player left, notifications aren't checked here
     jest.spyOn(push, 'sendPushToUser').mockResolvedValue(0);
 
     // 2. make a mock game: an upcoming game with the player and another player in it
     const players = [ORGANIZER_ID, player.userId, OTHER_PLAYER_ID];
-    const game: Game = {
-      gameId: GAME_ID,
-      organizerId: ORGANIZER_ID,
-      title: 'Sunday Soccer',
-      sport: 'soccer',
-      description: null,
-      startsAt: '2030-01-06T18:00:00Z',
-      endsAt: null,
-      locationName: 'Jericho Park',
-      address: '3941 Point Grey Rd, Vancouver',
-      latitude: 49.2722,
-      longitude: -123.1957,
-      maxPlayers: 10,
-      playerCount: players.length,
-      skillLevel: 'any',
-      status: 'scheduled',
-      hasStarted: false,
-      createdAt: '2026-10-01T00:00:00Z',
-    };
+    const game = testGame({ gameId: GAME_ID, organizerId: ORGANIZER_ID });
     jest.spyOn(gamesDb, 'getGameById').mockImplementation((gameId) =>
       Promise.resolve(gameId === game.gameId ? { ...game, playerCount: players.length } : null));
     const leaveGame = jest.spyOn(gamesDb, 'leaveGame').mockImplementation((_gameId, userId) => {

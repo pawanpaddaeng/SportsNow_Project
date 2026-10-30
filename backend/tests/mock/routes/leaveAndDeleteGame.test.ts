@@ -1,45 +1,16 @@
 import request from 'supertest';
 
 import { createApp } from '../../../src/app';
-import { createAuthToken } from '../../../src/user/auth/jwt';
 import * as mysql from '../../../src/core/db/mysql';
 import { pool, type SqlValue } from '../../../src/core/db/mysql';
-import * as usersDb from '../../../src/user/db/users';
-import { type User } from '../../../src/user/db/users';
+import { cleanUpAfterTests, signIn, testOrganizer } from '../helpers';
 
-// the server reads its settings from the environment when it loads; with every
-// database call mocked it needs no real ones (jest.mock runs before the imports)
-jest.mock('../../../src/core/config/env', () => ({
-  env: {
-    port: 3000,
-    mysqlUrl: 'mysql://test:test@localhost:3306/test',
-    mysqlUser: 'test',
-    mysqlPassword: 'test',
-    mysqlDatabase: 'test',
-    jwtSecret: 'test-jwt-secret',
-  },
-}));
+// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
+jest.mock('../../../src/core/config/env', () => jest.requireActual('../mockEnv'));
 
 const GAME_ID = 42;
 
-const organizer: User = {
-  userId: 1,
-  googleId: 'google-organizer',
-  email: 'organizer@example.com',
-  firstName: 'Olivia',
-  lastName: 'Organizer',
-  birthYear: 1995,
-  // before the token is made, so requireAuth accepts it
-  createdAt: new Date('2026-01-01T00:00:00Z'),
-};
-
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface POST /api/games/{gameId}/leave
 describe('Mocked: POST /api/games/{gameId}/leave (last player)', () => {
@@ -54,9 +25,9 @@ describe('Mocked: POST /api/games/{gameId}/leave (last player)', () => {
   //   left the game is deleted
   // Expected output: { msg: "success" }
   test('Last player leaves and the game is deleted', async () => {
-    // 1. sign in: requireAuth looks the organizer up (not what this test checks)
-    jest.spyOn(usersDb, 'findUserById').mockResolvedValue(organizer);
-    const token = createAuthToken(organizer.userId);
+    // 1. sign in as the organizer (not what this test checks)
+    const organizer = testOrganizer();
+    const token = signIn(organizer);
 
     // 2. make a mock game: a cancelled game whose only player is the organizer, in an
     //    in-memory stand-in for the games and game_players tables
