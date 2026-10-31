@@ -152,6 +152,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onEdit = { navController.navigate(Routes.editGame(gameId)) },
             onDirections = { location -> openDirections(context, location) },
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
+            onOpenChat = { navController.navigate(Routes.gameChat(gameId)) },
             onGameAction = { action -> runAction(action) },
             onRemovePlayer = { player -> removeFromGame(player) },
             onRequestToJoin = { showJoinSheet = true },
