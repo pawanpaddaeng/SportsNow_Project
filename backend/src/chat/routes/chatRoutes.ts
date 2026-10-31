@@ -3,21 +3,8 @@ import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { readId } from '../../core/validation';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
-import { type ChatMessage, getChatAccess, getChatMessages } from '../db/chats';
-
-function chatMessageJson(message: ChatMessage) {
-  return {
-    message_id: message.messageId,
-    chat_id: message.chatId,
-    sender: {
-      user_id: message.senderId,
-      first_name: message.senderFirstName,
-      last_name: message.senderLastName,
-    },
-    text: message.text,
-    created_at: message.createdAt,
-  };
-}
+import { getChatAccess, getChatMessages } from '../db/chats';
+import { chatMessageJson } from './chatJson';
 
 // loading a chat's earlier messages. New messages are sent over the WebSocket
 export function chatsRouter(): Router {

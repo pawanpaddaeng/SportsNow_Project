@@ -26,6 +26,13 @@ interface ChatMessageRow {
   created_at_unix: number;
 }
 
+// messages with their sender's name, shared by every query that returns messages
+const SELECT_MESSAGES = `
+  SELECT m.message_id, m.chat_id, m.sender_id, u.first_name, u.last_name, m.text,
+         UNIX_TIMESTAMP(m.created_at) AS created_at_unix
+  FROM chat_messages m
+  JOIN users u ON u.user_id = m.sender_id`;
+
 // opens the chat of a new game, in the transaction creating the game. Returns chat_id
 export async function createGameChat(connection: Queryable, gameId: number): Promise<number> {
   const result = await executeWrite('INSERT INTO chats (game_id) VALUES (?)', [gameId], connection);
@@ -88,14 +95,34 @@ function toChatMessage(row: ChatMessageRow): ChatMessage {
  */
 export async function getChatMessages(chatId: number, before: number | null): Promise<ChatMessage[]> {
   const rows = await selectRows<ChatMessageRow>(
-    `SELECT m.message_id, m.chat_id, m.sender_id, u.first_name, u.last_name, m.text,
-            UNIX_TIMESTAMP(m.created_at) AS created_at_unix
-     FROM chat_messages m
-     JOIN users u ON u.user_id = m.sender_id
+    `${SELECT_MESSAGES}
      WHERE m.chat_id = ? ${before === null ? '' : 'AND m.message_id < ?'}
      ORDER BY m.message_id DESC
      LIMIT ${MESSAGES_PAGE_SIZE}`,
     before === null ? [chatId] : [chatId, before],
   );
   return rows.map(toChatMessage);
+}
+
+// saves a message and reads it back so everyone gets the stored id, sender name and time
+export async function createChatMessage(chatId: number, senderId: number, text: string): Promise<ChatMessage> {
+  const result = await executeWrite(
+    'INSERT INTO chat_messages (chat_id, sender_id, text) VALUES (?, ?, ?)',
+    [chatId, senderId, text],
+  );
+  const rows = await selectRows<ChatMessageRow>(`${SELECT_MESSAGES} WHERE m.message_id = ?`, [result.insertId]);
+  const row = rows[0];
+  if (!row) throw new Error(`Message ${result.insertId} not found after creating it`);
+  return toChatMessage(row);
+}
+
+// the users who can currently be in the chat: the players of its game
+export async function getChatPlayerIds(chatId: number): Promise<number[]> {
+  const rows = await selectRows<{ user_id: number }>(
+    `SELECT p.user_id FROM chats c
+     JOIN game_players p ON p.game_id = c.game_id
+     WHERE c.chat_id = ?`,
+    [chatId],
+  );
+  return rows.map((row) => row.user_id);
 }
