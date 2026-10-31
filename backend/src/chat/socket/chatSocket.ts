@@ -116,7 +116,7 @@ export function startChatSocket(port: number): ChatSocket {
       webSocket.send(JSON.stringify({
         type: 'error',
         msg: 'server_error',
-        error: 'Could not send the message, try again',
+        error: 'Could not send the message',
         client_id: parsed.value.clientId,
       }));
     });

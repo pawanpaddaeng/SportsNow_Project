@@ -62,7 +62,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         composable(Routes.DISCOVER) { DiscoverRoute(app, it, modifier) }
         composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
         composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
-        composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, modifier) }
+        composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, it, modifier) }
         composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }
         composable(Routes.EDIT_GAME, arguments = gameIdArgument) { EditGameRoute(app, it, modifier) }
         composable(Routes.PICK_LOCATION) { PickLocationRoute(app, modifier) }
