@@ -25,8 +25,8 @@ import java.io.IOException
 const val COULD_NOT_LOAD_GAME ="Couldn't load this game, try again"
 
 sealed interface GameChangeResult {
-    // the game as the server stored it
-    data class Done(val game: GameDto) : GameChangeResult
+    // the game as the server stored it, null when leaving deleted it (the user was the last player)
+    data class Done(val game: GameDto?) : GameChangeResult
     data class Failed(val message: String) : GameChangeResult
 }
 
@@ -49,7 +49,7 @@ private fun GameInfoForm.toRequest() = CreateGameRequest(
 private fun userError(msg: String?, error: String?): String? =
     error.takeIf { msg != null && msg != "server_error" }
 
-// sends a create, edit or cancel request and reads the reply
+// sends a create, edit, cancel, complete, leave or remove player request and reads the reply
 private suspend fun changeGame(
     context: Context,
     failureMessage: String,
@@ -61,7 +61,7 @@ private suspend fun changeGame(
         val reply = readReply(response, CreateGameResponse::class.java)
         val game = reply?.game
         when {
-            reply?.msg == "success" && game != null -> GameChangeResult.Done(game)
+            reply?.msg == "success" && (game != null || reply.gameDeleted == true) -> GameChangeResult.Done(game)
             else -> GameChangeResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
         }
     } catch (e: IOException) {
@@ -85,6 +85,26 @@ suspend fun updateGame(context: Context, gameId: Int, form: GameInfoForm): GameC
 suspend fun cancelGame(context: Context, gameId: Int): GameChangeResult =
     changeGame(context, "Could not cancel the game, try again") { authorization ->
         ServerApi.retrofitService.cancelGame(authorization = authorization, gameId = gameId)
+    }
+
+// the organizer marks their started game completed, the server notifies the game's players
+suspend fun completeGame(context: Context, gameId: Int): GameChangeResult =
+    changeGame(context, "Could not complete the game, try again") { authorization ->
+        ServerApi.retrofitService.completeGame(authorization = authorization, gameId = gameId)
+    }
+
+/*  takes the user out of the game: a player at any time, the organizer once it's
+    cancelled or completed. The server explains why it can't
+ */
+suspend fun leaveGame(context: Context, gameId: Int): GameChangeResult =
+    changeGame(context, "Could not leave the game, try again") { authorization ->
+        ServerApi.retrofitService.leaveGame(authorization = authorization, gameId = gameId)
+    }
+
+// the organizer removes a player before the game starts, the server notifies them
+suspend fun removePlayer(context: Context, gameId: Int, userId: Int): GameChangeResult =
+    changeGame(context, "Could not remove the player, try again") { authorization ->
+        ServerApi.retrofitService.removePlayer(authorization = authorization, gameId = gameId, userId = userId)
     }
 
 sealed interface GameDetailsResult {
@@ -121,12 +141,13 @@ sealed interface EditableGame {
     data class Unavailable(val message: String) : EditableGame
 }
 
-// only the organizer can edit a game, and not once it's cancelled
+// only the organizer can edit a game, and not once it's cancelled or completed
 suspend fun loadEditableGame(context: Context, gameId: Int): EditableGame =
     when (val result = fetchGameDetails(context, gameId)) {
         is GameDetailsResult.Loaded -> when {
             result.details.viewerRole != "organizer" -> EditableGame.Unavailable("Only the organizer can edit this game.")
             result.game.status == "cancelled" -> EditableGame.Unavailable("This game was cancelled.")
+            result.game.status == "completed" -> EditableGame.Unavailable("This game was completed.")
             // the form is null when the game's values can't fill it
             else -> runCatching { result.game.toGameInfoForm() }.getOrNull()
                 ?.let { EditableGame.Loaded(form = it, playerCount = result.game.playerCount) }

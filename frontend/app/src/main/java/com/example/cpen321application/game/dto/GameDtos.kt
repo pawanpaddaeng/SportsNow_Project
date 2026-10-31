@@ -23,7 +23,11 @@ data class GameDto(
     @SerializedName("player_count") val playerCount: Int,
     @field:Required @SerializedName("skill_level") val skillLevel: String,
     @field:Required val status: String,
-    @field:Required @SerializedName("created_at") val createdAt: String
+    // the server decides whether the game started, by its own clock
+    @SerializedName("has_started") val hasStarted: Boolean,
+    @field:Required @SerializedName("created_at") val createdAt: String,
+    // join requests waiting for the organizer, only sent with the user's organized games on Home
+    @SerializedName("pending_requests") val pendingRequests: Int? = null
 )
 
 /*  body for POST api/games. starts_at is a UTC ISO 8601 time, e.g. "2026-10-18T02:00:00Z".
@@ -79,7 +83,9 @@ data class GameDetailsResponse(
 data class CreateGameResponse(
     val msg: String?,
     val game: GameDto?,
-    val error: String?
+    val error: String?,
+    // only sent by leave: true when the user was the last player and the game was deleted
+    @SerializedName("game_deleted") val gameDeleted: Boolean? = null
 )
 
 /*  a game on the Discover screen: the game, how far it is from the user in metres

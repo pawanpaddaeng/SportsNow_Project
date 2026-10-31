@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
+import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.GameRole
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
@@ -20,21 +21,29 @@ import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.theme.*
 
+// the Game Details actions that wait for the server, each with its own button and what's shown once it's done
+enum class GameAction(val doneMessage: String) {
+    Cancel("Game cancelled"),
+    Complete("Game completed"),
+    Leave("You left the game")
+}
+
 /*  what the Game Details screen shows. details is null until the game loads; isLoading
-    shows a spinner and errorMessage a problem. isCancelling shows progress on the Cancel
-    Game button. selectedTab is highlighted in the bottom bar: Discover when the game was
-    opened from there, otherwise Home
+    shows a spinner and errorMessage a problem. busyAction shows progress on that
+    action's button, removingPlayerId on that player's Remove button. selectedTab is
+    highlighted in the bottom bar: Discover when the game was opened from there, otherwise Home
  */
 data class GameDetailsUiState(
     val details: GameDetails?,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val isCancelling: Boolean = false,
+    val busyAction: GameAction? = null,
+    val removingPlayerId: Int? = null,
     val selectedTab: BottomTab = BottomTab.Home
 )
 
-/*  onRetry is null when retrying won't help. onCancelGame is only called after the
-    organizer confirms
+/*  onRetry is null when retrying won't help. onGameAction (cancel, complete or leave)
+    and onRemovePlayer are only called after the user confirms
  */
 data class GameDetailsActions(
     val onBack: () -> Unit,
@@ -43,22 +52,27 @@ data class GameDetailsActions(
     val onDirections: (GameLocation) -> Unit = {},
     val onJoinRequests: () -> Unit = {},
     val onOpenChat: () -> Unit = {},
-    val onCancelGame: () -> Unit = {},
-    val onLeaveGame: () -> Unit = {},
+    val onGameAction: (GameAction) -> Unit = {},
+    val onRemovePlayer: (GamePlayer) -> Unit = {},
     val onRequestToJoin: () -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
 /*
     Game Details screen from the Figma mockups, one screen for the three versions:
-    the organizer sees Edit, pending join requests and Cancel Game, a joined player
-    sees "You're in" and Leave Game, anyone else sees the spots left and Request to Join
+    the organizer sees Edit, pending join requests, Remove next to each player until the
+    game starts, and Cancel Game (Mark as Completed once it started, Leave Game once it's
+    cancelled or completed), a joined player sees
+    "You're in" and Leave Game, anyone else sees the spots left and Request to Join
  */
 @Composable
 fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, modifier: Modifier = Modifier) {
     val details = state.details
     var showPlayers by remember { mutableStateOf(false) }
-    var confirmCancel by remember { mutableStateOf(false) }
+    // the action whose confirmation dialog is open
+    var confirmAction by remember { mutableStateOf<GameAction?>(null) }
+    // the player the organizer is asked to confirm removing
+    var confirmRemove by remember { mutableStateOf<GamePlayer?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -76,8 +90,9 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // a cancelled or started game can't be changed any more
-            val canEdit = details?.role == GameRole.Organizer && !details.isCancelled && !details.hasStarted
+            // a cancelled, completed or started game can't be changed any more
+            val canEdit = details?.role == GameRole.Organizer &&
+                !details.isCancelled && !details.isCompleted && !details.hasStarted
             BackTitleBar(title = "Game Details", onBack = actions.onBack) {
                 if (canEdit) {
                     TextButton(onClick = actions.onEdit) {
@@ -94,30 +109,50 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
                     state = state,
                     actions = actions,
                     onSeeAllPlayers = { showPlayers = true },
-                    onCancelGame = { confirmCancel = true }
+                    onGameAction = { action -> confirmAction = action }
                 )
             }
         }
     }
 
     if (showPlayers && details != null) {
-        PlayersDialog(details = details, onDismiss = { showPlayers = false })
+        PlayersDialog(
+            details = details,
+            removingPlayerId = state.removingPlayerId,
+            onRemove = { player -> confirmRemove = player },
+            onDismiss = { showPlayers = false }
+        )
     }
 
-    if (confirmCancel && details != null) {
-        ConfirmCancelDialog(
-            title = details.title,
+    val playerToRemove = confirmRemove
+    if (playerToRemove != null && details != null) {
+        ConfirmRemovePlayerDialog(
+            player = playerToRemove,
+            gameTitle = details.title,
             onConfirm = {
-                confirmCancel = false
-                actions.onCancelGame()
+                confirmRemove = null
+                actions.onRemovePlayer(playerToRemove)
             },
-            onDismiss = { confirmCancel = false }
+            onDismiss = { confirmRemove = null }
+        )
+    }
+
+    val pendingAction = confirmAction
+    if (pendingAction != null && details != null) {
+        ConfirmActionDialog(
+            action = pendingAction,
+            details = details,
+            onConfirm = {
+                confirmAction = null
+                actions.onGameAction(pendingAction)
+            },
+            onDismiss = { confirmAction = null }
         )
     }
 }
 
-/*  the loaded game's sections, from the hero to the action buttons. onCancelGame asks
-    the organizer to confirm first, onSeeAllPlayers opens the players dialog
+/*  the loaded game's sections, from the hero to the action buttons. onGameAction asks
+    the user to confirm the action first, onSeeAllPlayers opens the players dialog
  */
 @Composable
 private fun LoadedDetails(
@@ -125,7 +160,7 @@ private fun LoadedDetails(
     state: GameDetailsUiState,
     actions: GameDetailsActions,
     onSeeAllPlayers: () -> Unit,
-    onCancelGame: () -> Unit
+    onGameAction: (GameAction) -> Unit
 ) {
     // a refresh failed, the last loaded details stay visible
     if (state.errorMessage != null) {
@@ -140,7 +175,12 @@ private fun LoadedDetails(
     InfoCard(details)
     LocationCard(location = details.location, onDirections = { actions.onDirections(details.location) })
 
-    if (details.role == GameRole.Organizer && details.pendingRequests > 0 && !details.isCancelled) {
+    // only the organizer answers requests, and only while the game is still open
+    val isOrganizer = details.role == GameRole.Organizer
+    val hasPendingRequests = details.pendingRequests > 0
+    val isGameOpen = !details.isCancelled && !details.isCompleted
+    val showJoinRequestsBanner = isOrganizer && hasPendingRequests && isGameOpen
+    if (showJoinRequestsBanner) {
         JoinRequestsBanner(count = details.pendingRequests, onClick = actions.onJoinRequests)
     }
 
@@ -155,10 +195,9 @@ private fun LoadedDetails(
 
     ActionButtons(
         details = details,
-        isCancelling = state.isCancelling,
+        busyAction = state.busyAction,
         onOpenChat = actions.onOpenChat,
-        onCancelGame = onCancelGame,
-        onLeaveGame = actions.onLeaveGame,
+        onGameAction = onGameAction,
         onRequestToJoin = actions.onRequestToJoin
     )
 }

@@ -12,7 +12,24 @@ import java.time.Instant
 // the signed in user's relation to the game, decides which actions are shown
 enum class GameRole { Organizer, Player, Viewer }
 
-data class GamePlayer(val firstName: String, val lastName: String) {
+/*  where a game is at, shown as one tag by Home and Game Details. InProgress has started
+    but the organizer hasn't marked it completed yet
+ */
+enum class GameState { Upcoming, InProgress, Completed, Cancelled }
+
+/*  the game's state from its server status ("scheduled", "cancelled" or "completed") and
+    the server's has_started. The app doesn't compare times itself, so it always agrees
+    with what the server allows
+ */
+fun gameState(status: String, hasStarted: Boolean): GameState = when {
+    status == "cancelled" -> GameState.Cancelled
+    status == "completed" -> GameState.Completed
+    hasStarted -> GameState.InProgress
+    else -> GameState.Upcoming
+}
+
+// userId lets the organizer remove the player
+data class GamePlayer(val userId: Int, val firstName: String, val lastName: String) {
     val fullName get() = "$firstName $lastName".trim()
     val initial get() = firstName.take(1).uppercase()
 }
@@ -43,10 +60,13 @@ data class GameDetails(
     val maxPlayers: Int,
     val pendingRequests: Int,
     val joinRequestStatus: String?,
-    val isCancelled: Boolean,
-    val hasStarted: Boolean
+    val state: GameState
 ) {
     val spotsLeft get() = (maxPlayers - playerCount).coerceAtLeast(0)
+    val isCancelled get() = state == GameState.Cancelled
+    val isCompleted get() = state == GameState.Completed
+    // a cancelled game counts as not started, it can't be played any more
+    val hasStarted get() = state == GameState.InProgress || state == GameState.Completed
 }
 
 /*  the Input Game Info form. sport and skillLevel use the server's values
@@ -63,7 +83,7 @@ data class GameInfoForm(
     val description: String?
 ) : Serializable
 
-// a game card on Home, pendingRequests is only used for games the user organizes
+// a game card on Home, pendingRequests is only used for games the user organizes, every card shows its state
 data class GameSummary(
     val id: String,
     val sport: String,
@@ -72,7 +92,8 @@ data class GameSummary(
     val location: String,
     val playerCount: Int,
     val maxPlayers: Int,
-    val pendingRequests: Int = 0
+    val pendingRequests: Int = 0,
+    val state: GameState = GameState.Upcoming
 )
 
 fun GameDto.toLocation() = GameLocation(locationName, address, latitude, longitude)
@@ -90,18 +111,18 @@ fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
         },
         sport = game.sport.capitalized(),
         title = game.title,
-        organizer = organizer?.let { GamePlayer(it.firstName, it.lastName) } ?: GamePlayer("Unknown", ""),
+        organizer = organizer?.let { GamePlayer(it.userId, it.firstName, it.lastName) }
+            ?: GamePlayer(game.organizerId, "Unknown", ""),
         whenText = start?.let { formatGameTime(it, end) } ?: game.startsAt,
         skillLevel = game.skillLevel.capitalized(),
         location = game.toLocation(),
         description = game.description?.takeIf { it.isNotBlank() },
-        players = players.orEmpty().map { GamePlayer(it.firstName, it.lastName) },
+        players = players.orEmpty().map { GamePlayer(it.userId, it.firstName, it.lastName) },
         playerCount = game.playerCount,
         maxPlayers = game.maxPlayers,
         pendingRequests = pendingRequests ?: 0,
         joinRequestStatus = joinRequestStatus,
-        isCancelled = game.status == "cancelled",
-        hasStarted = start?.toInstant()?.isBefore(Instant.now()) ?: false
+        state = gameState(game.status, game.hasStarted)
     )
 }
 
@@ -122,5 +143,7 @@ fun GameDto.toGameSummary() = GameSummary(
     dateTime = formatDayTime(startsAt),
     location = locationName,
     playerCount = playerCount,
-    maxPlayers = maxPlayers
+    maxPlayers = maxPlayers,
+    pendingRequests = pendingRequests ?: 0,
+    state = gameState(status, hasStarted)
 )

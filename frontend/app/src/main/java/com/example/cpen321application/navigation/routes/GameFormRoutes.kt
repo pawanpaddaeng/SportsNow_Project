@@ -55,7 +55,7 @@ fun CreateGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: 
             when (result) {
                 is GameChangeResult.Done -> {
                     // show the new game right away, at the top of Organized Games
-                    app.homeState.organizedGames.add(0, result.game.toGameSummary())
+                    result.game?.let { app.homeState.organizedGames.add(0, it.toGameSummary()) }
                     Toast.makeText(context, "Game created", Toast.LENGTH_SHORT).show()
                     navController.popBackStack()
                 }

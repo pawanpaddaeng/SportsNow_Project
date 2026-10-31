@@ -21,6 +21,7 @@ import retrofit2.Retrofit
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.DELETE
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -78,6 +79,25 @@ interface NetworkConnection {
     suspend fun cancelGame(
         @Header("Authorization") authorization: String,
         @Path("gameId") gameId: Int
+    ) : Response<CreateGameResponse>
+
+    @POST("api/games/{gameId}/complete")
+    suspend fun completeGame(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int
+    ) : Response<CreateGameResponse>
+
+    @POST("api/games/{gameId}/leave")
+    suspend fun leaveGame(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int
+    ) : Response<CreateGameResponse>
+
+    @DELETE("api/games/{gameId}/players/{userId}")
+    suspend fun removePlayer(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int,
+        @Path("userId") userId: Int
     ) : Response<CreateGameResponse>
 
     @GET("api/games/{gameId}")

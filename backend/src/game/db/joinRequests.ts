@@ -1,5 +1,5 @@
 import { executeWrite, inTransaction, selectRows } from '../../core/db/mysql';
-import { type GameChangeProblem, lockGameForChange } from './games';
+import { type GameChangeProblem, lockGame, lockGameForChange, PENDING_REQUESTS_COUNT } from './games';
 
 export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 
@@ -28,16 +28,6 @@ export type CreateJoinRequestResult =
   | { ok: true; requestId: number; organizerId: number; title: string }
   | { ok: false; problem: JoinRequestProblem };
 
-interface JoinableGameRow {
-  organizer_id: number;
-  title: string;
-  status: 'scheduled' | 'cancelled';
-  has_started: number;
-  max_players: number;
-  player_count: number;
-  is_player: number;
-}
-
 interface ExistingRequestRow {
   request_id: number;
   status: JoinRequestStatus;
@@ -54,22 +44,14 @@ export async function createJoinRequest(
   request: NewJoinRequest,
 ): Promise<CreateJoinRequestResult> {
   return inTransaction(async (connection) => {
-    const games = await selectRows<JoinableGameRow>(
-      `SELECT g.organizer_id, g.title, g.status, g.max_players,
-              g.starts_at <= UTC_TIMESTAMP() AS has_started,
-              (SELECT COUNT(*) FROM game_players p WHERE p.game_id = g.game_id) AS player_count,
-              EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = g.game_id AND p.user_id = ?) AS is_player
-       FROM games g WHERE g.game_id = ? FOR UPDATE`,
-      [userId, gameId],
-      connection,
-    );
-    const game = games[0];
+    const game = await lockGame(connection, gameId, userId);
     if (!game) return { ok: false, problem: 'not_found' };
-    if (game.organizer_id === userId) return { ok: false, problem: 'own_game' };
+    if (game.organizerId === userId) return { ok: false, problem: 'own_game' };
     if (game.status === 'cancelled') return { ok: false, problem: 'cancelled' };
-    if (Number(game.has_started) === 1) return { ok: false, problem: 'started' };
-    if (Number(game.is_player) === 1) return { ok: false, problem: 'already_player' };
-    if (Number(game.player_count) >= game.max_players) return { ok: false, problem: 'game_full' };
+    // a completed game has started too
+    if (game.hasStarted) return { ok: false, problem: 'started' };
+    if (game.isPlayer) return { ok: false, problem: 'already_player' };
+    if (game.playerCount >= game.maxPlayers) return { ok: false, problem: 'game_full' };
 
     const existing = await selectRows<ExistingRequestRow>(
       'SELECT request_id, status FROM join_requests WHERE game_id = ? AND user_id = ? FOR UPDATE',
@@ -100,7 +82,7 @@ export async function createJoinRequest(
       requestId = result.insertId;
     }
 
-    return { ok: true, requestId, organizerId: game.organizer_id, title: game.title };
+    return { ok: true, requestId, organizerId: game.organizerId, title: game.title };
   });
 }
 
@@ -160,7 +142,7 @@ interface CountRow {
 // join requests still waiting for the organizer, for the badge on Game Details
 export async function countPendingJoinRequests(gameId: number): Promise<number> {
   const rows = await selectRows<CountRow>(
-    "SELECT COUNT(*) AS count FROM join_requests WHERE game_id = ? AND status = 'pending'",
+    `SELECT ${PENDING_REQUESTS_COUNT} AS count FROM games g WHERE g.game_id = ?`,
     [gameId],
   );
   return Number(rows[0]?.count ?? 0);
@@ -217,7 +199,7 @@ export async function decideJoinRequest(
     if (request.status !== 'pending') return { ok: false, problem: 'already_responded' };
 
     if (approve) {
-      if (Number(locked.game.player_count) >= locked.game.max_players) {
+      if (locked.game.playerCount >= locked.game.maxPlayers) {
         return { ok: false, problem: 'game_full' };
       }
       // IGNORE: if they somehow joined already, approving just closes the request

@@ -1,4 +1,4 @@
-import type { DiscoverGame, Game, GamePlayer } from '../db/games';
+import type { DiscoverGame, Game, GamePlayer, OrganizedGame } from '../db/games';
 import type { PendingJoinRequest } from '../db/joinRequests';
 
 /*  JSON shapes of games and join requests sent to the app. Every endpoint that
@@ -22,8 +22,14 @@ export function gameJson(game: Game) {
     player_count: game.playerCount,
     skill_level: game.skillLevel,
     status: game.status,
+    has_started: game.hasStarted,
     created_at: game.createdAt,
   };
+}
+
+// an organized game on Home: the game with its pending_requests count
+export function organizedGameJson(entry: OrganizedGame) {
+  return { ...gameJson(entry.game), pending_requests: entry.pendingRequests };
 }
 
 export function gamePlayerJson(player: GamePlayer) {
