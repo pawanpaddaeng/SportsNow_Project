@@ -4,7 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+| Oct 31, 2026 | 4.1, 4.2, 4.4 | Game chat is built. Section 4.1 now lists the Message component's real interfaces, and a chat closes through the game's status instead of a separate `closeGameChat` call. Section 4.2 stores chat messages in MySQL instead of MongoDB, because the 1 GB server doesn't have the memory to run a second database. Section 4.4 removes the MongoDB driver and marks `ws` as in use. |
 
 ---
 
@@ -274,7 +274,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Returns the games the user organises and the games they have joined.
         3. `GET /api/games/discover?lat=&lng=` → `200 { games }` or `200 { msg: "no_games" }`
             - **Purpose**: Returns the nearby games the user can join, closest first.
-        4. `GET /api/games/{gameId}` → `200 { game, organizer, players, viewer_role }`
+        4. `GET /api/games/{gameId}` → `200 { game, organizer, players, viewer_role, chat_id }`
             - **Purpose**: Returns a game's details, its players, and what the signed in user can do with it.
         5. `PUT /api/games/{gameId}` body same as create → `200 { game }`
             - **Purpose**: Lets the organiser edit the details of their game.
@@ -313,15 +313,13 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 4. **Message**
     - **Purpose**: Handles chat messages for both game chat and friend chat.
     - **Rationale**: Game chat and friend chat send and store messages the same way, so one component handles both. We chose a WebSocket connection over polling so messages arrive live and the app doesn't use battery asking for new ones.
-    - **Interfaces**: *(planned)*
-        1. `GET /api/chats/{chatId}/messages?before=` → `200 { messages }`
-            - **Purpose**: Returns the earlier messages of a game or friend chat, newest first.
-        2. WebSocket `send_message { chat_id, text }` → `new_message { message }`
-            - **Purpose**: Sends a message and delivers it live to everyone in the chat.
-        3. `String createGameChat(int gameId)`
-            - **Purpose**: Used by Game to open a temporary chat room for a new game, returning its chat id.
-        4. `void closeGameChat(int gameId)`
-            - **Purpose**: Used by Game to close a game's chat room after the game ends.
+    - **Interfaces**: Game chat is built. Friend chat is *(planned)* and will use the same interfaces.
+        1. `GET /api/chats/{chatId}/messages?before=` → `200 { messages, is_closed }`
+            - **Purpose**: Returns 50 of the chat's earlier messages, newest first, to a current player of the game. `before` is the oldest message id the app already has. `is_closed` is true once the game is completed or cancelled.
+        2. WebSocket `send_message { chat_id, text, client_id }` → `new_message { message, client_id }`, or `error { msg, error, client_id }`
+            - **Purpose**: Sends a message and delivers it live to everyone in the chat. The connection needs `?chat_id=` and the user's JWT, and only opens for a current player of the game. Sending fails with `chat_closed` once the game is completed or cancelled, so the chat can still be read but not written to. `client_id` lets the app match a reply to the message it sent.
+        3. `int createGameChat(Queryable connection, int gameId)`
+            - **Purpose**: Used by Game to open the chat room for a new game in the same transaction that creates the game, returning its chat id.
 
 5. **Social**
     - **Purpose**: Handles friend search, friend requests, removing friends, and viewing friends' profiles.
@@ -345,11 +343,8 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 
 ### **4.2. Databases**
 1. **Relational Database (MySQL)**
-    - **Purpose**: Stores users, games, players, join requests, device tokens, friendships, and ratings.
-    - **Rationale**: This data has clear links between tables and needs transactions, such as locking a game while a join request is approved. We chose MySQL over a document database for these joins and transactions.
-2. **Chat Database (MongoDB)**
-    - **Purpose**: Stores chat messages for the Message component.
-    - **Rationale**: Chat messages are many small records read by chat in time order and don't need joins. We chose MongoDB over storing them in MySQL so the large message volume doesn't slow down the game queries.
+    - **Purpose**: Stores users, games, players, join requests, device tokens, chats and their messages, friendships, and ratings.
+    - **Rationale**: This data has clear links between tables and needs transactions, such as locking a game while a join request is approved. We chose MySQL over a document database for these joins and transactions. Chat messages are stored here too, instead of in a second database, because the 1 GB server doesn't have the memory to run both, and checking who can read a chat already needs the game and player tables.
 
 
 
@@ -388,16 +383,13 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 6. **firebase-admin**
     - **Purpose**: Sends push notifications to users' phones through Firebase Cloud Messaging.
     - **Reason**: It is the official way for a server to send Firebase notifications and reports tokens that no longer work.
-7. **ws** *(planned)*
+7. **ws**
     - **Purpose**: Keeps a WebSocket connection open while a chat screen is shown so messages arrive live.
     - **Reason**: It is a small WebSocket library that works with the Express server.
-8. **MongoDB Node.js Driver** *(planned)*
-    - **Purpose**: Stores and reads chat messages in the Chat Database.
-    - **Reason**: It is MongoDB's official driver and is enough for the simple message queries chat needs.
-9. **dotenv**
+8. **dotenv**
     - **Purpose**: Loads settings such as the database password and Google client id from a `.env` file.
     - **Reason**: It keeps secrets out of the code.
-10. **Jest and Supertest**
+9. **Jest and Supertest**
     - **Purpose**: Run the back-end tests and send test HTTP requests to the server.
     - **Reason**: Jest is the most used Node.js test framework, and Supertest calls the Express app without starting a real server.
 
@@ -409,7 +401,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
     - **Purpose**: Moves between the app's screens.
     - **Reason**: It is the standard navigation library for Compose apps.
 3. **Retrofit with Gson and OkHttp**
-    - **Purpose**: Makes the HTTP requests to the back-end and turns the JSON replies into Kotlin objects.
+    - **Purpose**: Makes the HTTP requests to the back-end and turns the JSON replies into Kotlin objects. OkHttp also keeps the chat's WebSocket connection open.
     - **Reason**: Retrofit turns each endpoint into one Kotlin function, which keeps the network code short.
 4. **Credential Manager with Google ID**
     - **Purpose**: Shows the Google sign in prompt and gets the Google ID token.
