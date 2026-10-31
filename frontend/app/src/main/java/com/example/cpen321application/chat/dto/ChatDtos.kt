@@ -37,6 +37,7 @@ data class SendMessageRequest(
 data class ChatSocketEvent(
     @field:Required val type: String,
     val message: ChatMessageDto?,
+    val msg: String?,
     val error: String?,
     @SerializedName("client_id") val clientId: String?
 )

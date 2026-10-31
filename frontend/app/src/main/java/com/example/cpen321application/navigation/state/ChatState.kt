@@ -46,6 +46,9 @@ class ChatState(private val context: Context, private val gameId: Int, private v
     // retrying won't help: the game is gone or the user isn't in it
     var isUnavailable by mutableStateOf(false)
         private set
+    // the game was completed or cancelled: the messages can be read but no new ones sent
+    var isClosed by mutableStateOf(false)
+        private set
 
     private var chatId: Int? = null
     private var connection: ChatConnection? = null
@@ -88,7 +91,9 @@ class ChatState(private val context: Context, private val gameId: Int, private v
                 merge(result.messages.map { it.toChatMessage(myUserId()) })
                 error = null
                 isLoading = false
-                connect(id)
+                isClosed = result.isClosed
+                // nothing new can arrive in a closed chat, so it doesn't need a connection
+                if (!isClosed) connect(id)
             }
             is ChatMessagesResult.Unavailable -> becomeUnavailable(result.message)
             is ChatMessagesResult.Failed -> {
@@ -150,7 +155,18 @@ class ChatState(private val context: Context, private val gameId: Int, private v
             merge(listOf(message.toChatMessage(myUserId())))
         } else if (event.type == "error") {
             markFailed(event.clientId, event.error ?: NOT_SENT_MESSAGE)
+            if (event.msg == "chat_closed") closeChat()
         }
+    }
+
+    // the server says the game ended while the chat was open
+    private fun closeChat() {
+        isClosed = true
+        connectionNumber++
+        connection?.close()
+        connection = null
+        isConnected = false
+        failSendingMessages()
     }
 
     private fun handleDisconnect(canRetry: Boolean) {

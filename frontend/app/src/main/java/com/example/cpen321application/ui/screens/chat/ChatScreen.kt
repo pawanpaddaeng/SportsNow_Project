@@ -40,8 +40,8 @@ import com.example.cpen321application.ui.theme.*
 private const val LOAD_OLDER_MARGIN = 5
 
 /*  what the Chat screen shows, messages are newest first like the server sends them.
-    isConnected false shows that new messages aren't arriving, canWrite false hides the
-    box to write in
+    isConnected false shows that new messages aren't arriving, isClosed that the game ended
+    so the chat is read only. canWrite false hides the box to write in
  */
 data class ChatUiState(
     val title: String,
@@ -49,6 +49,7 @@ data class ChatUiState(
     val isLoading: Boolean = false,
     val isConnected: Boolean = false,
     val errorMessage: String? = null,
+    val isClosed: Boolean = false,
     val canWrite: Boolean = true
 )
 
@@ -92,10 +93,11 @@ fun ChatScreen(state: ChatUiState, actions: ChatActions, modifier: Modifier = Mo
                 .fillMaxWidth()
         ) {
             items(state.messages, key = { it.key }) { message ->
-                MessageRow(message, onRetrySend = { actions.onRetrySend(message) })
+                MessageRow(message, canRetry = state.canWrite, onRetrySend = { actions.onRetrySend(message) })
             }
         }
         if (state.canWrite) MessageInput(onSend = actions.onSend)
+        if (state.isClosed) ClosedNote()
     }
 }
 
@@ -121,10 +123,27 @@ private fun LoadOlderNearTheTop(listState: LazyListState, onLoadOlder: () -> Uni
     }
 }
 
+// shown instead of the box to write in once the game has ended
+@Composable
+private fun ClosedNote() {
+    Text(
+        text = "This game has ended, so the chat is read only.",
+        color = SportsOnSurfaceVariant,
+        fontSize = 12.sp,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SportsSurfaceContainer)
+            .padding(16.dp)
+    )
+}
+
 // loading bar, the problem that stopped the chat, or that it's reconnecting
 @Composable
 private fun ChatStatus(state: ChatUiState, onRetry: (() -> Unit)?) {
     when {
+        // a closed chat has no connection to wait for
+        state.isClosed && state.errorMessage == null -> Unit
         state.errorMessage != null ->
             RetryMessage(message = state.errorMessage, onRetry = onRetry, modifier = Modifier.padding(16.dp))
         state.isLoading && state.messages.isEmpty() -> LinearProgressIndicator(
@@ -144,7 +163,7 @@ private fun ChatStatus(state: ChatUiState, onRetry: (() -> Unit)?) {
 
 // someone else's message on the left with their initial and name, the user's own on the right
 @Composable
-private fun MessageRow(message: ChatMessage, onRetrySend: () -> Unit) {
+private fun MessageRow(message: ChatMessage, canRetry: Boolean, onRetrySend: () -> Unit) {
     Row(
         horizontalArrangement = if (message.isMine) Arrangement.End else Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
@@ -154,11 +173,11 @@ private fun MessageRow(message: ChatMessage, onRetrySend: () -> Unit) {
             MessageBubble(message)
             if (message.failureMessage != null) {
                 Text(
-                    text = "${message.failureMessage}. Tap to try again.",
+                    text = if (canRetry) "${message.failureMessage}. Tap to try again." else "${message.failureMessage}.",
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 12.sp,
                     modifier = Modifier
-                        .clickable(onClick = onRetrySend)
+                        .clickable(enabled = canRetry, onClick = onRetrySend)
                         .padding(top = 4.dp)
                 )
             }
