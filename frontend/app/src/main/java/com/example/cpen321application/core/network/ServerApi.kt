@@ -1,6 +1,12 @@
 package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
+import com.example.cpen321application.friend.dto.FriendChangeResponse
+import com.example.cpen321application.friend.dto.FriendDecisionBody
+import com.example.cpen321application.friend.dto.FriendRequestsResponse
+import com.example.cpen321application.friend.dto.FriendsResponse
+import com.example.cpen321application.friend.dto.SendFriendRequestBody
+import com.example.cpen321application.friend.dto.UserSearchResponse
 import com.example.cpen321application.game.dto.CreateGameRequest
 import com.example.cpen321application.game.dto.CreateGameResponse
 import com.example.cpen321application.game.dto.DiscoverGamesResponse
@@ -135,6 +141,33 @@ interface NetworkConnection {
         @Path("requestId") requestId: Int,
         @Body request: JoinRequestDecisionBody
     ) : Response<JoinRequestDecisionResponse>
+
+    // users whose name matches or is similar to q, best match first
+    @GET("api/users/search")
+    suspend fun searchUsers(
+        @Header("Authorization") authorization: String,
+        @Query("q") query: String
+    ) : Response<UserSearchResponse>
+
+    @GET("api/friends")
+    suspend fun getFriends(@Header("Authorization") authorization: String) : Response<FriendsResponse>
+
+    // requests sent to the signed in user that are waiting for an answer, newest first
+    @GET("api/friends/requests")
+    suspend fun getFriendRequests(@Header("Authorization") authorization: String) : Response<FriendRequestsResponse>
+
+    @POST("api/friends/requests")
+    suspend fun sendFriendRequest(
+        @Header("Authorization") authorization: String,
+        @Body request: SendFriendRequestBody
+    ) : Response<FriendChangeResponse>
+
+    @PATCH("api/friends/requests/{requestId}")
+    suspend fun decideFriendRequest(
+        @Header("Authorization") authorization: String,
+        @Path("requestId") requestId: Int,
+        @Body request: FriendDecisionBody
+    ) : Response<FriendChangeResponse>
 }
 
 object ServerApi {

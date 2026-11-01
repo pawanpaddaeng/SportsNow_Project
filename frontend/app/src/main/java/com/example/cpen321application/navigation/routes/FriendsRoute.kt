@@ -1,25 +1,38 @@
 package com.example.cpen321application.navigation.routes
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.ui.screens.friends.FriendsActions
 import com.example.cpen321application.ui.screens.friends.FriendsScreen
 import com.example.cpen321application.ui.screens.friends.FriendsUiState
 
-// the Friends tab, its lists stay empty until the screen is connected to the server
+// the Friends tab, reloads whenever the screen is shown
 @Composable
-fun FriendsRoute(app: AppState, modifier: Modifier) {
-    var query by remember { mutableStateOf("") }
+fun FriendsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Modifier) {
+    val friends = app.friendsState
+    val searching = friends.query.isNotBlank()
+
+    OnResume(backStackEntry) { friends.refresh() }
 
     FriendsScreen(
-        state = FriendsUiState(query = query),
+        state = FriendsUiState(
+            query = friends.query,
+            friends = friends.friends,
+            requests = friends.requests,
+            searchResults = friends.searchResults,
+            isLoading = if (searching) friends.isSearching else friends.isLoading,
+            errorMessage = if (searching) friends.searchError else friends.error,
+            busyRequestIds = friends.busyRequestIds,
+            busyUserIds = friends.busyUserIds
+        ),
         actions = FriendsActions(
-            onQueryChange = { query = it },
+            onQueryChange = { friends.updateQuery(it) },
+            onRetry = { if (searching) friends.retrySearch() else friends.refresh() },
+            onAddFriend = { friends.addFriend(it) },
+            onAccept = { friends.answer(it, accept = true) },
+            onDecline = { friends.answer(it, accept = false) },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
         modifier = modifier

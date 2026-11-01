@@ -30,6 +30,7 @@ class AppState(
     val homeState = HomeState(context, scope)
     val discoverState = DiscoverState(context, scope)
     val profileState = ProfileState(context, scope)
+    val friendsState = FriendsState(context, scope)
 
     // a saved token from a previous session signs in automatically, an expired one is renewed later
     fun startDestination(): String {
@@ -67,6 +68,7 @@ class AppState(
         homeState.clear()
         discoverState.clear()
         profileState.clear()
+        friendsState.clear()
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }

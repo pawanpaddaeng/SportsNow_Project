@@ -56,6 +56,7 @@ class PushNotificationService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         // let open screens about this game reload, e.g. Join Requests on a new request
         GameEvents.publish(message.data)
+        FriendEvents.publish(message.data)
 
         val title = message.notification?.title ?: message.data["title"] ?: return
         val body = message.notification?.body ?: message.data["body"] ?: ""

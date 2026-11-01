@@ -8,6 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.cpen321application.core.notifications.FriendEvents
 import com.example.cpen321application.core.notifications.GameEvents
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.navigation.routes.CreateGameRoute
@@ -45,6 +46,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
     }
 
+    // a friend request arrived or was answered while the app is open
+    LaunchedEffect(Unit) {
+        FriendEvents.events.collect { app.friendsState.refresh() }
+    }
+
     // signed in from a previous session: register notifications once at start
     LaunchedEffect(Unit) {
         if (startDestination == Routes.HOME) {
@@ -60,7 +66,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         composable(Routes.SIGN_UP) { SignUpRoute(app, modifier) }
         composable(Routes.HOME) { HomeRoute(app, it, modifier) }
         composable(Routes.DISCOVER) { DiscoverRoute(app, it, modifier) }
-        composable(Routes.FRIENDS) { FriendsRoute(app, modifier) }
+        composable(Routes.FRIENDS) { FriendsRoute(app, it, modifier) }
         composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
         composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
         composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }
