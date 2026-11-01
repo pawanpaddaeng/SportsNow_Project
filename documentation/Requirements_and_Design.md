@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| 2026-11-01 | 4.1 Main Components (Social) | Search results now include `friendship_status`, so the Friends tab shows Request Sent instead of Add once a request is sent. |
 | 2026-11-01 | 4.1 Main Components (Social) | Built friend search, friend requests and the friends list for the new Friends tab. Added `GET /api/friends/requests` so the tab can list incoming requests, and search now also returns similar names so partial names and typos still find people. |
 
 ---
@@ -328,7 +329,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
     - **Rationale**: Friendships are used by friend chat, game invites and friend profiles, so one component owns them. We chose to keep it apart from User so the User component only handles accounts and profiles.
     - **Interfaces**: Search, friend requests and the friends list are built. Removing friends, friend profiles and `areFriends` are *(planned)*.
         1. `GET /api/users/search?q=` → `200 { users }`
-            - **Purpose**: Searches for users by name as the user types, returning at most 20 with the best match first. Names that start with or contain `q` come first, then similar names, so partial names and typos still find people.
+            - **Purpose**: Searches for users by name as the user types, returning at most 20 with the best match first. Names that start with or contain `q` come first, then similar names, so partial names and typos still find people. Each user has a `friendship_status` of `none`, `friends`, `request_sent` or `request_received`, so the app can show Add or where the request stands.
         2. `POST /api/friends/requests` body `{ user_id }` → `201 { request }`
             - **Purpose**: Sends a friend request and notifies the other user. Blocked for yourself, a user who doesn't exist, someone who is already a friend, and when either user already has a pending request to the other.
         3. `GET /api/friends/requests` → `200 { requests }`
