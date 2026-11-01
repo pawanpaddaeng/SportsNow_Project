@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
 import { handleRouteErrors } from './core/http/asyncRoute';
+import { friendsRouter } from './friend/routes/friendRoutes';
 import { gamesRouter } from './game/routes/gameRoutes';
 import { joinRequestsRouter } from './game/routes/joinRequestRoutes';
 import { authRouter } from './user/routes/authRoutes';
@@ -12,6 +13,7 @@ export function createApp(): Express {
   app.use(authRouter());
   app.use(gamesRouter());
   app.use(joinRequestsRouter());
+  app.use(friendsRouter());
   app.use(usersRouter());
 
   //simple api to test connection health
