@@ -17,6 +17,7 @@ private const val DIRECT_SOCKET_PORT = 8080
 // the server closes the connection with this code when the user is no longer in the game
 private const val CLOSE_NOT_A_PLAYER = 4403
 private const val CLOSE_NORMAL = 1000
+private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 
@@ -32,12 +33,16 @@ private fun chatSocketUrl(chatId: Int): String {
     }
 }
 
+/*  why a connection ended: Lost can reconnect, NotAllowed won't help reconnecting (the user
+    isn't in the game or the chat is gone), and Unauthorized means the server rejected the JWT
+ */
+enum class ChatDisconnect { Lost, NotAllowed, Unauthorized }
+
 // what the connection reports. These run on OkHttp's thread, not the main thread
 interface ChatConnectionListener {
     fun onOpen()
     fun onEvent(event: ChatSocketEvent)
-    // canRetry is false when reconnecting won't help: the user isn't in the game or the chat is gone
-    fun onDisconnected(canRetry: Boolean)
+    fun onDisconnected(reason: ChatDisconnect)
 }
 
 // a WebSocket to one chat, opened when created. Only stays open while the chat screen is shown
@@ -64,12 +69,17 @@ class ChatConnection(private val chatId: Int, jwt: String, private val listener:
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                listener.onDisconnected(canRetry = code != CLOSE_NOT_A_PLAYER)
+                listener.onDisconnected(if (code == CLOSE_NOT_A_PLAYER) ChatDisconnect.NotAllowed else ChatDisconnect.Lost)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                val code = response?.code
-                listener.onDisconnected(canRetry = code != HTTP_FORBIDDEN && code != HTTP_NOT_FOUND)
+                listener.onDisconnected(
+                    when (response?.code) {
+                        HTTP_UNAUTHORIZED -> ChatDisconnect.Unauthorized
+                        HTTP_FORBIDDEN, HTTP_NOT_FOUND -> ChatDisconnect.NotAllowed
+                        else -> ChatDisconnect.Lost
+                    }
+                )
             }
         }
     )

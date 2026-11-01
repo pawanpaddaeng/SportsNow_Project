@@ -1,4 +1,4 @@
-import type { ParseResult } from '../../core/validation';
+import { type ParseResult, readId } from '../../core/validation';
 
 // longest message, matching chat_messages.text
 export const MAX_MESSAGE_LENGTH = 1000;
@@ -25,13 +25,14 @@ export function parseSendMessage(raw: string): ParseResult<SendMessage> {
 
   const { type, chat_id: chatId, text, client_id: clientId } = input as Record<string, unknown>;
   if (type !== 'send_message') return { ok: false, error: 'type must be send_message' };
-  if (typeof chatId !== 'number') return { ok: false, error: 'chat_id must be a number' };
+  const id = typeof chatId === 'number' ? readId(String(chatId)) : null;
+  if (id === null) return { ok: false, error: 'chat_id must be a positive whole number' };
   if (typeof text !== 'string' || text.trim() === '') return { ok: false, error: 'text must not be empty' };
   if (text.trim().length > MAX_MESSAGE_LENGTH) {
     return { ok: false, error: `text must be at most ${MAX_MESSAGE_LENGTH} characters` };
   }
   return {
     ok: true,
-    value: { chatId, text: text.trim(), clientId: typeof clientId === 'string' ? clientId : null },
+    value: { chatId: id, text: text.trim(), clientId: typeof clientId === 'string' ? clientId : null },
   };
 }

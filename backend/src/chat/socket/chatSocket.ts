@@ -37,6 +37,22 @@ function readBearerToken(req: IncomingMessage): string | null {
   return header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() || null : null;
 }
 
+// a request's text, whichever way ws hands over its bytes
+function requestText(raw: RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8');
+  return Buffer.isBuffer(raw) ? raw.toString('utf8') : Buffer.from(raw).toString('utf8');
+}
+
+// sends to one connection, it may have closed already so a failure is only logged
+function sendJson(webSocket: WebSocket, reply: object): void {
+  if (webSocket.readyState !== WebSocket.OPEN) return;
+  try {
+    webSocket.send(JSON.stringify(reply));
+  } catch (error) {
+    logError('Sending over a chat connection failed:', error);
+  }
+}
+
 /*  decides who is connecting and to which chat: ?chat_id= and the JWT in the Authorization
     header. Returns the new client, or the status to reject with. A closed chat can still
     be opened, sending to it is what fails
@@ -69,36 +85,53 @@ export function startChatSocket(port: number): ChatSocket {
   const webSockets = new WebSocketServer({ noServer: true, maxPayload: MAX_REQUEST_BYTES });
   const clients = new Map<WebSocket, ChatClient>();
 
-  // sends to the chat's connections, closing those of users no longer in the game
-  async function broadcast(chatId: number, reply: object): Promise<void> {
-    const playerIds = new Set(await getChatPlayerIds(chatId));
+  /*  sends to the chat's connections, closing those of users no longer in the game. The
+      message is already saved by now, so if the players can't be read only the sender is
+      told: it's sent, and the others get it when their chat next loads
+   */
+  async function broadcast(chatId: number, sender: WebSocket, reply: object): Promise<void> {
+    let playerIds: Set<number>;
+    try {
+      playerIds = new Set(await getChatPlayerIds(chatId));
+    } catch (error) {
+      logError(`Reading the players of chat ${chatId} failed:`, error);
+      sendJson(sender, reply);
+      return;
+    }
     for (const [webSocket, client] of clients) {
       if (client.chatId !== chatId) continue;
-      if (!playerIds.has(client.userId)) {
-        webSocket.close(CLOSE_NOT_A_PLAYER, 'Not a player of this game');
-      } else if (webSocket.readyState === WebSocket.OPEN) {
-        webSocket.send(JSON.stringify(reply));
-      }
+      if (playerIds.has(client.userId)) sendJson(webSocket, reply);
+      else webSocket.close(CLOSE_NOT_A_PLAYER, 'Not a player of this game');
     }
   }
 
   // checks again on every message, the user may have left or the game may have ended since connecting
   async function sendToChat(webSocket: WebSocket, client: ChatClient, message: SendMessage): Promise<void> {
     const sendError = (msg: string, error: string): void => {
-      webSocket.send(JSON.stringify({ type: 'error', msg, error, client_id: message.clientId }));
+      sendJson(webSocket, { type: 'error', msg, error, client_id: message.clientId });
     };
-    if (message.chatId !== client.chatId) return sendError('forbidden', 'This connection is for a different chat');
+    if (message.chatId !== client.chatId) {
+      sendError('forbidden', 'This connection is for a different chat');
+      return;
+    }
 
     const access = await getChatAccess(client.chatId, client.userId);
-    if (!access) return sendError('chat_not_found', 'This chat does not exist');
+    if (!access) {
+      sendError('chat_not_found', 'This chat does not exist');
+      return;
+    }
     if (!access.isPlayer) {
       sendError('forbidden', 'Only players of this game can use its chat');
-      return webSocket.close(CLOSE_NOT_A_PLAYER, 'Not a player of this game');
+      webSocket.close(CLOSE_NOT_A_PLAYER, 'Not a player of this game');
+      return;
     }
-    if (access.isClosed) return sendError('chat_closed', 'This chat is closed because the game ended');
+    if (access.isClosed) {
+      sendError('chat_closed', 'This chat is closed because the game ended');
+      return;
+    }
 
     const saved = await createChatMessage(client.chatId, client.userId, message.text);
-    await broadcast(client.chatId, {
+    await broadcast(client.chatId, webSocket, {
       type: 'new_message',
       message: chatMessageJson(saved),
       client_id: message.clientId,
@@ -106,19 +139,19 @@ export function startChatSocket(port: number): ChatSocket {
   }
 
   function handleRequest(webSocket: WebSocket, client: ChatClient, raw: RawData): void {
-    const parsed = parseSendMessage(raw.toString());
+    const parsed = parseSendMessage(requestText(raw));
     if (!parsed.ok) {
-      webSocket.send(JSON.stringify({ type: 'error', msg: 'invalid_request', error: parsed.error, client_id: null }));
+      sendJson(webSocket, { type: 'error', msg: 'invalid_request', error: parsed.error, client_id: null });
       return;
     }
     sendToChat(webSocket, client, parsed.value).catch((error: unknown) => {
       logError(`Sending to chat ${client.chatId} failed:`, error);
-      webSocket.send(JSON.stringify({
+      sendJson(webSocket, {
         type: 'error',
         msg: 'server_error',
         error: 'Could not send the message',
         client_id: parsed.value.clientId,
-      }));
+      });
     });
   }
 

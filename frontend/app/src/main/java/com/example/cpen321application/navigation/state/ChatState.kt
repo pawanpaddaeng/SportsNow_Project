@@ -11,7 +11,9 @@ import com.example.cpen321application.chat.repository.ChatMessagesResult
 import com.example.cpen321application.chat.repository.fetchChatMessages
 import com.example.cpen321application.chat.socket.ChatConnection
 import com.example.cpen321application.chat.socket.ChatConnectionListener
+import com.example.cpen321application.chat.socket.ChatDisconnect
 import com.example.cpen321application.core.session.AuthTokenStore
+import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.core.session.jwtToken
 import com.example.cpen321application.game.repository.GameDetailsResult
 import com.example.cpen321application.game.repository.fetchGameDetails
@@ -57,6 +59,7 @@ class ChatState(private val context: Context, private val gameId: Int, private v
     private var openJob: Job? = null
     private var olderJob: Job? = null
     private var hasOlderMessages = true
+    private var wasRejectedJwt = false
 
     private fun myUserId(): Int? = currentJwt()?.let { AuthTokenStore.userIdOf(it) }
 
@@ -142,9 +145,12 @@ class ChatState(private val context: Context, private val gameId: Int, private v
             scope.launch { if (number == connectionNumber) action() }
         }
         connection = ChatConnection(id, jwt, object : ChatConnectionListener {
-            override fun onOpen() = onMain { isConnected = true }
+            override fun onOpen() = onMain {
+                isConnected = true
+                wasRejectedJwt = false
+            }
             override fun onEvent(event: ChatSocketEvent) = onMain { handleEvent(event) }
-            override fun onDisconnected(canRetry: Boolean) = onMain { handleDisconnect(canRetry) }
+            override fun onDisconnected(reason: ChatDisconnect) = onMain { handleDisconnect(reason) }
         })
     }
 
@@ -169,12 +175,26 @@ class ChatState(private val context: Context, private val gameId: Int, private v
         failSendingMessages()
     }
 
-    private fun handleDisconnect(canRetry: Boolean) {
+    /*  a rejected JWT gets one more try, since reopening reloads the messages and that renews
+        an expired one. Rejected again, the session can't be used so the user has to sign in
+     */
+    private fun handleDisconnect(reason: ChatDisconnect) {
         connectionNumber++
         connection = null
         isConnected = false
         failSendingMessages()
-        if (canRetry) reopenAfterDelay() else becomeUnavailable(NOT_IN_GAME_MESSAGE)
+        when (reason) {
+            ChatDisconnect.Lost -> reopenAfterDelay()
+            ChatDisconnect.NotAllowed -> becomeUnavailable(NOT_IN_GAME_MESSAGE)
+            ChatDisconnect.Unauthorized -> {
+                if (wasRejectedJwt) {
+                    Session.requireSignIn()
+                } else {
+                    wasRejectedJwt = true
+                    reopenAfterDelay()
+                }
+            }
+        }
     }
 
     // adds the stored messages, keeping the list in order and each message once
