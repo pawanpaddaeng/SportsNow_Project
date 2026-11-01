@@ -14,6 +14,7 @@ import com.example.cpen321application.navigation.routes.CreateGameRoute
 import com.example.cpen321application.navigation.routes.DiscoverRoute
 import com.example.cpen321application.navigation.routes.EditGameRoute
 import com.example.cpen321application.navigation.routes.EditProfileRoute
+import com.example.cpen321application.navigation.routes.FriendsRoute
 import com.example.cpen321application.navigation.routes.GameDetailsRoute
 import com.example.cpen321application.navigation.routes.HomeRoute
 import com.example.cpen321application.navigation.routes.JoinRequestsRoute
@@ -59,6 +60,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         composable(Routes.SIGN_UP) { SignUpRoute(app, modifier) }
         composable(Routes.HOME) { HomeRoute(app, it, modifier) }
         composable(Routes.DISCOVER) { DiscoverRoute(app, it, modifier) }
+        composable(Routes.FRIENDS) { FriendsRoute(app, modifier) }
         composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
         composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
         composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }

@@ -38,12 +38,16 @@ class AppState(
         return Routes.HOME
     }
 
-    // bottom bar: Home, Discover and Profile are built, the other tabs aren't yet
+    // bottom bar: Home, Discover, Friends and Profile are built, the other tabs aren't yet
     fun openTab(tab: BottomTab) {
         when (tab) {
             BottomTab.Home -> navController.popBackStack(Routes.HOME, inclusive = false)
-            // Home stays underneath so back from Discover or Profile returns to it
+            // Home stays underneath so back from Discover, Friends or Profile returns to it
             BottomTab.Discover -> navController.navigate(Routes.DISCOVER) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+            BottomTab.Friends -> navController.navigate(Routes.FRIENDS) {
                 popUpTo(Routes.HOME)
                 launchSingleTop = true
             }
