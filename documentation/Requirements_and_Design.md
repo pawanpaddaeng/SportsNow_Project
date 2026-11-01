@@ -4,7 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+| 2026-11-01 | 4.1 Main Components (Social) | Built friend search, friend requests and the friends list for the new Friends tab. Added `GET /api/friends/requests` so the tab can list incoming requests, and search now also returns similar names so partial names and typos still find people. |
 
 ---
 
@@ -326,26 +326,28 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 5. **Social**
     - **Purpose**: Handles friend search, friend requests, removing friends, and viewing friends' profiles.
     - **Rationale**: Friendships are used by friend chat, game invites and friend profiles, so one component owns them. We chose to keep it apart from User so the User component only handles accounts and profiles.
-    - **Interfaces**: *(planned)*
+    - **Interfaces**: Search, friend requests and the friends list are built. Removing friends, friend profiles and `areFriends` are *(planned)*.
         1. `GET /api/users/search?q=` → `200 { users }`
-            - **Purpose**: Searches for users by name.
+            - **Purpose**: Searches for users by name as the user types, returning at most 20 with the best match first. Names that start with or contain `q` come first, then similar names, so partial names and typos still find people.
         2. `POST /api/friends/requests` body `{ user_id }` → `201 { request }`
-            - **Purpose**: Sends a friend request and notifies the other user.
-        3. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
-            - **Purpose**: Accepts or declines a friend request.
-        4. `GET /api/friends` → `200 { friends }`
+            - **Purpose**: Sends a friend request and notifies the other user. Blocked for yourself, a user who doesn't exist, someone who is already a friend, and when either user already has a pending request to the other.
+        3. `GET /api/friends/requests` → `200 { requests }`
+            - **Purpose**: Returns the requests sent to the user that are waiting for an answer, newest first.
+        4. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
+            - **Purpose**: Accepts or declines a friend request and notifies the sender. Accepting makes the two users friends.
+        5. `GET /api/friends` → `200 { friends }`
             - **Purpose**: Returns the user's friends.
-        5. `DELETE /api/friends/{userId}` → `200 { msg: "success" }`
+        6. `DELETE /api/friends/{userId}` → `200 { msg: "success" }` *(planned)*
             - **Purpose**: Removes a friend.
-        6. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }`
+        7. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }` *(planned)*
             - **Purpose**: Returns a friend's profile with their badges and upcoming games.
-        7. `boolean areFriends(int userId, int otherUserId)`
+        8. `boolean areFriends(int userId, int otherUserId)` *(planned)*
             - **Purpose**: Used by Message and Game to check that two users are friends before a chat or invite.
 
 
 ### **4.2. Databases**
 1. **Relational Database (MySQL)**
-    - **Purpose**: Stores users, games, players, join requests, device tokens, friendships, and ratings.
+    - **Purpose**: Stores users, games, players, join requests, device tokens, friend requests, friendships, and ratings.
     - **Rationale**: This data has clear links between tables and needs transactions, such as locking a game while a join request is approved. We chose MySQL over a document database for these joins and transactions.
 2. **Chat Database (MongoDB)**
     - **Purpose**: Stores chat messages for the Message component.
@@ -363,7 +365,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
     - **Rationale**: We chose it over OpenStreetMap because it is made for Android, is well documented, and uses the same Google Cloud project as Google sign in.
     - **Interface**: `GoogleMap(CameraPositionState cameraPositionState, Function<LatLng, Unit> onMapClick)` from the Maps SDK for Android, which shows the map in the app and returns the coordinates of the spot the user taps.
 3. **Firebase Cloud Messaging** 
-    - **Purpose**: Sends push notifications, such as new join requests and request decisions, to users' phones.
+    - **Purpose**: Sends push notifications, such as new join requests, friend requests and their decisions, to users' phones.
     - **Rationale**: We chose it over keeping a connection open or polling the server because it is built into Android and saves battery.
     - **Interface**: `BatchResponse messaging.sendEachForMulticast(MulticastMessage message)`, which sends a title, body and data to a list of device tokens and reports which tokens no longer work.
 

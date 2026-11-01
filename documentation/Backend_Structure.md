@@ -2,7 +2,7 @@
 
 The backend lives in `backend/src/`. It is a Node.js server written in TypeScript with Express, and it stores data in MySQL. It runs with Docker Compose (see the README).
 
-The code is grouped by the components in the design doc (User, Game), plus shared code in `core/`. This matches the frontend layout.
+The code is grouped by the components in the design doc (User, Game, Social), plus shared code in `core/`. This matches the frontend layout.
 
 ## Folder overview
 
@@ -12,12 +12,14 @@ backend/src/
 ├── app.ts            creates the Express app and mounts every router
 ├── core/             shared by every component
 ├── user/             User component: sign up, login, JWTs, profile
-└── game/             Game component: games, discover, join requests
+├── game/             Game component: games, discover, join requests
+└── friend/           Social component: user search, friend requests, friends list
 ```
 
 **Dependency rules**
-- `core/` imports nothing from `user/` or `game/`.
+- `core/` imports nothing from `user/`, `game/` or `friend/`.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
+- `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`.
 - `app.ts` is the only place routers are mounted.
 
 ## core/
@@ -58,6 +60,14 @@ backend/src/
 | `validation/joinRequest.ts` | Checks a join request body: skill level, how often they play and the message |
 | `validation/coordinates.ts` | Checks the `lat` and `lng` query values for Discover |
 
+## friend/
+
+| File | What it does |
+| --- | --- |
+| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
+| `db/friends.ts` | Friend queries: search, friends list, incoming requests, send a request, accept or decline |
+| `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
+
 The endpoints are listed in the Requirements and Design doc (section 4.1 Main Components). Every endpoint except sign up, login and `/health` needs `Authorization: Bearer <jwt>`.
 
 ## How a request flows
@@ -85,10 +95,12 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 - **Reply format:** every reply has a `msg` code the app checks, e.g. `success`, `no_games`, `invalid_request`, `game_full`, `server_error`. Errors also have a readable `error` message the app can show.
 - **Result types instead of exceptions:** `db` functions return `{ ok: true, ... }` or `{ ok: false, problem }` for rule problems the user can act on. Routes turn each problem into a reply using an error table. Exceptions are only for unexpected failures.
 - **Error tables:** `GAME_CHANGE_ERRORS` (in `gameErrors.ts`), `JOIN_REQUEST_ERRORS` and `DECISION_ERRORS` (in `joinRequestRoutes.ts`) are typed `Record`s keyed by every possible problem. If a new problem is added, the compiler forces it to have a reply.
-- **Row locking:** edits, cancels, join requests and approvals lock the game's row with `FOR UPDATE` inside `inTransaction`, so the player limit can't be exceeded by two approvals at once.
+- **Row locking:** edits, cancels, join requests and approvals lock the game's row with `FOR UPDATE` inside `inTransaction`, so the player limit can't be exceeded by two approvals at once. Friend requests lock both users' rows the same way, lowest id first, so two people asking each other at once can't both succeed.
+- **Friendships:** one friendship is two rows in `friendships`, one for each user, so a user's friends are found by `user_id` alone.
+- **Name search:** MySQL can't rank names by how similar they are, so `searchUsers` reads every user's name and compares them on the server. That is fine at this size, but a much larger user base would need a search index.
 - **Times:** stored as UTC in MySQL and sent to the app as ISO 8601 strings, e.g. `"2026-10-18T02:00:00Z"`.
 - **Notifications are best effort:** sending never blocks or fails a reply. The database is the source of truth, and the app reloads when it next opens a screen.
-- **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests) the first time the MySQL container starts.
+- **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests, friend requests, friendships) the first time the MySQL container starts. They only run on a new database, so an existing one needs a new script run by hand.
 - **Route order:** `/api/games/mine` and `/api/games/discover` are registered before `/api/games/:gameId`, so `mine` and `discover` aren't read as game ids.
 
 ## Adding a new endpoint
@@ -101,4 +113,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-The design doc's Player Review, Message (chat over WebSocket, stored in MongoDB) and Social (friends) components have no backend code yet. They should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+The design doc's Player Review and Message (chat over WebSocket, stored in MongoDB) components have no backend code yet, and Social doesn't have removing friends, friend profiles or `areFriends` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.

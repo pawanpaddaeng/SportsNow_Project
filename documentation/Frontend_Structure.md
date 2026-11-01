@@ -2,7 +2,7 @@
 
 The Android app lives in `frontend/app/src/main/java/com/example/cpen321application/`. It is written in Kotlin with Jetpack Compose.
 
-The code is grouped by the components in the design doc (User, Game), plus shared code in `core/`, the wiring in `navigation/`, and the screens in `ui/`.
+The code is grouped by the components in the design doc (User, Game, Social), plus shared code in `core/`, the wiring in `navigation/`, and the screens in `ui/`.
 
 ## Folder overview
 
@@ -12,6 +12,7 @@ cpen321application/
 ├── core/                      shared by every component
 ├── user/                      User component: sign in, sign up, profile
 ├── game/                      Game component: games, discover, join requests
+├── friend/                    Social component: user search, friend requests, friends list
 ├── navigation/                connects routes to screens and holds shared state
 └── ui/                        screens and reusable UI pieces (drawing only)
 ```
@@ -27,6 +28,7 @@ cpen321application/
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |
 | `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them |
 | `notifications/GameEvents.kt` | Passes notifications to open screens so they reload (e.g. a new join request) |
+| `notifications/FriendEvents.kt` | Passes friend request notifications on so the Friends tab reloads |
 | `SafeCoroutines.kt` | Coroutine scopes that show a message instead of crashing on an unexpected error |
 | `Messages.kt` | Error messages shared by the repositories |
 
@@ -55,11 +57,19 @@ cpen321application/
 | `GameFormat.kt` | Formats times, distances and "spots left" text |
 | `GameOptions.kt` | The sports and skill levels the server accepts |
 
+## friend/
+
+| File | What it does |
+| --- | --- |
+| `repository/FriendRepository.kt` | Every friends call: search, friends list, incoming requests, send a request, accept or decline |
+| `dto/FriendDtos.kt` | Request and reply classes for the friends endpoints, matching the server's JSON |
+| `model/FriendModels.kt` | What the Friends tab shows: `FriendPerson`, `FriendRequestItem`, and the converters from DTOs |
+
 ## navigation/
 
 | File | What it does |
 | --- | --- |
-| `AppNavigation.kt` | Maps each route to its route function, listens for sign-in-required and approval events |
+| `AppNavigation.kt` | Maps each route to its route function, listens for sign-in-required, approval and friend request events |
 | `Routes.kt` | Route names and `savedStateHandle` keys for passing values between screens |
 | `routes/` | One function per screen (see below) |
 | `state/` | State that survives leaving a screen (see below) |
@@ -72,6 +82,7 @@ cpen321application/
 | `AccountRoutes.kt` | Profile, Edit Profile, and the shared `OnResume` helper |
 | `HomeRoute.kt` | Home |
 | `DiscoverRoute.kt` | Discover, including the location permission |
+| `FriendsRoute.kt` | Friends |
 | `GameDetailsRoute.kt` | Game Details and the join request popup |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
 | `GameFormRoutes.kt` | Create Game, Edit Game, Pick Location |
@@ -80,10 +91,11 @@ cpen321application/
 
 | File | Holds |
 | --- | --- |
-| `AppState.kt` | The nav controller, the three states below, sign in/out and tab switching |
+| `AppState.kt` | The nav controller, the four states below, sign in/out and tab switching |
 | `HomeState.kt` | The user's organised and joined games |
 | `DiscoverState.kt` | Discover results, the search location, and the picked place |
 | `ProfileState.kt` | The signed-in user's profile |
+| `FriendsState.kt` | The search text and results, incoming friend requests and the friends list. Searches shortly after typing pauses |
 
 ## ui/
 
@@ -96,6 +108,7 @@ Screens only draw and report taps. They never call the server.
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
 | `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, and their parts |
+| `screens/friends/` | Friends: search, friend requests and the friends list |
 | `screens/profile/` | Profile, Edit Profile |
 | `theme/` | Colours, fonts and the app theme |
 
@@ -141,10 +154,11 @@ If loading fails after the game was already shown, the old details stay on scree
 1. The backend sends a Firebase message with a `type` (e.g. `join_request`) and a `gameId`.
 2. `PushNotificationService` shows the notification and calls `GameEvents.publish`.
 3. Any open route for that game reloads. `AppNavigation` also refreshes Home when a join request is approved.
+4. Friend request notifications have a `type` starting with `friend_request` and no `gameId`. They go through `FriendEvents` instead, and `AppNavigation` refreshes the Friends tab.
 
 **Session ends**
 - Any call whose JWT can't be renewed makes `Session` emit `signInRequired`.
-- `AppNavigation` calls `AppState.returnToSignIn`, which clears the saved JWT and all the Home, Discover and Profile state, then shows Sign In with "Your session ended".
+- `AppNavigation` calls `AppState.returnToSignIn`, which clears the saved JWT and all the Home, Discover, Profile and Friends state, then shows Sign In with "Your session ended".
 
 ## Things to know
 
@@ -168,4 +182,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-The design doc's Player Review, Message (chats) and Social (friends) components have no frontend code yet. They should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+The design doc's Player Review and Message (chats) components have no frontend code yet, and Social doesn't have removing friends or friend profiles yet. Tapping a friend does nothing until friend chat is built. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
