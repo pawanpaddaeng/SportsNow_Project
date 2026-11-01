@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.cpen321application.friend.model.FriendPerson
 import com.example.cpen321application.friend.model.FriendRequestItem
+import com.example.cpen321application.friend.model.FriendshipStatus
 import com.example.cpen321application.friend.repository.FriendResult
 import com.example.cpen321application.friend.repository.decideFriendRequest
 import com.example.cpen321application.friend.repository.fetchFriendRequests
@@ -52,6 +53,8 @@ class FriendsState(private val context: Context, private val scope: CoroutineSco
 
     // on failure the last loaded lists stay visible with the error above them
     fun refresh() {
+        // someone in the results may have sent or answered a request meanwhile
+        if (query.isNotBlank()) retrySearch()
         if (isLoading) return
         isLoading = true
         loadJob = scope.launch {
@@ -115,11 +118,16 @@ class FriendsState(private val context: Context, private val scope: CoroutineSco
             } finally {
                 busyUserIds = busyUserIds - person.userId
             }
-            val message = when (result) {
-                is FriendResult.Done -> "Friend request sent to ${person.name}"
-                is FriendResult.Failed -> result.message
+            when (result) {
+                is FriendResult.Done -> searchResults = searchResults.map {
+                    if (it.userId == person.userId) it.copy(status = FriendshipStatus.RequestSent) else it
+                }
+                is FriendResult.Failed -> {
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                    // e.g. they sent this user a request meanwhile, show where things stand now
+                    retrySearch()
+                }
             }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
