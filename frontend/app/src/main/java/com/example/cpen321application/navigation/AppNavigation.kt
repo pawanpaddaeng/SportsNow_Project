@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.example.cpen321application.core.notifications.FriendEvents
 import com.example.cpen321application.core.notifications.GameEvents
 import com.example.cpen321application.core.session.Session
+import com.example.cpen321application.core.session.jwtToken
 import com.example.cpen321application.navigation.routes.CreateGameRoute
 import com.example.cpen321application.navigation.routes.DiscoverRoute
 import com.example.cpen321application.navigation.routes.EditGameRoute
@@ -27,9 +28,11 @@ import com.example.cpen321application.navigation.state.rememberAppState
 
 private val gameIdArgument = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
 
-// connects each route to its screen, the shared state lives in AppState
+/*  connects each route to its screen, the shared state lives in AppState. gameToOpen is
+    the game of a tapped invite notification, onGameOpened is called once it's handled
+ */
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier) {
+fun AppNavigation(modifier: Modifier = Modifier, gameToOpen: Int? = null, onGameOpened: () -> Unit = {}) {
     val app = rememberAppState()
     val startDestination = remember { app.startDestination() }
 
@@ -55,6 +58,14 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         if (startDestination == Routes.HOME) {
             app.registerNotifications()
+        }
+    }
+
+    // a game invite was tapped: open the game so the friend can ask to join (if signed in)
+    LaunchedEffect(gameToOpen) {
+        if (gameToOpen != null) {
+            if (jwtToken != null) app.navController.navigate(Routes.gameDetails(gameToOpen))
+            onGameOpened()
         }
     }
 
