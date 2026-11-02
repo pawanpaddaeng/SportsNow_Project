@@ -4,10 +4,9 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| 2026-11-02 | 4.1 Main Components (Game, Social) | Built `POST /api/games/{gameId}/invites` for the Invite Friend use case, and `areFriends`, which it uses to check the organiser only invites their friends. Invites are only notifications, so nothing new is stored. |
 | 2026-11-01 | 4.1 Main Components (Social) | Search results now include `friendship_status`, so the Friends tab shows Request Sent instead of Add once a request is sent. |
 | 2026-11-01 | 4.1 Main Components (Social) | Built friend search, friend requests and the friends list for the new Friends tab. Added `GET /api/friends/requests` so the tab can list incoming requests, and search now also returns similar names so partial names and typos still find people. |
-| 2026-11-01 | 4.1 Main Components (Game, Social) | Built `POST /api/games/{gameId}/invites` for the Invite Friend use case, and `areFriends`, which it uses to check the organiser only invites their friends. Invites are only notifications, so nothing new is stored. |
-
 ---
 
 ## 2. Project Description
@@ -292,7 +291,6 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Lets a player leave a game, or the organiser remove a player, before the game starts.
         11. `POST /api/games/{gameId}/invites` body `{ friend_ids }` → `201 { msg: "success" }`
             - **Purpose**: Lets the organiser invite friends to their game by notifying them. Tapping the notification opens the game, where the friend can send a join request. Only the organiser can invite, only their friends who aren't in the game yet, and not once the game is cancelled, started or full.
-            - **Purpose**: Lets the organiser invite friends to their game by notifying them.
         12. `List<GamePlayer> getGamePlayers(int gameId)`
             - **Purpose**: Used by Player Review and Message to check who played in a game.
         13. `List<Game> getFinishedGames(int userId)` *(planned)*
