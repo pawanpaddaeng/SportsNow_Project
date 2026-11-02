@@ -156,3 +156,12 @@ data class JoinRequestDecisionResponse(
     val game: GameDto?,
     val error: String?
 )
+
+// body for POST api/games/{gameId}/invites, the friends the organizer picked
+data class InviteFriendsBody(@SerializedName("friend_ids") val friendIds: List<Int>)
+
+// reply from POST api/games/{gameId}/invites: msg "success", or an error code with error
+data class InviteFriendsResponse(
+    val msg: String?,
+    val error: String?
+)

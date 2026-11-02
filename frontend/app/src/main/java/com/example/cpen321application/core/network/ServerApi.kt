@@ -11,6 +11,8 @@ import com.example.cpen321application.game.dto.CreateGameRequest
 import com.example.cpen321application.game.dto.CreateGameResponse
 import com.example.cpen321application.game.dto.DiscoverGamesResponse
 import com.example.cpen321application.game.dto.GameDetailsResponse
+import com.example.cpen321application.game.dto.InviteFriendsBody
+import com.example.cpen321application.game.dto.InviteFriendsResponse
 import com.example.cpen321application.game.dto.JoinRequestBody
 import com.example.cpen321application.game.dto.JoinRequestDecisionBody
 import com.example.cpen321application.game.dto.JoinRequestDecisionResponse
@@ -141,6 +143,14 @@ interface NetworkConnection {
         @Path("requestId") requestId: Int,
         @Body request: JoinRequestDecisionBody
     ) : Response<JoinRequestDecisionResponse>
+
+    // the organizer invites friends to their game, the server notifies each of them
+    @POST("api/games/{gameId}/invites")
+    suspend fun inviteFriends(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int,
+        @Body request: InviteFriendsBody
+    ) : Response<InviteFriendsResponse>
 
     // users whose name matches or is similar to q, best match first
     @GET("api/users/search")

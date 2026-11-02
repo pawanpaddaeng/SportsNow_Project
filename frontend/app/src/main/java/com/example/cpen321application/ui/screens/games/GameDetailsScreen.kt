@@ -52,6 +52,7 @@ data class GameDetailsActions(
     val onDirections: (GameLocation) -> Unit = {},
     val onJoinRequests: () -> Unit = {},
     val onOpenChat: () -> Unit = {},
+    val onInviteFriends: () -> Unit = {},
     val onGameAction: (GameAction) -> Unit = {},
     val onRemovePlayer: (GamePlayer) -> Unit = {},
     val onRequestToJoin: () -> Unit = {},
@@ -60,9 +61,9 @@ data class GameDetailsActions(
 
 /*
     Game Details screen from the Figma mockups, one screen for the three versions:
-    the organizer sees Edit, pending join requests, Remove next to each player until the
-    game starts, and Cancel Game (Mark as Completed once it started, Leave Game once it's
-    cancelled or completed), a joined player sees
+    the organizer sees Edit, pending join requests, Remove next to each player and Invite
+    Friends until the game starts, and Cancel Game (Mark as Completed once it started,
+    Leave Game once it's cancelled or completed), a joined player sees
     "You're in" and Leave Game, anyone else sees the spots left and Request to Join
  */
 @Composable
@@ -197,6 +198,7 @@ private fun LoadedDetails(
         details = details,
         busyAction = state.busyAction,
         onOpenChat = actions.onOpenChat,
+        onInviteFriends = actions.onInviteFriends,
         onGameAction = onGameAction,
         onRequestToJoin = actions.onRequestToJoin
     )
