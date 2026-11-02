@@ -34,9 +34,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         createNotificationChannel(this)
         requestNotificationPermission()
+        // when recreated (e.g. the phone was rotated) the game is already open
+        if (savedInstanceState == null) gameToOpen = invitedGameId(intent)
         setContent {
-            // when recreated (e.g. the phone was rotated) the game is already open
-            if (savedInstanceState == null) gameToOpen = invitedGameId(intent)
             CPEN321ApplicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     AppNavigation(
@@ -49,13 +49,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Android 13+ asks the user before an app can show notifications
     // a notification tapped while the app is already open can arrive here instead of onCreate
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         gameToOpen = invitedGameId(intent)
     }
 
+    // Android 13+ asks the user before an app can show notifications
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
