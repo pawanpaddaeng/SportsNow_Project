@@ -19,7 +19,7 @@ backend/src/
 **Dependency rules**
 - `core/` imports nothing from `user/`, `game/` or `friend/`.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
-- `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`.
+- `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
 - `app.ts` is the only place routers are mounted.
 
 ## core/
@@ -52,12 +52,15 @@ backend/src/
 | --- | --- |
 | `routes/gameRoutes.ts` | Create, my games, discover, game details, edit and cancel (endpoints below) |
 | `routes/joinRequestRoutes.ts` | Send a join request, list pending requests, approve or decline |
+| `routes/inviteRoutes.ts` | `POST /api/games/:gameId/invites`: the organiser invites friends, each gets a `game_invite` notification |
 | `routes/gameJson.ts` | The JSON shapes sent to the app for games, players, Discover results and join requests |
 | `routes/gameErrors.ts` | Game id parsing, `readBackGame`, and the error tables that map problems like `game_full` to a status and message |
 | `db/games.ts` | Game queries: create, read, my games, discover (distance search), update, cancel, players, and `lockGameForChange` |
 | `db/joinRequests.ts` | Join request queries: create, list pending, approve/decline, pending count and the user's request status |
+| `db/invites.ts` | `checkInvites`: the game is the organiser's and not cancelled, started or full, and everyone invited is their friend and not in it yet. Invites aren't stored |
 | `validation/newGame.ts` | Checks a create/edit game body: sport, title, times, location, max players and skill level |
 | `validation/joinRequest.ts` | Checks a join request body: skill level, how often they play and the message |
+| `validation/invite.ts` | Checks an invite body: `friend_ids` is a list of 1 to 100 user ids |
 | `validation/coordinates.ts` | Checks the `lat` and `lng` query values for Discover |
 
 ## friend/
@@ -65,7 +68,7 @@ backend/src/
 | File | What it does |
 | --- | --- |
 | `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
-| `db/friends.ts` | Friend queries: search, friends list, incoming requests, send a request, accept or decline |
+| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, incoming requests, send a request, accept or decline |
 | `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
 
 The endpoints are listed in the Requirements and Design doc (section 4.1 Main Components). Every endpoint except sign up, login and `/health` needs `Authorization: Bearer <jwt>`.
@@ -113,4 +116,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-The design doc's Player Review and Message (chat over WebSocket, stored in MongoDB) components have no backend code yet, and Social doesn't have removing friends, friend profiles or `areFriends` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+The design doc's Player Review and Message (chat over WebSocket, stored in MongoDB) components have no backend code yet, and Social doesn't have removing friends or friend profiles yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.

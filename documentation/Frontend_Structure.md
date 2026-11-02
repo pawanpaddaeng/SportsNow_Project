@@ -26,7 +26,7 @@ cpen321application/
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |
-| `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them |
+| `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. `invitedGameId` reads which game a tapped invite is for |
 | `notifications/GameEvents.kt` | Passes notifications to open screens so they reload (e.g. a new join request) |
 | `notifications/FriendEvents.kt` | Passes friend request notifications on so the Friends tab reloads |
 | `SafeCoroutines.kt` | Coroutine scopes that show a message instead of crashing on an unexpected error |
@@ -83,7 +83,7 @@ cpen321application/
 | `HomeRoute.kt` | Home |
 | `DiscoverRoute.kt` | Discover, including the location permission |
 | `FriendsRoute.kt` | Friends |
-| `GameDetailsRoute.kt` | Game Details and the join request popup |
+| `GameDetailsRoute.kt` | Game Details, the join request popup and the Invite Friends picker |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
 | `GameFormRoutes.kt` | Create Game, Edit Game, Pick Location |
 
@@ -155,6 +155,7 @@ If loading fails after the game was already shown, the old details stay on scree
 2. `PushNotificationService` shows the notification and calls `GameEvents.publish`.
 3. Any open route for that game reloads. `AppNavigation` also refreshes Home when a join request is approved.
 4. Friend request notifications have a `type` starting with `friend_request` and no `gameId`. They go through `FriendEvents` instead, and `AppNavigation` refreshes the Friends tab.
+5. Tapping a `game_invite` notification opens the app with its data in the intent's extras. `MainActivity` reads the game with `invitedGameId` and `AppNavigation` opens its Game Details, where the friend can send a join request.
 
 **Session ends**
 - Any call whose JWT can't be renewed makes `Session` emit `signInRequired`.
