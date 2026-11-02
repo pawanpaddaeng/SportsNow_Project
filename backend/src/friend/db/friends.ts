@@ -83,6 +83,15 @@ export async function getFriends(userId: number): Promise<FriendUser[]> {
   return rows.map(toFriendUser);
 }
 
+// whether the two users are friends, used by Game before an organizer invites someone
+export async function areFriends(userId: number, otherUserId: number): Promise<boolean> {
+  const rows = await selectRows<{ user_id: number }>(
+    'SELECT user_id FROM friendships WHERE user_id = ? AND friend_id = ?',
+    [userId, otherUserId],
+  );
+  return rows.length > 0;
+}
+
 // a request waiting for the user's answer
 export interface IncomingFriendRequest {
   requestId: number;

@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import { handleRouteErrors } from './core/http/asyncRoute';
 import { friendsRouter } from './friend/routes/friendRoutes';
 import { gamesRouter } from './game/routes/gameRoutes';
+import { invitesRouter } from './game/routes/inviteRoutes';
 import { joinRequestsRouter } from './game/routes/joinRequestRoutes';
 import { authRouter } from './user/routes/authRoutes';
 import { usersRouter } from './user/routes/userRoutes';
@@ -13,6 +14,7 @@ export function createApp(): Express {
   app.use(authRouter());
   app.use(gamesRouter());
   app.use(joinRequestsRouter());
+  app.use(invitesRouter());
   app.use(friendsRouter());
   app.use(usersRouter());
 
