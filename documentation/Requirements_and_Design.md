@@ -143,7 +143,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 <a id="uc3r"></a>
-#### **Use Case 3: Join Request**
+#### **Use Case 3: Join Game**
 
 **Description**: A player sends a request to join a game, stating their skill level, how often they play, and an optional message. The request waits for the organiser’s approval.
 
@@ -431,23 +431,23 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
 1. <a id="seq-uc1"></a> [**Use Case 1: Create Game**](#uc1r)\
-![Sequence Diagram UC1](images/UC1%20-%20Create_ver2.png)
+![Sequence Diagram UC1](images/UC1%20-%20Create_ver3.png)
 <br><br>
 
 2. <a id="seq-uc2"></a> [**Use Case 2: Discover Game**](#uc2r)\
-![Sequence Diagram UC2](images/UC2%20-%20Discover_ver2.png)
+![Sequence Diagram UC2](images//UC2%20-%20Discover_ver3.png)
 <br><br>
 
-3. <a id="seq-uc3"></a> [**Use Case 3: Join Request**](#uc3r)\
-![Sequence Diagram UC3](images/UC3%20-%20Join%20Request.png)
+3. <a id="seq-uc3"></a> [**Use Case 3: Join Game**](#uc3r)\
+![Sequence Diagram UC3](images/UC3%20-%20Join%20Game_ver3.png)
 <br><br>
 
 4. <a id="seq-uc4"></a> [**Use Case 4: Friend Chat**](#uc4r)\
-![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat_ver2.png)
+![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat_ver2.5.png)
 <br><br>
 
 5. <a id="seq-uc5"></a> [**Use Case 5: Rate Players**](#uc5r)\
-![Sequence Diagram UC5](images/UC5%20-%20Rating_ver2.png)
+![Sequence Diagram UC5](images/UC5%20-%20Rating_ver2.5.png)
 <br><br>
 
 ### **4.7. Design of Non-Functional Requirements**
