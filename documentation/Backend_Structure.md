@@ -14,6 +14,7 @@ backend/src/
 ├── user/             User component: sign up, login, JWTs, profile
 ├── game/             Game component: games, discover, join requests
 ├── friend/           Social component: user search, friend requests, friends list
+├── review/           Player Review component: reputation, so far only games played
 └── chat/             Message component: game chats, message history, WebSocket
 ```
 
@@ -21,6 +22,7 @@ backend/src/
 - `core/` imports nothing from `user/`, `game/`, `friend/` or `chat/`.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
 - `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
+- `user/routes/publicProfileRoutes.ts` imports `getReputation` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
 - `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id. `chat/` never imports from `game/`, it reads the game tables with SQL.
 
 ## core/
@@ -42,6 +44,7 @@ backend/src/
 | --- | --- |
 | `routes/authRoutes.ts` | `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/register_notif` |
 | `routes/userRoutes.ts` | `GET /api/users/me`, `PUT /api/users/me` |
+| `routes/publicProfileRoutes.ts` | `GET /api/users/:userId`, another player's public profile: name, age range (never the birth year or email), games played, reputation and friendship status. Mounted after the routers for `/api/users/me` and `/api/users/search` |
 | `auth/jwt.ts` | Creates and checks the app's JWTs (HS256, signed with `JWT_SECRET`, valid for 30 days) |
 | `auth/middleware.ts` | `requireAuth` checks the JWT on every protected route and loads the user. `getAuthUser(res)` gives the route that user. `checkToken` is the check itself, also used by the chat WebSocket |
 | `db/users.ts` | User queries: create, find by id or Google id, update profile, and `userJson` |
@@ -69,8 +72,15 @@ backend/src/
 | File | What it does |
 | --- | --- |
 | `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
-| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, incoming requests, send a request, accept or decline |
+| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline |
 | `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
+
+## review/
+
+| File | What it does |
+| --- | --- |
+| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for), reputation score and badges. Score and badges are empty until ratings are built |
+
 
 
 ## chat/
@@ -130,4 +140,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-The design doc's Player Review component has no backend code yet, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+The design doc's Player Review component only has `getReputation` so far, without ratings, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
