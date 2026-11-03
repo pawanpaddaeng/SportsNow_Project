@@ -38,7 +38,7 @@ object NotificationRegistration {
 
         return try {
             val response = Session.call(context) { authorization ->
-                ServerApi.retrofitService.registerNotif(
+                ServerApi.userService.registerNotif(
                     authorization = authorization,
                     request = RegisterNotifRequest(fcmToken = fcmToken)
                 )
@@ -68,7 +68,7 @@ object NotificationRegistration {
     suspend fun registerNewToken(context: Context, fcmToken: String) {
         val jwt = jwtToken ?: AuthTokenStore.load(context) ?: return
         try {
-            val response = ServerApi.retrofitService.registerNotif(
+            val response = ServerApi.userService.registerNotif(
                 authorization = "Bearer $jwt",
                 request = RegisterNotifRequest(fcmToken = fcmToken)
             )

@@ -86,7 +86,7 @@ object Session {
         val googleToken = triggerSilentGoogleSignIn(context) ?: return null
         val newJwt = try {
             val reply = readAuthResponse(
-                ServerApi.retrofitService.login(LoginRequest(idToken = googleToken))
+                ServerApi.userService.login(LoginRequest(idToken = googleToken))
             )
             reply?.jwtToken?.takeIf { reply.msg == "signedIn" }
         } catch (e: IOException) {
