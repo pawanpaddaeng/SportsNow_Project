@@ -69,7 +69,8 @@ fun GameChatRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
             onRetry = if (chat.isUnavailable) null else ({ chat.start() }),
             onSend = { text -> chat.send(text) },
             onRetrySend = { message -> chat.retry(message) },
-            onLoadOlder = { chat.loadOlder() }
+            onLoadOlder = { chat.loadOlder() },
+            onOpenProfile = { userId -> app.openProfile(userId) }
         ),
         modifier = modifier
     )

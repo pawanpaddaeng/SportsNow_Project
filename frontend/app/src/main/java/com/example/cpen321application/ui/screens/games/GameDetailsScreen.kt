@@ -55,6 +55,7 @@ data class GameDetailsActions(
     val onInviteFriends: () -> Unit = {},
     val onGameAction: (GameAction) -> Unit = {},
     val onRemovePlayer: (GamePlayer) -> Unit = {},
+    val onOpenProfile: (Int) -> Unit = {},
     val onRequestToJoin: () -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
@@ -121,6 +122,7 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
             details = details,
             removingPlayerId = state.removingPlayerId,
             onRemove = { player -> confirmRemove = player },
+            onOpenProfile = { player -> actions.onOpenProfile(player.userId) },
             onDismiss = { showPlayers = false }
         )
     }

@@ -33,6 +33,7 @@ fun FriendsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
             onAddFriend = { friends.addFriend(it) },
             onAccept = { friends.answer(it, accept = true) },
             onDecline = { friends.answer(it, accept = false) },
+            onOpenProfile = { userId -> app.openProfile(userId) },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
         modifier = modifier
