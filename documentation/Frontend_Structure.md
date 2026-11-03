@@ -13,6 +13,7 @@ cpen321application/
 ├── user/                      User component: sign in, sign up, profile
 ├── game/                      Game component: games, discover, join requests
 ├── chat/                      Message component: game chats
+├── review/                    Player Review component: rating players after a game
 ├── navigation/                connects routes to screens and holds shared state
 └── ui/                        screens and reusable UI pieces (drawing only)
 ```
@@ -56,6 +57,14 @@ cpen321application/
 | `GameFormat.kt` | Formats times, distances and "spots left" text |
 | `GameOptions.kt` | The sports and skill levels the server accepts |
 
+## review/
+
+| File | What it does |
+| --- | --- |
+| `repository/ReviewRepository.kt` | Loads the players to rate, submits a rating, and loads the user's own score |
+| `dto/ReviewDtos.kt` | Request and reply classes for the ratings endpoints |
+| `model/PlayerRating.kt` | The rating categories, a Rate Players row, its converter, and how a score reads |
+
 ## chat/
 
 | File | What it does |
@@ -85,6 +94,7 @@ cpen321application/
 | `GameDetailsRoute.kt` | Game Details and the join request popup |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
 | `ChatRoute.kt` | Game Chat, opening and closing its connection as the screen is shown and hidden |
+| `RatePlayersRoute.kt` | Rate Players and its rating form, for the players who showed up to a completed game |
 | `GameFormRoutes.kt` | Create Game, Edit Game, Pick Location |
 
 **state/**: kept for the whole app session.
@@ -108,7 +118,7 @@ Screens only draw and report taps. They never call the server.
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
-| `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, and their parts |
+| `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, Rate Players, and their parts |
 | `screens/profile/` | Profile, Edit Profile |
 | `screens/chat/` | Chat |
 | `theme/` | Colours, fonts and the app theme |
@@ -182,4 +192,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-The design doc's Player Review and Social (friends) components have no frontend code yet, and friend chat isn't part of `chat/` yet. They should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+Player Review's reputation screens and badges, and the design doc's Social (friends) component, have no frontend code yet, and friend chat isn't part of `chat/` yet. They should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
