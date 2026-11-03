@@ -76,6 +76,8 @@ data class GameDetailsResponse(
     @SerializedName("viewer_role") val viewerRole: String?,
     @SerializedName("pending_requests") val pendingRequests: Int?,
     @SerializedName("join_request_status") val joinRequestStatus: String?,
+    // the game's chat, null when the user isn't a player of the game
+    @SerializedName("chat_id") val chatId: Int?,
     val error: String?
 )
 

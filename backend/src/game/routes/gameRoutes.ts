@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { getGameChatId } from '../../chat/db/chats';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logError, logInfo } from '../../core/logger';
@@ -142,7 +143,8 @@ export function gamesRouter(): Router {
   /*  game details: the game with its organizer, players and what the signed in user
       can do with it. viewer_role is "organizer", "player" (joined) or "viewer".
       pending_requests is only sent to the organizer and join_request_status
-      (null if they never asked) only to viewers, both are null otherwise.
+      (null if they never asked) only to viewers, both are null otherwise. chat_id is
+      null for viewers, only players can open the game's chat.
       Responds 400 invalid_request for a malformed id, 404 not_found if no game has it.
       Registered after /api/games/mine so "mine" isn't read as an id
    */
@@ -170,6 +172,7 @@ export function gamesRouter(): Router {
         viewer_role: role,
         pending_requests: role === 'organizer' ? await countPendingJoinRequests(gameId) : null,
         join_request_status: role === 'viewer' ? await getJoinRequestStatus(gameId, user.userId) : null,
+        chat_id: role === 'viewer' ? null : await getGameChatId(gameId),
       });
     }));
 

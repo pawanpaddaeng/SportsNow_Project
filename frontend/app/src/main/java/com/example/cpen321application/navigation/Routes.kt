@@ -21,6 +21,11 @@ object Routes {
     // the organizer's pending join requests for a game, build it with joinRequests(id)
     const val JOIN_REQUESTS = "join_requests/{$GAME_ID_ARG}"
     fun joinRequests(gameId: Int) = "join_requests/$gameId"
+
+    // the chat of a game, build it with gameChat(id)
+    const val GAME_CHAT = "game_chat/{$GAME_ID_ARG}"
+    fun gameChat(gameId: Int) = "game_chat/$gameId"
+
     const val PROFILE = "profile"
 
     const val EDIT_PROFILE = "edit_profile"

@@ -1,14 +1,20 @@
 import 'dotenv/config';
 
-const rawPort = process.env.PORT;
-const port =
-  rawPort === undefined || rawPort === ''
-    ? 3000
-    : Number.parseInt(rawPort, 10);
+function readPort(name: string, rawPort: string | undefined, defaultPort: number): number {
+  const port =
+    rawPort === undefined || rawPort === ''
+      ? defaultPort
+      : Number.parseInt(rawPort, 10);
 
-if (Number.isNaN(port) || port < 1 || port > 65535) {
-  throw new Error(`Invalid PORT: ${rawPort}`);
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid ${name}: ${rawPort}`);
+  }
+  return port;
 }
+
+const port = readPort('PORT', process.env.PORT, 3000);
+// the chat WebSocket, on the port docker-compose and Caddy send it to
+const wsPort = readPort('WS_PORT', process.env.WS_PORT, 8080);
 
 // the environment variables, looked up by name with get() instead of indexing process.env
 const environment = new Map(Object.entries(process.env));
@@ -40,6 +46,7 @@ const jwtSecret = requiredEnv('JWT_SECRET');
 
 export const env = {
   port,
+  wsPort,
   mysqlUrl,
   mysqlUser,
   mysqlPassword,
