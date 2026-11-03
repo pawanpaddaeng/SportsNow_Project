@@ -34,13 +34,6 @@ function mockDatabase(game: Game, friendIds: number[] = FRIEND_IDS) {
   return jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(0);
 }
 
-function invite(token: string, body: unknown) {
-  return request(createApp())
-    .post(`/api/games/${GAME_ID}/invites`)
-    .set('Authorization', `Bearer ${token}`)
-    .send(body as object);
-}
-
 // Interface POST /api/games/{gameId}/invites
 describe('Mocked: POST /api/games/{gameId}/invites', () => {
   // Mocked behavior: the database is replaced by upcoming game 42 with 3 of 10 players,
@@ -54,7 +47,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const token = signIn(organizer);
     const sendPush = mockDatabase(testGame({ gameId: GAME_ID, organizerId: organizer.userId }));
 
-    const response = await invite(token, { friend_ids: FRIEND_IDS });
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friend_ids: FRIEND_IDS });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ msg: 'success' });
@@ -75,7 +71,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const token = signIn(testPlayer());
     const sendPush = mockDatabase(testGame({ gameId: GAME_ID, organizerId: testOrganizer().userId }));
 
-    const response = await invite(token, { friend_ids: [5] });
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friend_ids: [5] });
 
     expect(response.status).toBe(403);
     expect(response.body.msg).toBe('forbidden');
@@ -92,7 +91,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const token = signIn(organizer);
     const sendPush = mockDatabase(testGame({ gameId: GAME_ID, organizerId: organizer.userId }));
 
-    const response = await invite(token, { friend_ids: [5, 7] });
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friend_ids: [5, 7] });
 
     expect(response.status).toBe(403);
     expect(response.body.msg).toBe('not_friend');
@@ -110,7 +112,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId });
     const sendPush = mockDatabase(game, [...FRIEND_IDS, PLAYER_ID]);
 
-    const response = await invite(token, { friend_ids: [5, PLAYER_ID] });
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friend_ids: [5, PLAYER_ID] });
 
     expect(response.status).toBe(409);
     expect(response.body.msg).toBe('already_player');
@@ -132,7 +137,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const token = signIn(organizer);
     const sendPush = mockDatabase(testGame({ gameId: GAME_ID, organizerId: organizer.userId, ...changes }));
 
-    const response = await invite(token, { friend_ids: [5] });
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friend_ids: [5] });
 
     expect(response.status).toBe(409);
     expect(response.body.msg).toBe(msg);
@@ -155,7 +163,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const token = signIn(organizer);
     const sendPush = mockDatabase(testGame({ gameId: GAME_ID, organizerId: organizer.userId }));
 
-    const response = await invite(token, body);
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
 
     expect(response.status).toBe(400);
     expect(response.body.msg).toBe('invalid_request');
@@ -173,7 +184,10 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const sendPush = mockDatabase(testGame({ gameId: GAME_ID, organizerId: organizer.userId }));
     jest.spyOn(gamesDb, 'getGameById').mockRejectedValue(new Error('database is down'));
 
-    const response = await invite(token, { friend_ids: [5] });
+    const response = await request(createApp())
+      .post(`/api/games/${GAME_ID}/invites`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friend_ids: [5] });
 
     expect(response.status).toBe(500);
     expect(response.body.msg).toBe('server_error');
