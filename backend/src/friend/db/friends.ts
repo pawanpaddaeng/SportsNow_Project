@@ -59,6 +59,7 @@ export async function getFriendshipStatus(userId: number, otherUserId: number): 
   );
   const row = rows[0];
   return row ? toFriendshipStatus(row) : 'none';
+}
 
 /*  users whose name matches or is similar to text, best match first, except the user
     searching. MySQL can't compare how similar names are, so every name is compared here
