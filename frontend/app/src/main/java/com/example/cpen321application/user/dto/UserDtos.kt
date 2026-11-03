@@ -56,3 +56,20 @@ data class ProfileResponse(
     val user: UserProfileDto?,
     val error: String?
 )
+
+data class PublicProfileDto(
+    @SerializedName("user_id") val userId: Int,
+    @field:Required @SerializedName("first_name") val firstName: String,
+    @field:Required @SerializedName("last_name") val lastName: String,
+    @field:Required @SerializedName("age_range") val ageRange: String,
+    @SerializedName("games_played") val gamesPlayed: Int,
+    @SerializedName("reputation_score") val reputationScore: Double?,
+    val badges: List<String>?,
+    @field:Required @SerializedName("friendship_status") val friendshipStatus: String
+)
+
+data class PublicProfileResponse(
+    val msg: String?,
+    val profile: PublicProfileDto?,
+    val error: String?
+)
