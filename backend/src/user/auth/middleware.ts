@@ -15,6 +15,27 @@ function readToken(req: Request): string | null {
   return typeof bodyToken === 'string' && bodyToken !== '' ? bodyToken : null;
 }
 
+export type CheckTokenResult =
+  | { ok: true; user: User }
+  | { ok: false; reason: 'expired' | 'invalid' | 'no_user' };
+
+const TOKEN_ERRORS = {
+  expired: { msg: 'expired_token', error: 'Session expired, sign in again' },
+  invalid: { msg: 'invalid_token', error: 'Invalid jwt_token' },
+  no_user: { msg: 'no_user', error: 'No account found, sign up or sign in again' },
+};
+
+// the user a JWT belongs to, also used by the chat WebSocket when it connects
+export async function checkToken(token: string): Promise<CheckTokenResult> {
+  const result = verifyAuthToken(token);
+  if (!result.ok) return { ok: false, reason: result.reason };
+
+  const user = await findUserById(result.payload.user_id);
+  const createdAtSeconds = user ? Math.floor(user.createdAt.getTime() / 1000) : 0;
+  if (!user || result.payload.iat < createdAtSeconds) return { ok: false, reason: 'no_user' };
+  return { ok: true, user };
+}
+
 /*
     JWT middleware for routes that need a signed in user. On success the user
     is available to the route through getAuthUser(res). Otherwise it responds:
@@ -32,24 +53,13 @@ async function checkAuth(req: Request, res: Response, next: NextFunction): Promi
     return;
   }
 
-  const result = verifyAuthToken(token);
+  const result = await checkToken(token);
   if (!result.ok) {
-    if (result.reason === 'expired') {
-      res.status(401).json({ msg: 'expired_token', error: 'Session expired, sign in again' });
-    } else {
-      res.status(401).json({ msg: 'invalid_token', error: 'Invalid jwt_token' });
-    }
+    res.status(401).json(TOKEN_ERRORS[result.reason]);
     return;
   }
 
-  const user = await findUserById(result.payload.user_id);
-  const createdAtSeconds = user ? Math.floor(user.createdAt.getTime() / 1000) : 0;
-  if (!user || result.payload.iat < createdAtSeconds) {
-    res.status(401).json({ msg: 'no_user', error: 'No account found, sign up or sign in again' });
-    return;
-  }
-
-  res.locals.user = user;
+  res.locals.user = result.user;
   next();
 }
 

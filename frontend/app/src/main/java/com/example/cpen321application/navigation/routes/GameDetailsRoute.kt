@@ -160,6 +160,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onDirections = { location -> openDirections(context, location) },
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
             onInviteFriends = { showInviteFriends = true },
+            onOpenChat = { navController.navigate(Routes.gameChat(gameId)) },
             onGameAction = { action -> runAction(action) },
             onRemovePlayer = { player -> removeFromGame(player) },
             onRequestToJoin = { showJoinSheet = true },

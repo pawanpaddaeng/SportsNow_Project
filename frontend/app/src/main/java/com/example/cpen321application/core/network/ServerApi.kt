@@ -1,6 +1,7 @@
 package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
+import com.example.cpen321application.chat.dto.ChatMessagesResponse
 import com.example.cpen321application.friend.dto.FriendChangeResponse
 import com.example.cpen321application.friend.dto.FriendDecisionBody
 import com.example.cpen321application.friend.dto.FriendRequestsResponse
@@ -178,6 +179,14 @@ interface NetworkConnection {
         @Path("requestId") requestId: Int,
         @Body request: FriendDecisionBody
     ) : Response<FriendChangeResponse>
+
+    // a page of the chat's messages, newest first. A null before gives the newest page
+    @GET("api/chats/{chatId}/messages")
+    suspend fun getChatMessages(
+        @Header("Authorization") authorization: String,
+        @Path("chatId") chatId: Int,
+        @Query("before") before: Int?
+    ) : Response<ChatMessagesResponse>
 }
 
 object ServerApi {
