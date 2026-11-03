@@ -33,13 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.friend.model.FriendshipStatus
 import com.example.cpen321application.user.model.PlayerProfile
+import com.example.cpen321application.review.model.formatReputationScore
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
 import com.example.cpen321application.ui.theme.SportsPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsSurfaceContainer
-import java.util.Locale
 
 /*  what the profile popup shows. profile is null until it loads; isLoading shows a spinner and
     errorMessage a problem, with Retry when canRetry. Once the profile is shown, errorMessage is
@@ -115,10 +115,9 @@ private fun ProfileDetails(profile: PlayerProfile, state: PlayerProfileUiState, 
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Stat(value = profile.gamesPlayed.toString(), label = "Games played", modifier = Modifier.weight(1f))
-            val score = profile.reputationScore
             Stat(
-                value = score?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: "–",
-                label = if (score == null) "No ratings yet" else "Reputation",
+                value = profile.reputationScore?.let(::formatReputationScore) ?: "–",
+                label = "Rating",
                 modifier = Modifier.weight(1f)
             )
         }

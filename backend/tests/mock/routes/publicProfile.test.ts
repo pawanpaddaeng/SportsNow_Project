@@ -20,7 +20,7 @@ cleanUpAfterTests();
 function mockUsers(users: User[]) {
   jest.spyOn(usersDb, 'findUserById').mockImplementation((userId) =>
     Promise.resolve(users.find((user) => user.userId === userId) ?? null));
-  return jest.spyOn(reputationDb, 'getReputation').mockResolvedValue({ score: null, badges: [], gamesPlayed: 4 });
+  return jest.spyOn(reputationDb, 'getReputation').mockResolvedValue({ score: 4.2, badges: [], gamesPlayed: 4 });
 }
 
 // Interface GET /api/users/{userId}
@@ -51,7 +51,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
         last_name: 'Player',
         age_range: ageRange(player.birthYear, new Date().getUTCFullYear()),
         games_played: 4,
-        reputation_score: null,
+        reputation_score: 4.2,
         badges: [],
         friendship_status: 'request_sent',
       },

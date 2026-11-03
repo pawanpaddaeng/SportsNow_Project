@@ -81,7 +81,7 @@ backend/src/
 | --- | --- |
 | `routes/ratingRoutes.ts` | The players a user can rate, submitting a rating, and the user's own score (`GET /api/users/me/stats`) |
 | `db/ratings.ts` | Rating queries, and `getReputationScore`, which `game/` uses to show organizers a requester's score |
-| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for) for the public profile. Its score and badges are empty for now |
+| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for) and reputation score, for the public profile. Its badges are empty for now |
 | `validation/rating.ts` | Checks a rating body: who is rated and the stars in every category |
 | `reputation.ts` | The score rules, with no database so they can be tested on their own |
 

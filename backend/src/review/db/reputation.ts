@@ -1,10 +1,9 @@
 import { selectRows } from '../../core/db/mysql';
+import { getReputationScore } from './ratings';
 
-/*  a player's record as other players see it. Their score isn't shown to other players
-    yet and badges aren't built, so for now score is null and badges is empty
- */
+// a player's record as other players see it. Badges aren't built yet, so badges is empty
 export interface Reputation {
-  score: number | null;
+  score: number;
   badges: string[];
   gamesPlayed: number;
 }
@@ -25,5 +24,5 @@ const GAMES_PLAYED = `
 // the user's reputation score, badges and games played, used by the public profile
 export async function getReputation(userId: number): Promise<Reputation> {
   const rows = await selectRows<{ games_played: number }>(GAMES_PLAYED, [userId, userId, userId]);
-  return { score: null, badges: [], gamesPlayed: Number(rows[0]?.games_played ?? 0) };
+  return { score: await getReputationScore(userId), badges: [], gamesPlayed: Number(rows[0]?.games_played ?? 0) };
 }
