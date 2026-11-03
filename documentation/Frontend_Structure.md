@@ -23,7 +23,7 @@ cpen321application/
 
 | File | What it does |
 | --- | --- |
-| `network/ServerApi.kt` | Every backend endpoint as a Retrofit function |
+| `network/ServerApi.kt` | Every backend endpoint as a Retrofit function, split into `UserApi`, `GameApi` and `FriendApi` services |
 | `network/ServerGson.kt` | Gson setup. `@Required` fields make a reply fail to parse if the server leaves them out |
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
@@ -149,7 +149,7 @@ Example: the user taps a game card on Discover.
 3. **Open the route.** `AppNavigation` matches `Routes.GAME_DETAILS` and runs `GameDetailsRoute`. The route reads the id with `backStackEntry.gameId()`. It also checks whether the previous screen was Discover, so the bottom bar highlights Discover and a sent join request returns there.
 4. **Load.** When the screen is shown, `OnResume` runs `loadDetails()`. It sets `isLoading = true` and launches a coroutine on `app.scope`.
 5. **Repository.** `loadDetails()` calls `fetchGameDetails(context, gameId)` in `game/repository/GameRepository.kt`.
-6. **Session.** The repository calls `Session.call`, which reads the JWT (from memory, or from `AuthTokenStore`) and calls `ServerApi.retrofitService.getGameDetails("Bearer <jwt>", gameId)`. This sends `GET /api/games/42`.
+6. **Session.** The repository calls `Session.call`, which reads the JWT (from memory, or from `AuthTokenStore`) and calls `ServerApi.gameService.getGameDetails("Bearer <jwt>", gameId)`. This sends `GET /api/games/42`.
    - If the server says the JWT expired, `Session` signs in to Google silently, gets a new JWT from `/api/auth/login`, and sends the request again once.
    - If that fails, `Session` returns `null`, the repository returns `Failed("Your session ended…")`, and `AppNavigation` sends the user back to sign in.
 7. **Reply.** Retrofit and Gson turn the JSON into a `GameDetailsResponse` DTO (`game/dto/GameDtos.kt`). The repository returns one of:

@@ -69,11 +69,7 @@ data class GameDetailsActions(
 @Composable
 fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, modifier: Modifier = Modifier) {
     val details = state.details
-    var showPlayers by remember { mutableStateOf(false) }
-    // the action whose confirmation dialog is open
-    var confirmAction by remember { mutableStateOf<GameAction?>(null) }
-    // the player the organizer is asked to confirm removing
-    var confirmRemove by remember { mutableStateOf<GamePlayer?>(null) }
+    val dialogs = remember { OpenDialogs() }
 
     ScrollingTabScreen(selectedTab = state.selectedTab, onTabSelected = actions.onTabSelected, modifier = modifier) {
         // a cancelled, completed or started game can't be changed any more
@@ -94,54 +90,76 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
                 details = details,
                 state = state,
                 actions = actions,
-                onSeeAllPlayers = { showPlayers = true },
-                onGameAction = { action -> confirmAction = action }
+                onSeeAllPlayers = { dialogs.showPlayers = true },
+                onGameAction = { action -> dialogs.confirmAction = action }
             )
         }
     }
 
-    if (showPlayers && details != null) {
+    if (details != null) {
+        GameDetailsPopups(details = details, removingPlayerId = state.removingPlayerId, actions = actions, dialogs = dialogs)
+    }
+}
+
+// which of the Game Details dialogs is open
+private class OpenDialogs {
+    var showPlayers by mutableStateOf(false)
+    // the action whose confirmation dialog is open
+    var confirmAction by mutableStateOf<GameAction?>(null)
+    // the player the organizer is asked to confirm removing
+    var confirmRemove by mutableStateOf<GamePlayer?>(null)
+}
+
+// the players list and the confirmations, shown while dialogs says they're open
+@Composable
+private fun GameDetailsPopups(
+    details: GameDetails,
+    removingPlayerId: Int?,
+    actions: GameDetailsActions,
+    dialogs: OpenDialogs
+) {
+    if (dialogs.showPlayers) {
         PlayersDialog(
             details = details,
-            removingPlayerId = state.removingPlayerId,
-            onRemove = { player -> confirmRemove = player },
+            removingPlayerId = removingPlayerId,
+            onRemove = { player -> dialogs.confirmRemove = player },
             onOpenProfile = { player -> actions.onOpenProfile(player.userId) },
-            onDismiss = { showPlayers = false }
+            onDismiss = { dialogs.showPlayers = false }
         )
     }
 
-    val playerToRemove = confirmRemove
-    if (playerToRemove != null && details != null) {
+    val playerToRemove = dialogs.confirmRemove
+    if (playerToRemove != null) {
         ConfirmRemovePlayerDialog(
             player = playerToRemove,
             gameTitle = details.title,
             onConfirm = {
-                confirmRemove = null
+                dialogs.confirmRemove = null
                 actions.onRemovePlayer(playerToRemove)
             },
-            onDismiss = { confirmRemove = null }
+            onDismiss = { dialogs.confirmRemove = null }
         )
     }
 
-    val pendingAction = confirmAction
-    if (pendingAction == GameAction.Complete && details != null) {
+    val pendingAction = dialogs.confirmAction
+    if (pendingAction == GameAction.Complete) {
         CompleteGameDialog(
             details = details,
             onConfirm = { noShowUserIds ->
-                confirmAction = null
+                dialogs.confirmAction = null
                 actions.onCompleteGame(noShowUserIds)
             },
-            onDismiss = { confirmAction = null }
+            onDismiss = { dialogs.confirmAction = null }
         )
-    } else if (pendingAction != null && details != null) {
+    } else if (pendingAction != null) {
         ConfirmActionDialog(
             action = pendingAction,
             details = details,
             onConfirm = {
-                confirmAction = null
+                dialogs.confirmAction = null
                 actions.onGameAction(pendingAction)
             },
-            onDismiss = { confirmAction = null }
+            onDismiss = { dialogs.confirmAction = null }
         )
     }
 }

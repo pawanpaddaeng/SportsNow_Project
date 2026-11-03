@@ -22,7 +22,7 @@ sealed interface ChatMessagesResult {
 suspend fun fetchChatMessages(context: Context, chatId: Int, before: Int? = null): ChatMessagesResult {
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getChatMessages(authorization = authorization, chatId = chatId, before = before)
+            ServerApi.gameService.getChatMessages(authorization = authorization, chatId = chatId, before = before)
         } ?: return ChatMessagesResult.Failed(SESSION_ENDED_MESSAGE)
         if (response.code() == 403 || response.code() == 404) {
             return ChatMessagesResult.Unavailable("You can't open this chat, you're no longer in this game.")

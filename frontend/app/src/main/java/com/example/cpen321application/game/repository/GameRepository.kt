@@ -76,24 +76,24 @@ private suspend fun changeGame(
 
 suspend fun createGame(context: Context, form: GameInfoForm): GameChangeResult =
     changeGame(context, "Could not create game, try again") { authorization ->
-        ServerApi.retrofitService.createGame(authorization = authorization, request = form.toRequest())
+        ServerApi.gameService.createGame(authorization = authorization, request = form.toRequest())
     }
 
 suspend fun updateGame(context: Context, gameId: Int, form: GameInfoForm): GameChangeResult =
     changeGame(context, "Could not save your changes, try again") { authorization ->
-        ServerApi.retrofitService.updateGame(authorization = authorization, gameId = gameId, request = form.toRequest())
+        ServerApi.gameService.updateGame(authorization = authorization, gameId = gameId, request = form.toRequest())
     }
 
 // the server notifies the game's players
 suspend fun cancelGame(context: Context, gameId: Int): GameChangeResult =
     changeGame(context, "Could not cancel the game, try again") { authorization ->
-        ServerApi.retrofitService.cancelGame(authorization = authorization, gameId = gameId)
+        ServerApi.gameService.cancelGame(authorization = authorization, gameId = gameId)
     }
 
 // the organizer marks their started game completed and who didn't show up, the server notifies the game's players
 suspend fun completeGame(context: Context, gameId: Int, noShowUserIds: List<Int>): GameChangeResult =
     changeGame(context, "Could not complete the game, try again") { authorization ->
-        ServerApi.retrofitService.completeGame(
+        ServerApi.gameService.completeGame(
             authorization = authorization,
             gameId = gameId,
             request = CompleteGameBody(noShowUserIds)
@@ -105,13 +105,13 @@ suspend fun completeGame(context: Context, gameId: Int, noShowUserIds: List<Int>
  */
 suspend fun leaveGame(context: Context, gameId: Int): GameChangeResult =
     changeGame(context, "Could not leave the game, try again") { authorization ->
-        ServerApi.retrofitService.leaveGame(authorization = authorization, gameId = gameId)
+        ServerApi.gameService.leaveGame(authorization = authorization, gameId = gameId)
     }
 
 // the organizer removes a player before the game starts, the server notifies them
 suspend fun removePlayer(context: Context, gameId: Int, userId: Int): GameChangeResult =
     changeGame(context, "Could not remove the player, try again") { authorization ->
-        ServerApi.retrofitService.removePlayer(authorization = authorization, gameId = gameId, userId = userId)
+        ServerApi.gameService.removePlayer(authorization = authorization, gameId = gameId, userId = userId)
     }
 
 sealed interface GameDetailsResult {
@@ -124,7 +124,7 @@ sealed interface GameDetailsResult {
 suspend fun fetchGameDetails(context: Context, gameId: Int): GameDetailsResult {
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getGameDetails(authorization = authorization, gameId = gameId)
+            ServerApi.gameService.getGameDetails(authorization = authorization, gameId = gameId)
         } ?: return GameDetailsResult.Failed(SESSION_ENDED_MESSAGE)
         if (response.code() == 404) return GameDetailsResult.NotFound
 
@@ -174,7 +174,7 @@ suspend fun fetchDiscoverGames(context: Context, latitude: Double, longitude: Do
     val failed = DiscoverGamesResult.Failed("Couldn't load games near you, try again")
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getDiscoverGames(
+            ServerApi.gameService.getDiscoverGames(
                 authorization = authorization,
                 latitude = latitude,
                 longitude = longitude
@@ -215,7 +215,7 @@ suspend fun sendJoinRequest(
     )
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.sendJoinRequest(authorization = authorization, gameId = gameId, request = request)
+            ServerApi.gameService.sendJoinRequest(authorization = authorization, gameId = gameId, request = request)
         } ?: return JoinRequestResult.Failed(SESSION_ENDED_MESSAGE)
         val reply = readReply(response, JoinRequestResponse::class.java)
         if (reply?.msg == "success") {
@@ -247,7 +247,7 @@ suspend fun inviteFriends(context: Context, gameId: Int, friendIds: List<Int>): 
     val failureMessage = "Could not send your invites, try again"
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.inviteFriends(
+            ServerApi.gameService.inviteFriends(
                 authorization = authorization,
                 gameId = gameId,
                 request = InviteFriendsBody(friendIds)
@@ -270,7 +270,7 @@ suspend fun fetchPendingJoinRequests(context: Context, gameId: Int): PendingJoin
     val failed = PendingJoinRequestsResult.Failed("Couldn't load join requests, try again")
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getPendingJoinRequests(authorization = authorization, gameId = gameId)
+            ServerApi.gameService.getPendingJoinRequests(authorization = authorization, gameId = gameId)
         } ?: return PendingJoinRequestsResult.Failed(SESSION_ENDED_MESSAGE)
         when (response.code()) {
             404 -> return PendingJoinRequestsResult.Unavailable("This game no longer exists.")
@@ -307,7 +307,7 @@ suspend fun decideJoinRequest(
     val request = JoinRequestDecisionBody(decision = if (approve) "approve" else "decline")
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.decideJoinRequest(
+            ServerApi.gameService.decideJoinRequest(
                 authorization = authorization,
                 gameId = gameId,
                 requestId = requestId,
@@ -337,7 +337,7 @@ suspend fun fetchMyGames(context: Context): MyGamesResult {
     val failed = MyGamesResult.Failed("Couldn't update your games, try again")
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getMyGames(authorization = authorization)
+            ServerApi.gameService.getMyGames(authorization = authorization)
         } ?: return MyGamesResult.Failed(SESSION_ENDED_MESSAGE)
         // error replies (e.g. server_error) have no body here and fall to the else case
         val reply = response.body()

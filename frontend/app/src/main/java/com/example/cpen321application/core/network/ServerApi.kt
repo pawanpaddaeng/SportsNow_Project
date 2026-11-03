@@ -50,7 +50,8 @@ private val retrofit = Retrofit.Builder()
     .baseUrl(BuildConfig.API_BASE_URL)
     .build()
 
-interface NetworkConnection {
+// signing up and in, notifications, and the users' profiles
+interface UserApi {
     @POST("api/auth/signup")
     suspend fun signUp(@Body request: SignUpRequest) : Response<AuthTokenResponse>
 
@@ -72,12 +73,19 @@ interface NetworkConnection {
         @Body request: UpdateProfileRequest
     ) : Response<ProfileResponse>
 
+    // deletes the signed in user's account and everything tied to it, msg is "success" with no user
+    @DELETE("api/users/me")
+    suspend fun deleteMyAccount(@Header("Authorization") authorization: String): Response<ProfileResponse>
+
     @GET("api/users/{userId}")
     suspend fun getPublicProfile(
         @Header("Authorization") authorization: String,
         @Path("userId") userId: Int
     ) : Response<PublicProfileResponse>
+}
 
+// games, their join requests and invites, and their chats
+interface GameApi {
     // the signed in user is the new game's organizer
     @POST("api/games")
     suspend fun createGame(
@@ -166,6 +174,17 @@ interface NetworkConnection {
         @Body request: InviteFriendsBody
     ) : Response<InviteFriendsResponse>
 
+    // a page of the chat's messages, newest first. A null before gives the newest page
+    @GET("api/chats/{chatId}/messages")
+    suspend fun getChatMessages(
+        @Header("Authorization") authorization: String,
+        @Path("chatId") chatId: Int,
+        @Query("before") before: Int?
+    ) : Response<ChatMessagesResponse>
+}
+
+// finding people, friend requests and the user's friends
+interface FriendApi {
     // users whose name matches or is similar to q, best match first
     @GET("api/users/search")
     suspend fun searchUsers(
@@ -192,18 +211,10 @@ interface NetworkConnection {
         @Path("requestId") requestId: Int,
         @Body request: FriendDecisionBody
     ) : Response<FriendChangeResponse>
-
-    // a page of the chat's messages, newest first. A null before gives the newest page
-    @GET("api/chats/{chatId}/messages")
-    suspend fun getChatMessages(
-        @Header("Authorization") authorization: String,
-        @Path("chatId") chatId: Int,
-        @Query("before") before: Int?
-    ) : Response<ChatMessagesResponse>
 }
 
 // the Player Review component's endpoints
-interface ReviewConnection {
+interface ReviewApi {
     @GET("api/games/{gameId}/ratings")
     suspend fun getPlayersToRate(
         @Header("Authorization") authorization: String,
@@ -223,11 +234,10 @@ interface ReviewConnection {
     ) : Response<UserStatsResponse>
 }
 
+// one Retrofit service per part of the API, all on the same server
 object ServerApi {
-    val retrofitService : NetworkConnection by lazy {
-        retrofit.create(NetworkConnection::class.java)
-    }
-    val reviewService : ReviewConnection by lazy {
-        retrofit.create(ReviewConnection::class.java)
-    }
+    val userService: UserApi by lazy { retrofit.create(UserApi::class.java) }
+    val gameService: GameApi by lazy { retrofit.create(GameApi::class.java) }
+    val friendService: FriendApi by lazy { retrofit.create(FriendApi::class.java) }
+    val reviewService: ReviewApi by lazy { retrofit.create(ReviewApi::class.java) }
 }

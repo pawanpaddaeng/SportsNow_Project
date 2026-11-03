@@ -17,6 +17,7 @@ import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.SIGN_IN_MESSAGE_KEY
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.user.NotificationRegistration
+import com.example.cpen321application.user.clearGoogleSignIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -74,8 +75,8 @@ class AppState(
         }
     }
 
-    // forgets the session and shows sign in with a message, clearing every other screen
-    fun returnToSignIn() {
+    // forgets the session and shows sign in with message, clearing every other screen
+    fun returnToSignIn(message: String = "Your session ended. Please sign in again.") {
         jwtToken = null
         AuthTokenStore.clear(context)
         // the next user to sign in shouldn't see this user's data
@@ -87,10 +88,19 @@ class AppState(
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
-        navController.currentBackStackEntry?.savedStateHandle?.set(
-            SIGN_IN_MESSAGE_KEY,
-            "Your session ended. Please sign in again."
-        )
+        navController.currentBackStackEntry?.savedStateHandle?.set(SIGN_IN_MESSAGE_KEY, message)
+    }
+
+    // the user chose to sign out, or deleted their account: Google won't pick this account silently again
+    fun signOut(message: String, onDone: () -> Unit = {}) {
+        scope.launch {
+            try {
+                clearGoogleSignIn(context)
+            } finally {
+                onDone()
+            }
+            returnToSignIn(message)
+        }
     }
 
     fun registerNotifications() {

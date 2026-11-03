@@ -4,9 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.MutableContextWrapper
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.example.cpen321application.BuildConfig
@@ -81,6 +83,17 @@ suspend fun triggerGoogleSignIn(context: Context): String? {
             null
         }
 
+}
+
+/*  forgets which Google account signed in, so the silent sign in can't pick it again
+    after signing out. Signing out still goes ahead if this fails
+ */
+suspend fun clearGoogleSignIn(context: Context) {
+    try {
+        CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
+    } catch (e: ClearCredentialException) {
+        print("Could not clear Google sign in: $e")
+    }
 }
 
 /*

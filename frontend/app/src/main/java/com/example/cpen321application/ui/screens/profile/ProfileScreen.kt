@@ -22,6 +22,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,7 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.review.model.formatReputationScore
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.ConfirmDialog
+import com.example.cpen321application.ui.components.ConfirmText
 import com.example.cpen321application.ui.components.LabelValueRow
+import com.example.cpen321application.ui.components.OutlinedActionButton
 import com.example.cpen321application.ui.components.SurfaceCard
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsOnSurface
@@ -45,26 +52,35 @@ import com.example.cpen321application.user.repository.UserProfile
 // width of the labels in the details card, so the values line up
 private val DETAIL_LABEL_WIDTH = 104.dp
 
+// the Profile actions the user confirms first, each with its own button
+enum class ProfileAction { SignOut, DeleteAccount }
+
 /*  what the Profile screen shows. profile is null until it loads, reputationScore until
-    the score loads. isLoading shows a loading bar and errorMessage a problem
+    the score loads. isLoading shows a progress bar and errorMessage a problem. busyAction
+    shows progress on that action's button
  */
 data class ProfileUiState(
     val profile: UserProfile?,
     val reputationScore: Double? = null,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val busyAction: ProfileAction? = null
 )
 
-// what the Profile screen's controls do
+// onProfileAction (sign out or delete account) is only called after the user confirms
 data class ProfileActions(
     val onEdit: () -> Unit = {},
     val onRetry: () -> Unit = {},
+    val onProfileAction: (ProfileAction) -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
 @Composable
 fun ProfileScreen(state: ProfileUiState, actions: ProfileActions, modifier: Modifier = Modifier) {
     val profile = state.profile
+    // the action whose confirmation dialog is open
+    var confirmAction by remember { mutableStateOf<ProfileAction?>(null) }
+
     Scaffold(
         modifier = modifier,
         containerColor = Color.White,
@@ -99,8 +115,58 @@ fun ProfileScreen(state: ProfileUiState, actions: ProfileActions, modifier: Modi
                 ProfileIdentity(profile)
                 if (state.reputationScore != null) ReputationCard(state.reputationScore)
                 ProfileDetailsCard(profile)
+                AccountButtons(busyAction = state.busyAction, onProfileAction = { action -> confirmAction = action })
             }
         }
+    }
+
+    val pendingAction = confirmAction
+    if (pendingAction != null) {
+        ConfirmDialog(
+            text = confirmText(pendingAction),
+            onConfirm = {
+                confirmAction = null
+                actions.onProfileAction(pendingAction)
+            },
+            onDismiss = { confirmAction = null }
+        )
+    }
+}
+
+private fun confirmText(action: ProfileAction): ConfirmText = when (action) {
+    ProfileAction.SignOut -> ConfirmText(
+        title = "Sign out?",
+        body = "You'll need to sign in with Google again to use the app.",
+        confirm = "Sign Out",
+        dismiss = "Stay",
+        destructive = false
+    )
+    ProfileAction.DeleteAccount -> ConfirmText(
+        title = "Delete your account?",
+        body = "Your profile, the games you organize, your spots in other games and your chat messages " +
+            "will be permanently deleted. This can't be undone.",
+        confirm = "Delete Account",
+        dismiss = "Keep Account"
+    )
+}
+
+// Sign Out and Delete Account at the bottom of Profile, both disabled while either one runs
+@Composable
+private fun AccountButtons(busyAction: ProfileAction?, onProfileAction: (ProfileAction) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedActionButton(
+            text = "Sign Out",
+            onClick = { onProfileAction(ProfileAction.SignOut) },
+            isBusy = busyAction == ProfileAction.SignOut,
+            enabled = busyAction == null,
+            color = SportsPrimary
+        )
+        OutlinedActionButton(
+            text = "Delete Account",
+            onClick = { onProfileAction(ProfileAction.DeleteAccount) },
+            isBusy = busyAction == ProfileAction.DeleteAccount,
+            enabled = busyAction == null
+        )
     }
 }
 
