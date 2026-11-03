@@ -160,8 +160,10 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onDirections = { location -> openDirections(context, location) },
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
             onInviteFriends = { showInviteFriends = true },
+            onOpenChat = { navController.navigate(Routes.gameChat(gameId)) },
             onGameAction = { action -> runAction(action) },
             onRemovePlayer = { player -> removeFromGame(player) },
+            onOpenProfile = { userId -> app.openProfile(userId) },
             onRequestToJoin = { showJoinSheet = true },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
@@ -182,9 +184,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
         )
     }
 
-    if (showInviteFriends && shownDetails != null) {
-        InviteFriendsPopup(app = app, details = shownDetails, onDismiss = { showInviteFriends = false })
-    }
+    if (showInviteFriends && shownDetails != null) InviteFriendsPopup(app, shownDetails) { showInviteFriends = false }
 }
 
 /*  loads the organizer's friends for the picker and invites the ones they tick. The

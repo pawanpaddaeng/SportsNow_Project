@@ -28,18 +28,37 @@ export interface UserSearchResult extends FriendUser {
   friendshipStatus: FriendshipStatus;
 }
 
-interface UserSearchRow extends FriendUserRow {
+interface FriendshipRow {
   is_friend: number;
   request_sent: number;
   request_received: number;
 }
 
+interface UserSearchRow extends FriendUserRow, FriendshipRow {}
+
+function toFriendshipStatus(row: FriendshipRow): FriendshipStatus {
+  if (row.is_friend) return 'friends';
+  if (row.request_sent) return 'request_sent';
+  if (row.request_received) return 'request_received';
+  return 'none';
+}
+
 function toUserSearchResult(row: UserSearchRow): UserSearchResult {
-  let friendshipStatus: FriendshipStatus = 'none';
-  if (row.is_friend) friendshipStatus = 'friends';
-  else if (row.request_sent) friendshipStatus = 'request_sent';
-  else if (row.request_received) friendshipStatus = 'request_received';
-  return { ...toFriendUser(row), friendshipStatus };
+  return { ...toFriendUser(row), friendshipStatus: toFriendshipStatus(row) };
+}
+
+// how otherUserId is connected to userId, e.g. 'request_sent' when userId asked them
+export async function getFriendshipStatus(userId: number, otherUserId: number): Promise<FriendshipStatus> {
+  const rows = await selectRows<FriendshipRow>(
+    `SELECT EXISTS (SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?) AS is_friend,
+            EXISTS (SELECT 1 FROM friend_requests
+                    WHERE sender_id = ? AND receiver_id = ? AND status = 'pending') AS request_sent,
+            EXISTS (SELECT 1 FROM friend_requests
+                    WHERE sender_id = ? AND receiver_id = ? AND status = 'pending') AS request_received`,
+    [userId, otherUserId, userId, otherUserId, otherUserId, userId],
+  );
+  const row = rows[0];
+  return row ? toFriendshipStatus(row) : 'none';
 }
 
 /*  users whose name matches or is similar to text, best match first, except the user

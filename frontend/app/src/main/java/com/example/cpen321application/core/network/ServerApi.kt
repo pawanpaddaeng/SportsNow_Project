@@ -1,6 +1,7 @@
 package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
+import com.example.cpen321application.chat.dto.ChatMessagesResponse
 import com.example.cpen321application.friend.dto.FriendChangeResponse
 import com.example.cpen321application.friend.dto.FriendDecisionBody
 import com.example.cpen321application.friend.dto.FriendRequestsResponse
@@ -22,6 +23,7 @@ import com.example.cpen321application.game.dto.PendingJoinRequestsResponse
 import com.example.cpen321application.user.dto.AuthTokenResponse
 import com.example.cpen321application.user.dto.LoginRequest
 import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.PublicProfileResponse
 import com.example.cpen321application.user.dto.RegisterNotifRequest
 import com.example.cpen321application.user.dto.SignUpRequest
 import com.example.cpen321application.user.dto.UpdateProfileRequest
@@ -64,6 +66,12 @@ interface NetworkConnection {
         @Header("Authorization") authorization: String,
         @Body request: UpdateProfileRequest
     ) : Response<ProfileResponse>
+
+    @GET("api/users/{userId}")
+    suspend fun getPublicProfile(
+        @Header("Authorization") authorization: String,
+        @Path("userId") userId: Int
+    ) : Response<PublicProfileResponse>
 
     // the signed in user is the new game's organizer
     @POST("api/games")
@@ -178,6 +186,14 @@ interface NetworkConnection {
         @Path("requestId") requestId: Int,
         @Body request: FriendDecisionBody
     ) : Response<FriendChangeResponse>
+
+    // a page of the chat's messages, newest first. A null before gives the newest page
+    @GET("api/chats/{chatId}/messages")
+    suspend fun getChatMessages(
+        @Header("Authorization") authorization: String,
+        @Path("chatId") chatId: Int,
+        @Query("before") before: Int?
+    ) : Response<ChatMessagesResponse>
 }
 
 object ServerApi {

@@ -1,3 +1,4 @@
+import { createGameChat } from '../../chat/db/chats';
 import { executeWrite, inTransaction, type Queryable, selectRows } from '../../core/db/mysql';
 import type { JoinRequestStatus } from './joinRequests';
 
@@ -24,8 +25,8 @@ function toUtcDatetime(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-/*  creates the game and adds the organizer as its first player in one
-    transaction, so a game never exists without its organizer. Returns game_id
+/*  creates the game, adds the organizer as its first player and opens its chat in one
+    transaction, so a game never exists without its organizer or chat. Returns game_id
  */
 export async function createGame(game: NewGame): Promise<number> {
   return inTransaction(async (connection) => {
@@ -46,6 +47,7 @@ export async function createGame(game: NewGame): Promise<number> {
       [result.insertId, game.organizerId],
       connection,
     );
+    await createGameChat(connection, result.insertId);
     return result.insertId;
   });
 }

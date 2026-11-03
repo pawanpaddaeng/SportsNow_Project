@@ -9,9 +9,7 @@ import {
 } from '../db/games';
 import { invalidRequest } from '../../core/http/responses';
 import { logError } from '../../core/logger';
-
-// largest games.game_id (INT UNSIGNED)
-const MAX_GAME_ID = 4294967295;
+import { readId } from '../../core/validation';
 
 // notifications are best effort, a failure is only logged
 export function logNotificationError(error: unknown): void {
@@ -20,8 +18,7 @@ export function logNotificationError(error: unknown): void {
 
 // the game id from a route like /api/games/:gameId, or null if it isn't a valid id
 export function readGameId(raw: string): number | null {
-  const gameId = /^\d{1,10}$/.test(raw) ? Number(raw) : NaN;
-  return Number.isSafeInteger(gameId) && gameId >= 1 && gameId <= MAX_GAME_ID ? gameId : null;
+  return readId(raw);
 }
 
 // the route's game id, or null after answering 400 invalid_request when it isn't a valid id

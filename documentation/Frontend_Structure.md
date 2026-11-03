@@ -2,7 +2,7 @@
 
 The Android app lives in `frontend/app/src/main/java/com/example/cpen321application/`. It is written in Kotlin with Jetpack Compose.
 
-The code is grouped by the components in the design doc (User, Game, Social), plus shared code in `core/`, the wiring in `navigation/`, and the screens in `ui/`.
+The code is grouped by the components in the design doc (User, Game, Social, Message), plus shared code in `core/`, the wiring in `navigation/`, and the screens in `ui/`.
 
 ## Folder overview
 
@@ -13,6 +13,7 @@ cpen321application/
 ├── user/                      User component: sign in, sign up, profile
 ├── game/                      Game component: games, discover, join requests
 ├── friend/                    Social component: user search, friend requests, friends list
+├── chat/                      Message component: game chats
 ├── navigation/                connects routes to screens and holds shared state
 └── ui/                        screens and reusable UI pieces (drawing only)
 ```
@@ -36,8 +37,9 @@ cpen321application/
 
 | File | What it does |
 | --- | --- |
-| `repository/UserRepository.kt` | Login, sign up, reading the Google profile, and loading/updating the user's profile |
-| `dto/UserDtos.kt` | Request and reply classes for the auth and profile endpoints |
+| `repository/UserRepository.kt` | Login, sign up, reading the Google profile, loading/updating the user's profile, and loading another player's public profile |
+| `dto/UserDtos.kt` | Request and reply classes for the auth and profile endpoints, and another player's public profile |
+| `model/PlayerProfile.kt` | What the profile popup shows about a player, and its converter |
 | `GoogleSignIn.kt` | Google sign in with Credential Manager, normal and silent |
 | `ProfileValidation.kt` | Checks names and birth year before saving a profile |
 | `NotificationRegistration.kt` | Sends the phone's Firebase token to the server |
@@ -65,6 +67,15 @@ cpen321application/
 | `dto/FriendDtos.kt` | Request and reply classes for the friends endpoints, matching the server's JSON |
 | `model/FriendModels.kt` | What the Friends tab shows: `FriendPerson`, `FriendRequestItem`, and the converters from DTOs |
 
+## chat/
+
+| File | What it does |
+| --- | --- |
+| `repository/ChatRepository.kt` | Loads a page of a chat's earlier messages |
+| `socket/ChatConnection.kt` | The WebSocket to one chat, built on OkHttp: sends messages and reports what arrives |
+| `dto/ChatDtos.kt` | Request and reply classes for the chat endpoint and WebSocket, matching the server's JSON |
+| `model/ChatMessage.kt` | A message as the Chat screen shows it, and its converter |
+
 ## navigation/
 
 | File | What it does |
@@ -85,17 +96,21 @@ cpen321application/
 | `FriendsRoute.kt` | Friends |
 | `GameDetailsRoute.kt` | Game Details, the join request popup and the Invite Friends picker |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
+| `ChatRoute.kt` | Game Chat, opening and closing its connection as the screen is shown and hidden |
+| `PlayerProfilePopup.kt` | The player profile popup: loads a player's public profile and sends a friend request from it. `AppNavigation` shows it over any screen |
 | `GameFormRoutes.kt` | Create Game, Edit Game, Pick Location |
 
 **state/**: kept for the whole app session.
 
 | File | Holds |
 | --- | --- |
-| `AppState.kt` | The nav controller, the four states below, sign in/out and tab switching |
+| `AppState.kt` | The nav controller, the four states below, sign in/out, tab switching, and which player's profile popup is open (`openProfile`) |
 | `HomeState.kt` | The user's organised and joined games |
 | `DiscoverState.kt` | Discover results, the search location, and the picked place |
 | `ProfileState.kt` | The signed-in user's profile |
 | `FriendsState.kt` | The search text and results, incoming friend requests and the friends list. Searches shortly after typing pauses |
+
+`state/ChatState.kt` is the exception: it holds one open chat (messages, connection, sending and reconnecting), so it only lives as long as the Chat screen.
 
 ## ui/
 
@@ -103,13 +118,14 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar, form fields, chips, map preview, cards |
+| `components/` | Pieces used by several screens: bottom bar, form fields, chips, map preview, cards, and the player profile popup |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
 | `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, and their parts |
 | `screens/friends/` | Friends: search, friend requests and the friends list |
 | `screens/profile/` | Profile, Edit Profile |
+| `screens/chat/` | Chat |
 | `theme/` | Colours, fonts and the app theme |
 
 A screen with an `…Parts`, `…Sections`, `…Fields` or `…Card` file next to it was split into smaller files. Those files belong to that screen only.
@@ -165,7 +181,8 @@ If loading fails after the game was already shown, the old details stay on scree
 
 - **Result types:** repository functions never throw for normal problems. They return a sealed result like `Loaded` / `Failed(message)`, and the message is ready to show the user.
 - **DTO vs model:** DTOs match the server's JSON exactly. Models are what the screens show (formatted times, capitalised names). Converters are in `game/model/`.
-- **Live updates:** push notifications go through `GameEvents`. Routes that show a game listen to it and reload when an event for that game arrives.
+- **Live updates:** push notifications go through `GameEvents`. Routes that show a game listen to it and reload when an event for that game arrives. Chat messages arrive over a WebSocket instead, open only while the Chat screen is shown.
+- **Player profiles:** the players list, join requests, game chat and the friends list report a tapped name through their Actions (`onOpenProfile`), and their routes call `app.openProfile(userId)`. `AppNavigation` shows `PlayerProfilePopup` over the current screen, so closing it leaves that screen as it was.
 - **Passing values between screens:** Pick Location sends the chosen place back through `savedStateHandle`, using the keys in `Routes.kt`.
 - **Config:** `API_BASE_URL`, `GOOGLE_CLIENT_ID` and `MAPS_API_KEY` come from `frontend/local.properties` through `BuildConfig`. See the README.
 - **UiState and Actions:** most screens take a `…UiState` (what to show) and a `…Actions` (what each tap does). Both are defined at the top of the screen's file, so that's the place to start reading a screen.
@@ -183,4 +200,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-The design doc's Player Review and Message (chats) components have no frontend code yet, and Social doesn't have removing friends or friend profiles yet. Tapping a friend does nothing until friend chat is built. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+The design doc's Player Review component has no frontend code yet apart from the score and badges in the profile popup, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. Tapping a friend opens their profile until friend chat is built. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.

@@ -18,15 +18,17 @@ data class FriendPerson(
 // a friend request sent to this user, waiting for Accept or Decline
 data class FriendRequestItem(val requestId: Int, val sender: FriendPerson)
 
+fun friendshipStatusOf(value: String?): FriendshipStatus = when (value) {
+    "friends" -> FriendshipStatus.Friends
+    "request_sent" -> FriendshipStatus.RequestSent
+    "request_received" -> FriendshipStatus.RequestReceived
+    else -> FriendshipStatus.None
+}
+
 fun FriendUserDto.toFriendPerson() = FriendPerson(
     userId = userId,
     name = "$firstName $lastName".trim(),
-    status = when (friendshipStatus) {
-        "friends" -> FriendshipStatus.Friends
-        "request_sent" -> FriendshipStatus.RequestSent
-        "request_received" -> FriendshipStatus.RequestReceived
-        else -> FriendshipStatus.None
-    }
+    status = friendshipStatusOf(friendshipStatus)
 )
 
 fun FriendRequestDto.toFriendRequestItem() = FriendRequestItem(requestId = requestId, sender = sender.toFriendPerson())

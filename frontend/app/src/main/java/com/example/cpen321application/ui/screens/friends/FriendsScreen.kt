@@ -3,6 +3,7 @@ package com.example.cpen321application.ui.screens.friends
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -58,6 +59,7 @@ data class FriendsActions(
     val onAddFriend: (FriendPerson) -> Unit = {},
     val onAccept: (FriendRequestItem) -> Unit = {},
     val onDecline: (FriendRequestItem) -> Unit = {},
+    val onOpenProfile: (Int) -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
@@ -147,7 +149,9 @@ private fun LazyListScope.requestsAndFriends(state: FriendsUiState, actions: Fri
     }
 
     item(key = "friendsHeader") { SectionHeader(title = "Your Friends", count = state.friends.size) }
-    items(state.friends, key = { "friend${it.userId}" }) { friend -> PersonCard(person = friend) }
+    items(state.friends, key = { "friend${it.userId}" }) { friend ->
+        PersonCard(person = friend, onClick = { actions.onOpenProfile(friend.userId) })
+    }
     if (state.friends.isEmpty() && !state.isLoading && state.errorMessage == null) {
         item(key = "noFriends") { Note("No friends yet. Search for someone by name to send them a request.") }
     }
@@ -216,13 +220,21 @@ private fun Avatar(initial: String) {
     }
 }
 
-// one person: initial and name in a card like Home's game cards, trailing goes on the right
+/*  one person: initial and name in a card like Home's game cards, trailing goes on the right.
+    With onClick the whole card can be tapped, e.g. to open a friend's profile
+ */
 @Composable
-private fun PersonCard(person: FriendPerson, trailing: @Composable RowScope.() -> Unit = {}) {
+private fun PersonCard(
+    person: FriendPerson,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    val tapToOpen = onClick?.let { Modifier.clickable(onClickLabel = "View profile", onClick = it) } ?: Modifier
     CardRow(
         modifier = Modifier
             .cardBackground(SportsSurfaceContainer)
             .border(1.dp, SportsOutlineVariant, RoundedCornerShape(12.dp))
+            .then(tapToOpen)
     ) {
         Avatar(person.initial)
         Text(
