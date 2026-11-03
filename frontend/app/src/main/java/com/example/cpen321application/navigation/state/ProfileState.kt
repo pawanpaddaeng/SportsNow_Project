@@ -5,9 +5,11 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.cpen321application.user.repository.DeleteAccountResult
 import com.example.cpen321application.user.repository.ProfileForm
 import com.example.cpen321application.user.repository.ProfileResult
 import com.example.cpen321application.user.repository.UserProfile
+import com.example.cpen321application.user.repository.deleteMyAccount
 import com.example.cpen321application.user.repository.fetchMyProfile
 import com.example.cpen321application.user.repository.updateMyProfile
 import kotlinx.coroutines.CoroutineScope
@@ -25,8 +27,11 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
     var isSaving by mutableStateOf(false)
         private set
     var saveError by mutableStateOf<String?>(null)
+    var isDeleting by mutableStateOf(false)
+        private set
     private var loadJob: Job? = null
     private var saveJob: Job? = null
+    private var deleteJob: Job? = null
 
     fun refresh() {
         if (isLoading) return
@@ -69,12 +74,31 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
         }
     }
 
-    // also cancels a load or save in progress so its result can't fill the cleared state
+    // onDeleted runs once the server deleted the account, a failure is shown on Profile
+    fun deleteAccount(onDeleted: () -> Unit) {
+        if (isDeleting) return
+        isDeleting = true
+        deleteJob = scope.launch {
+            val result = try {
+                deleteMyAccount(context)
+            } finally {
+                isDeleting = false
+            }
+            when (result) {
+                DeleteAccountResult.Deleted -> onDeleted()
+                is DeleteAccountResult.Failed -> error = result.message
+            }
+        }
+    }
+
+    // also cancels a load, save or delete in progress so its result can't fill the cleared state
     fun clear() {
         loadJob?.cancel()
         saveJob?.cancel()
+        deleteJob?.cancel()
         isLoading = false
         isSaving = false
+        isDeleting = false
         profile = null
         error = null
         saveError = null

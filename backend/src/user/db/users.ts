@@ -84,6 +84,14 @@ export async function updateUserProfile(userId: number, profile: ProfileUpdate):
   );
 }
 
+/*  deletes the user. Their device tokens, the games they organize (with those games'
+    players, join requests and chats), their spots in other games, their join requests
+    and their chat messages go with it (ON DELETE CASCADE)
+ */
+export async function deleteUser(userId: number): Promise<void> {
+  await executeWrite('DELETE FROM users WHERE user_id = ?', [userId]);
+}
+
 export function userJson(user: User) {
   return {
     user_id: user.userId,

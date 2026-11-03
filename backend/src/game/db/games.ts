@@ -533,6 +533,38 @@ export async function getUsersToNotify(gameId: number, organizerId: number): Pro
   return rows.map((row) => row.user_id);
 }
 
+// a game that's still on (scheduled, started or not) with the user as one of its players
+export interface ActiveGame {
+  gameId: number;
+  organizerId: number;
+  title: string;
+  locationName: string;
+}
+
+interface ActiveGameRow {
+  game_id: number;
+  organizer_id: number;
+  title: string;
+  location_name: string;
+}
+
+// the games the user is playing in or organizing that are still on, e.g. to tell them the user deleted their account
+export async function getActiveGamesOfUser(userId: number): Promise<ActiveGame[]> {
+  const rows = await selectRows<ActiveGameRow>(
+    `SELECT g.game_id, g.organizer_id, g.title, g.location_name
+     FROM games g
+     JOIN game_players p ON p.game_id = g.game_id
+     WHERE p.user_id = ? AND g.status = 'scheduled'`,
+    [userId],
+  );
+  return rows.map((row) => ({
+    gameId: row.game_id,
+    organizerId: row.organizer_id,
+    title: row.title,
+    locationName: row.location_name,
+  }));
+}
+
 // a player in a game, with the name shown on the Game Details screen
 export interface GamePlayer {
   userId: number;

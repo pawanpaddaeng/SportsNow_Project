@@ -30,6 +30,7 @@ import java.util.Locale
 private const val LOAD_FAILED_MESSAGE = "Couldn't load your profile, try again"
 private const val SAVE_FAILED_MESSAGE = "Couldn't save your profile, try again"
 private const val SIGN_UP_FAILED_MESSAGE = "Could not create account, try again"
+private const val DELETE_FAILED_MESSAGE = "Couldn't delete your account, try again"
 
 private val MEMBER_SINCE_FORMAT = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
 
@@ -80,10 +81,15 @@ sealed interface ProfileResult {
     data class Failed(val message: String) : ProfileResult
 }
 
+sealed interface DeleteAccountResult {
+    data object Deleted : DeleteAccountResult
+    data class Failed(val message: String) : DeleteAccountResult
+}
+
 // the server answers "no_user" (404) when the Google account needs to sign up first
 suspend fun login(googleToken: String): LoginResult {
     return try {
-        val body = readAuthResponse(ServerApi.retrofitService.login(LoginRequest(idToken = googleToken)))
+        val body = readAuthResponse(ServerApi.userService.login(LoginRequest(idToken = googleToken)))
         when {
             body?.msg == "signedIn" && body.jwtToken != null -> LoginResult.SignedIn(body.jwtToken)
             body?.msg == "no_user" -> LoginResult.NoUser
@@ -102,7 +108,7 @@ suspend fun signUp(details: SignUpDetails): SignUpResult {
         ?: return SignUpResult.Failed("Could not read the email of your Google account, verify again")
 
     return try {
-        val response = ServerApi.retrofitService.signUp(
+        val response = ServerApi.userService.signUp(
             SignUpRequest(
                 idToken = details.idToken,
                 email = email,
@@ -150,7 +156,7 @@ fun readGoogleProfile(idToken: String): GoogleProfile {
 
 suspend fun fetchMyProfile(context: Context): ProfileResult =
     requestProfile(context, LOAD_FAILED_MESSAGE) { authorization ->
-        ServerApi.retrofitService.getMyProfile(authorization = authorization)
+        ServerApi.userService.getMyProfile(authorization = authorization)
     }
 
 suspend fun updateMyProfile(context: Context, form: ProfileForm): ProfileResult {
@@ -160,8 +166,25 @@ suspend fun updateMyProfile(context: Context, form: ProfileForm): ProfileResult 
         birthYear = form.birthYear
     )
     return requestProfile(context, SAVE_FAILED_MESSAGE) { authorization ->
-        ServerApi.retrofitService.updateMyProfile(authorization = authorization, request = request)
+        ServerApi.userService.updateMyProfile(authorization = authorization, request = request)
     }
+}
+
+// the server deletes the account with its games, spots in games and messages
+suspend fun deleteMyAccount(context: Context): DeleteAccountResult = try {
+    val response = Session.call(context) { authorization ->
+        ServerApi.userService.deleteMyAccount(authorization = authorization)
+    }
+    val reply = response?.let { readReply(it, ProfileResponse::class.java) }
+    when {
+        response == null -> DeleteAccountResult.Failed(SESSION_ENDED_MESSAGE)
+        reply?.msg == "success" -> DeleteAccountResult.Deleted
+        else -> DeleteAccountResult.Failed(reply?.error ?: DELETE_FAILED_MESSAGE)
+    }
+} catch (e: IOException) {
+    DeleteAccountResult.Failed(NETWORK_MESSAGE)
+} catch (e: JsonParseException) {
+    DeleteAccountResult.Failed(DELETE_FAILED_MESSAGE)
 }
 
 private suspend fun requestProfile(
@@ -200,7 +223,7 @@ suspend fun fetchPublicProfile(context: Context, userId: Int): PublicProfileResu
     val failureMessage = "Couldn't load this profile, try again"
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getPublicProfile(authorization = authorization, userId = userId)
+            ServerApi.userService.getPublicProfile(authorization = authorization, userId = userId)
         } ?: return PublicProfileResult.Failed(SESSION_ENDED_MESSAGE)
         val reply = readReply(response, PublicProfileResponse::class.java)
         val profile = reply?.profile

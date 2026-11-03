@@ -57,7 +57,7 @@ suspend fun searchUsers(context: Context, text: String): FriendResult<List<Frien
         context,
         "Couldn't search for people, try again",
         UserSearchResponse::class.java,
-        { authorization -> ServerApi.retrofitService.searchUsers(authorization, text) },
+        { authorization -> ServerApi.friendService.searchUsers(authorization, text) },
         { reply -> reply.users.orEmpty().map { it.toFriendPerson() } }
     )
 
@@ -66,7 +66,7 @@ suspend fun fetchFriends(context: Context): FriendResult<List<FriendPerson>> =
         context,
         "Couldn't load your friends, try again",
         FriendsResponse::class.java,
-        { authorization -> ServerApi.retrofitService.getFriends(authorization) },
+        { authorization -> ServerApi.friendService.getFriends(authorization) },
         { reply -> reply.friends.orEmpty().map { it.toFriendPerson() } }
     )
 
@@ -75,7 +75,7 @@ suspend fun fetchFriendRequests(context: Context): FriendResult<List<FriendReque
         context,
         "Couldn't load your friend requests, try again",
         FriendRequestsResponse::class.java,
-        { authorization -> ServerApi.retrofitService.getFriendRequests(authorization) },
+        { authorization -> ServerApi.friendService.getFriendRequests(authorization) },
         { reply -> reply.requests.orEmpty().map { it.toFriendRequestItem() } }
     )
 
@@ -84,7 +84,7 @@ suspend fun sendFriendRequest(context: Context, userId: Int): FriendResult<Unit>
         context,
         "Couldn't send your friend request, try again",
         FriendChangeResponse::class.java,
-        { authorization -> ServerApi.retrofitService.sendFriendRequest(authorization, SendFriendRequestBody(userId)) },
+        { authorization -> ServerApi.friendService.sendFriendRequest(authorization, SendFriendRequestBody(userId)) },
         { }
     )
 
@@ -94,7 +94,7 @@ suspend fun decideFriendRequest(context: Context, requestId: Int, accept: Boolea
         context,
         "Couldn't save your answer, try again",
         FriendChangeResponse::class.java,
-        { authorization -> ServerApi.retrofitService.decideFriendRequest(authorization, requestId, body) },
+        { authorization -> ServerApi.friendService.decideFriendRequest(authorization, requestId, body) },
         { }
     )
 }
