@@ -2,7 +2,7 @@
 
 The backend lives in `backend/src/`. It is a Node.js server written in TypeScript with Express, and it stores data in MySQL. It runs with Docker Compose (see the README).
 
-The code is grouped by the components in the design doc (User, Game, Message), plus shared code in `core/`. This matches the frontend layout.
+The code is grouped by the components in the design doc (User, Game, Social, Message), plus shared code in `core/`. This matches the frontend layout.
 
 ## Folder overview
 
@@ -13,14 +13,17 @@ backend/src/
 ├── core/             shared by every component
 ├── user/             User component: sign up, login, JWTs, profile
 ├── game/             Game component: games, discover, join requests
+├── friend/           Social component: user search, friend requests, friends list
+├── review/           Player Review component: reputation, so far only games played
 └── chat/             Message component: game chats, message history, WebSocket
 ```
 
 **Dependency rules**
-- `core/` imports nothing from `user/`, `game/` or `chat/`.
+- `core/` imports nothing from `user/`, `game/`, `friend/` or `chat/`.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
+- `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
+- `user/routes/publicProfileRoutes.ts` imports `getReputation` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
 - `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id. `chat/` never imports from `game/`, it reads the game tables with SQL.
-- `app.ts` is the only place routers are mounted.
 
 ## core/
 
@@ -41,6 +44,7 @@ backend/src/
 | --- | --- |
 | `routes/authRoutes.ts` | `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/register_notif` |
 | `routes/userRoutes.ts` | `GET /api/users/me`, `PUT /api/users/me` |
+| `routes/publicProfileRoutes.ts` | `GET /api/users/:userId`, another player's public profile: name, age range (never the birth year or email), games played, reputation and friendship status. Mounted after the routers for `/api/users/me` and `/api/users/search` |
 | `auth/jwt.ts` | Creates and checks the app's JWTs (HS256, signed with `JWT_SECRET`, valid for 30 days) |
 | `auth/middleware.ts` | `requireAuth` checks the JWT on every protected route and loads the user. `getAuthUser(res)` gives the route that user. `checkToken` is the check itself, also used by the chat WebSocket |
 | `db/users.ts` | User queries: create, find by id or Google id, update profile, and `userJson` |
@@ -52,13 +56,32 @@ backend/src/
 | --- | --- |
 | `routes/gameRoutes.ts` | Create, my games, discover, game details, edit and cancel (endpoints below) |
 | `routes/joinRequestRoutes.ts` | Send a join request, list pending requests, approve or decline |
+| `routes/inviteRoutes.ts` | `POST /api/games/:gameId/invites`: the organiser invites friends, each gets a `game_invite` notification |
 | `routes/gameJson.ts` | The JSON shapes sent to the app for games, players, Discover results and join requests |
 | `routes/gameErrors.ts` | Game id parsing, `readBackGame`, and the error tables that map problems like `game_full` to a status and message |
 | `db/games.ts` | Game queries: create, read, my games, discover (distance search), update, cancel, players, and `lockGameForChange` |
 | `db/joinRequests.ts` | Join request queries: create, list pending, approve/decline, pending count and the user's request status |
+| `db/invites.ts` | `checkInvites`: the game is the organiser's and not cancelled, started or full, and everyone invited is their friend and not in it yet. Invites aren't stored |
 | `validation/newGame.ts` | Checks a create/edit game body: sport, title, times, location, max players and skill level |
 | `validation/joinRequest.ts` | Checks a join request body: skill level, how often they play and the message |
+| `validation/invite.ts` | Checks an invite body: `friend_ids` is a list of 1 to 100 user ids |
 | `validation/coordinates.ts` | Checks the `lat` and `lng` query values for Discover |
+
+## friend/
+
+| File | What it does |
+| --- | --- |
+| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
+| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline |
+| `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
+
+## review/
+
+| File | What it does |
+| --- | --- |
+| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for), reputation score and badges. Score and badges are empty until ratings are built |
+
+
 
 ## chat/
 
@@ -99,10 +122,12 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 - **Reply format:** every reply has a `msg` code the app checks, e.g. `success`, `no_games`, `invalid_request`, `game_full`, `server_error`. Errors also have a readable `error` message the app can show.
 - **Result types instead of exceptions:** `db` functions return `{ ok: true, ... }` or `{ ok: false, problem }` for rule problems the user can act on. Routes turn each problem into a reply using an error table. Exceptions are only for unexpected failures.
 - **Error tables:** `GAME_CHANGE_ERRORS` (in `gameErrors.ts`), `JOIN_REQUEST_ERRORS` and `DECISION_ERRORS` (in `joinRequestRoutes.ts`) are typed `Record`s keyed by every possible problem. If a new problem is added, the compiler forces it to have a reply.
-- **Row locking:** edits, cancels, join requests and approvals lock the game's row with `FOR UPDATE` inside `inTransaction`, so the player limit can't be exceeded by two approvals at once.
+- **Row locking:** edits, cancels, join requests and approvals lock the game's row with `FOR UPDATE` inside `inTransaction`, so the player limit can't be exceeded by two approvals at once. Friend requests lock both users' rows the same way, lowest id first, so two people asking each other at once can't both succeed.
+- **Friendships:** one friendship is two rows in `friendships`, one for each user, so a user's friends are found by `user_id` alone.
+- **Name search:** MySQL can't rank names by how similar they are, so `searchUsers` reads every user's name and compares them on the server. That is fine at this size, but a much larger user base would need a search index.
 - **Times:** stored as UTC in MySQL and sent to the app as ISO 8601 strings, e.g. `"2026-10-18T02:00:00Z"`.
 - **Notifications are best effort:** sending never blocks or fails a reply. The database is the source of truth, and the app reloads when it next opens a screen.
-- **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests, chats) the first time the MySQL container starts. They don't run again on an existing database: a change to a table needs its own script or `ALTER TABLE` run by hand (see the README).
+- **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests, chats, friend requests, friendships) the first time the MySQL container starts. They don't run again on an existing database: a change to a table needs its own script or `ALTER TABLE` run by hand (see the README).
 - **Route order:** `/api/games/mine` and `/api/games/discover` are registered before `/api/games/:gameId`, so `mine` and `discover` aren't read as game ids.
 
 ## Adding a new endpoint
@@ -115,4 +140,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-The design doc's Player Review and Social (friends) components have no backend code yet, and friend chat isn't part of `chat/` yet. They should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+The design doc's Player Review component only has `getReputation` so far, without ratings, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.

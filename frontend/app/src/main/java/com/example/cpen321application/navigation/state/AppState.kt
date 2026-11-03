@@ -3,7 +3,10 @@ package com.example.cpen321application.navigation.state
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -31,6 +34,18 @@ class AppState(
     val homeState = HomeState(context, scope)
     val discoverState = DiscoverState(context, scope)
     val profileState = ProfileState(context, scope)
+    val friendsState = FriendsState(context, scope)
+
+    var profileUserId by mutableStateOf<Int?>(null)
+        private set
+
+    fun openProfile(userId: Int) {
+        profileUserId = userId
+    }
+
+    fun closeProfile() {
+        profileUserId = null
+    }
 
     // a saved token from a previous session signs in automatically, an expired one is renewed later
     fun startDestination(): String {
@@ -39,12 +54,16 @@ class AppState(
         return Routes.HOME
     }
 
-    // bottom bar: Home, Discover and Profile are built, the other tabs aren't yet
+    // bottom bar: Home, Discover, Friends and Profile are built, the other tabs aren't yet
     fun openTab(tab: BottomTab) {
         when (tab) {
             BottomTab.Home -> navController.popBackStack(Routes.HOME, inclusive = false)
-            // Home stays underneath so back from Discover or Profile returns to it
+            // Home stays underneath so back from Discover, Friends or Profile returns to it
             BottomTab.Discover -> navController.navigate(Routes.DISCOVER) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+            BottomTab.Friends -> navController.navigate(Routes.FRIENDS) {
                 popUpTo(Routes.HOME)
                 launchSingleTop = true
             }
@@ -64,6 +83,8 @@ class AppState(
         homeState.clear()
         discoverState.clear()
         profileState.clear()
+        friendsState.clear()
+        closeProfile()
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }

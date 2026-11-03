@@ -4,8 +4,10 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| 2026-11-02 | 4.1 Main Components (User, Player Review, Social) | Built `GET /api/users/{userId}` for the player profile popup (Player Statistics use case). It returns a player's name, age range, games played, reputation score and badges, never their email or birth year. `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. Added `getFriendshipStatus` so the popup knows when to offer Add Friend. |
+| 2026-11-01 | 4.1 Main Components (Social) | Search results now include `friendship_status`, so the Friends tab shows Request Sent instead of Add once a request is sent. |
+| 2026-11-01 | 4.1 Main Components (Social) | Built friend search, friend requests and the friends list for the new Friends tab. Added `GET /api/friends/requests` so the tab can list incoming requests, and search now also returns similar names so partial names and typos still find people. |
 | Oct 31, 2026 | 4.1, 4.2, 4.4 | Game chat is built. Section 4.1 now lists the Message component's real interfaces, and a chat closes through the game's status instead of a separate `closeGameChat` call. Section 4.2 stores chat messages in MySQL instead of MongoDB, because the 1 GB server doesn't have the memory to run a second database. Section 4.4 removes the MongoDB driver and marks `ws` as in use. |
-
 ---
 
 ## 2. Project Description
@@ -263,6 +265,8 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Used by the other components to get a user's name and details, returning null if no user has the id.
         7. `int sendPushToUser(int userId, PushMessage message)`
             - **Purpose**: Sends a push notification to every device the user is signed into and returns how many devices it reached.
+        8. `GET /api/users/{userId}` → `200 { profile }`
+            - **Purpose**: Returns another player's public profile for the profile popup: name, age range, games played, reputation score and badges, and a `friendship_status` (`self` on the user's own profile) so the app knows whether to offer Add Friend. Never returns email or birth year.
 
 2. **Game**
     - **Purpose**: Handles creating, editing, discovering, joining, and leaving games, accepting and removing players, and invitations, using the Google Maps API for locations.
@@ -288,8 +292,8 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Lets the organiser approve or decline a join request and notifies the requester.
         10. `DELETE /api/games/{gameId}/players/{userId}` → `200 { game }` *(planned)*
             - **Purpose**: Lets a player leave a game, or the organiser remove a player, before the game starts.
-        11. `POST /api/games/{gameId}/invites` body `{ friend_ids }` → `201 { msg: "success" }` *(planned)*
-            - **Purpose**: Lets the organiser invite friends to their game by notifying them.
+        11. `POST /api/games/{gameId}/invites` body `{ friend_ids }` → `201 { msg: "success" }`
+            - **Purpose**: Lets the organiser invite friends to their game by notifying them. Tapping the notification opens the game, where the friend can send a join request. Only the organiser can invite, only their friends who aren't in the game yet, and not once the game is cancelled, started or full.
         12. `List<GamePlayer> getGamePlayers(int gameId)`
             - **Purpose**: Used by Player Review and Message to check who played in a game.
         13. `List<Game> getFinishedGames(int userId)` *(planned)*
@@ -298,7 +302,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 3. **Player Review**
     - **Purpose**: Handles player ratings after a game, no-shows, reputation scores, and badges.
     - **Rationale**: The reputation score and badges are computed from ratings, so keeping them apart from games keeps the scoring algorithm in one place. We chose to recompute the score after each game over computing it on every profile view so profiles load quickly.
-    - **Interfaces**: *(planned)*
+    - **Interfaces**: `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. The rest are *(planned)*.
         1. `POST /api/games/{gameId}/ratings` body `{ rated_user_id, punctuality, sportsmanship, skill, reliability, overall }` → `201 { msg: "success" }`
             - **Purpose**: Records a user's rating of another player after a finished game.
         2. `POST /api/games/{gameId}/no-shows` body `{ user_ids }` → `200 { msg: "success" }`
@@ -306,7 +310,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         3. `GET /api/users/{userId}/stats` → `200 { reputation_score, games_played, badges }`
             - **Purpose**: Returns a user's reputation score, game history, and badges.
         4. `Reputation getReputation(int userId)`
-            - **Purpose**: Used by Game to show each requester's score and badges on the join request list.
+            - **Purpose**: Used by User's public profile to show a player's score, badges and games played, and by Game to show each requester's score and badges on the join request list.
         5. `void updateReputation(int gameId)`
             - **Purpose**: Recomputes the score of every player in a finished game and awards any new badges.
 
@@ -324,26 +328,30 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 5. **Social**
     - **Purpose**: Handles friend search, friend requests, removing friends, and viewing friends' profiles.
     - **Rationale**: Friendships are used by friend chat, game invites and friend profiles, so one component owns them. We chose to keep it apart from User so the User component only handles accounts and profiles.
-    - **Interfaces**: *(planned)*
+    - **Interfaces**: Search, friend requests, the friends list, `areFriends` and `getFriendshipStatus` are built. Removing friends and friend profiles are *(planned)*.
         1. `GET /api/users/search?q=` → `200 { users }`
-            - **Purpose**: Searches for users by name.
+            - **Purpose**: Searches for users by name as the user types, returning at most 20 with the best match first. Names that start with or contain `q` come first, then similar names, so partial names and typos still find people. Each user has a `friendship_status` of `none`, `friends`, `request_sent` or `request_received`, so the app can show Add or where the request stands.
         2. `POST /api/friends/requests` body `{ user_id }` → `201 { request }`
-            - **Purpose**: Sends a friend request and notifies the other user.
-        3. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
-            - **Purpose**: Accepts or declines a friend request.
-        4. `GET /api/friends` → `200 { friends }`
+            - **Purpose**: Sends a friend request and notifies the other user. Blocked for yourself, a user who doesn't exist, someone who is already a friend, and when either user already has a pending request to the other.
+        3. `GET /api/friends/requests` → `200 { requests }`
+            - **Purpose**: Returns the requests sent to the user that are waiting for an answer, newest first.
+        4. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
+            - **Purpose**: Accepts or declines a friend request and notifies the sender. Accepting makes the two users friends.
+        5. `GET /api/friends` → `200 { friends }`
             - **Purpose**: Returns the user's friends.
-        5. `DELETE /api/friends/{userId}` → `200 { msg: "success" }`
+        6. `DELETE /api/friends/{userId}` → `200 { msg: "success" }` *(planned)*
             - **Purpose**: Removes a friend.
-        6. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }`
+        7. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }` *(planned)*
             - **Purpose**: Returns a friend's profile with their badges and upcoming games.
-        7. `boolean areFriends(int userId, int otherUserId)`
+        8. `boolean areFriends(int userId, int otherUserId)`
             - **Purpose**: Used by Message and Game to check that two users are friends before a chat or invite.
+        9. `String getFriendshipStatus(int userId, int otherUserId)`
+            - **Purpose**: Used by User's public profile to say whether the two users are friends or one has a pending request to the other, so the popup shows Add Friend or where the request stands.
 
 
 ### **4.2. Databases**
 1. **Relational Database (MySQL)**
-    - **Purpose**: Stores users, games, players, join requests, device tokens, chats and their messages, friendships, and ratings.
+    - **Purpose**: Stores users, games, players, join requests, device tokens, chats and their messages, friend requests, friendships, and ratings.
     - **Rationale**: This data has clear links between tables and needs transactions, such as locking a game while a join request is approved. We chose MySQL over a document database for these joins and transactions. Chat messages are stored here too, instead of in a second database, because the 1 GB server doesn't have the memory to run both, and checking who can read a chat already needs the game and player tables.
 
 
@@ -358,7 +366,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
     - **Rationale**: We chose it over OpenStreetMap because it is made for Android, is well documented, and uses the same Google Cloud project as Google sign in.
     - **Interface**: `GoogleMap(CameraPositionState cameraPositionState, Function<LatLng, Unit> onMapClick)` from the Maps SDK for Android, which shows the map in the app and returns the coordinates of the spot the user taps.
 3. **Firebase Cloud Messaging** 
-    - **Purpose**: Sends push notifications, such as new join requests and request decisions, to users' phones.
+    - **Purpose**: Sends push notifications, such as new join requests, friend requests and their decisions, to users' phones.
     - **Rationale**: We chose it over keeping a connection open or polling the server because it is built into Android and saves battery.
     - **Interface**: `BatchResponse messaging.sendEachForMulticast(MulticastMessage message)`, which sends a title, body and data to a list of device tokens and reports which tokens no longer work.
 

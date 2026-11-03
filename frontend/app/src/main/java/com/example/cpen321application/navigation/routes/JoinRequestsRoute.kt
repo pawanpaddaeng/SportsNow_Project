@@ -113,6 +113,7 @@ fun JoinRequestsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier
             onRetry = if (unavailable) null else ({ loadRequests() }),
             onApprove = { request -> decide(request, approve = true) },
             onDecline = { request -> decide(request, approve = false) },
+            onOpenProfile = { userId -> app.openProfile(userId) },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
         modifier = modifier
