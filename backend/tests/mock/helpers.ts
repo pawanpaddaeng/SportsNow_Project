@@ -7,6 +7,12 @@ import { type User } from '../../src/user/db/users';
 // setup shared by the mocked tests. Each call makes new objects, so no test sees
 // another test's changes
 
+// the parts of a server reply the tests read
+export interface ApiReply {
+  status: number;
+  body: { msg?: string; error?: string; game?: unknown };
+}
+
 // the user organizing the test game
 export function testOrganizer(): User {
   return {

@@ -4,7 +4,7 @@ import { createApp } from '../../../src/app';
 import * as gamesDb from '../../../src/game/db/games';
 import * as ratingsDb from '../../../src/review/db/ratings';
 import type * as MockEnv from '../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testPlayer } from '../helpers';
+import { type ApiReply, cleanUpAfterTests, signIn, testGame, testPlayer } from '../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
@@ -15,11 +15,12 @@ const VALID_RATING = { rated_user_id: RATED_ID, punctuality: 5, sportsmanship: 4
 
 cleanUpAfterTests();
 
-function postRating(token: string, rating: object) {
-  return request(createApp())
+async function postRating(token: string, rating: object): Promise<ApiReply> {
+  const response = await request(createApp())
     .post(`/api/games/${GAME_ID}/ratings`)
     .set('Authorization', `Bearer ${token}`)
     .send(rating);
+  return response as ApiReply;
 }
 
 // Interface POST /api/games/{gameId}/ratings

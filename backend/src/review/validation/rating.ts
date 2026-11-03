@@ -18,8 +18,12 @@ export interface NewRating {
   scores: RatingScores;
 }
 
+function isPositiveWholeNumber(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 1;
+}
+
 function isStars(value: unknown): boolean {
-  return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5;
+  return isPositiveWholeNumber(value) && value <= 5;
 }
 
 /*  checks who is rated and that every category is a whole number of stars from 1 to 5.
@@ -27,14 +31,12 @@ function isStars(value: unknown): boolean {
  */
 export function parseRating(body: RatingBody | undefined): ParseResult<NewRating> {
   const { rated_user_id: ratedUserId, punctuality, sportsmanship, skill, reliability, overall } = body ?? {};
-  if (!Number.isInteger(ratedUserId) || Number(ratedUserId) < 1) {
-    return { ok: false, error: 'rated_user_id must be a user id' };
-  }
+  if (!isPositiveWholeNumber(ratedUserId)) return { ok: false, error: 'rated_user_id must be a user id' };
 
   const stars = { punctuality, sportsmanship, skill, reliability, overall };
   const invalid = Object.entries(stars).filter(([, value]) => !isStars(value)).map(([category]) => category);
   if (invalid.length > 0) {
     return { ok: false, error: `${invalid.join(', ')} must be a whole number from 1 to 5` };
   }
-  return { ok: true, value: { ratedUserId: Number(ratedUserId), scores: stars as RatingScores } };
+  return { ok: true, value: { ratedUserId, scores: stars as RatingScores } };
 }

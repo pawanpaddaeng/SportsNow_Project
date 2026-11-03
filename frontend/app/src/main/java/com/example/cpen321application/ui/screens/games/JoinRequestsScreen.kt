@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -26,8 +25,8 @@ import com.example.cpen321application.game.model.JoinRequestItem
 import com.example.cpen321application.game.model.JoinRequestsHeader
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.RetryMessage
-import com.example.cpen321application.ui.components.TabScaffold
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Join Requests screen shows. header is null until the game loads. isLoading
@@ -59,53 +58,45 @@ data class JoinRequestsActions(
 @Composable
 fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions, modifier: Modifier = Modifier) {
     val header = state.header
-    TabScaffold(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected, modifier = modifier) { innerPadding ->
-        LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            item(key = "top") { BackTitleBar(title = "Join Requests", onBack = actions.onBack) }
+    LazyTabScreen(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected, modifier = modifier) {
+        item(key = "top") { BackTitleBar(title = "Join Requests", onBack = actions.onBack) }
 
-            if (header != null) {
-                item(key = "game") {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(text = header.title, color = SportsOnSurface, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-                        Text(text = header.subtitle, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+        if (header != null) {
+            item(key = "game") {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(text = header.title, color = SportsOnSurface, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    Text(text = header.subtitle, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+                }
+            }
+        }
+
+        loadStatus(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
+
+        if (header?.isFull == true && state.requests.isNotEmpty()) {
+            item(key = "full") {
+                Note("The game is full. Edit the game to add spots before approving more players.")
+            }
+        }
+
+        items(state.requests, key = { it.requestId }) { request ->
+            RequestCard(
+                request = request,
+                isBusy = request.requestId in state.busyRequestIds,
+                canApprove = header?.isFull == false,
+                onApprove = { actions.onApprove(request) },
+                onDecline = { actions.onDecline(request) }
+            )
+        }
+
+        if (header != null) {
+            item(key = "footer") {
+                Note(
+                    if (state.requests.isEmpty()) {
+                        "No join requests right now. You'll get a notification when someone asks to join."
+                    } else {
+                        "Approved players are added to the game and its chat."
                     }
-                }
-            }
-
-            loadStatus(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
-
-            if (header?.isFull == true && state.requests.isNotEmpty()) {
-                item(key = "full") {
-                    Note("The game is full. Edit the game to add spots before approving more players.")
-                }
-            }
-
-            items(state.requests, key = { it.requestId }) { request ->
-                RequestCard(
-                    request = request,
-                    isBusy = request.requestId in state.busyRequestIds,
-                    canApprove = header?.isFull == false,
-                    onApprove = { actions.onApprove(request) },
-                    onDecline = { actions.onDecline(request) }
                 )
-            }
-
-            if (header != null) {
-                item(key = "footer") {
-                    Note(
-                        if (state.requests.isEmpty()) {
-                            "No join requests right now. You'll get a notification when someone asks to join."
-                        } else {
-                            "Approved players are added to the game and its chat."
-                        }
-                    )
-                }
             }
         }
     }

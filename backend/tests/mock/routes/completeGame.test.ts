@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createApp } from '../../../src/app';
 import * as gamesDb from '../../../src/game/db/games';
 import type * as MockEnv from '../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../helpers';
+import { type ApiReply, cleanUpAfterTests, signIn, testGame, testOrganizer } from '../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
@@ -12,11 +12,12 @@ const GAME_ID = 42;
 
 cleanUpAfterTests();
 
-function postComplete(token: string, body?: object) {
-  return request(createApp())
+async function postComplete(token: string, body?: object): Promise<ApiReply> {
+  const response = await request(createApp())
     .post(`/api/games/${GAME_ID}/complete`)
     .set('Authorization', `Bearer ${token}`)
     .send(body);
+  return response as ApiReply;
 }
 
 // Interface POST /api/games/{gameId}/complete
