@@ -28,7 +28,7 @@ sealed interface PlayersToRateResult {
 suspend fun fetchPlayersToRate(context: Context, gameId: Int): PlayersToRateResult {
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getPlayersToRate(authorization = authorization, gameId = gameId)
+            ServerApi.reviewService.getPlayersToRate(authorization = authorization, gameId = gameId)
         } ?: return PlayersToRateResult.Failed(SESSION_ENDED_MESSAGE)
         if (response.code() == 403 || response.code() == 404) {
             return PlayersToRateResult.Unavailable("You can't rate players in this game.")
@@ -55,7 +55,7 @@ sealed interface ReputationScoreResult {
 suspend fun fetchMyReputationScore(context: Context): ReputationScoreResult {
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.getMyStats(authorization = authorization)
+            ServerApi.reviewService.getMyStats(authorization = authorization)
         } ?: return ReputationScoreResult.Failed(SESSION_ENDED_MESSAGE)
         val score = response.body()?.reputationScore
         if (score != null) ReputationScoreResult.Loaded(score) else ReputationScoreResult.Failed(COULD_NOT_LOAD_SCORE)
@@ -88,7 +88,7 @@ suspend fun submitRating(
     )
     return try {
         val response = Session.call(context) { authorization ->
-            ServerApi.retrofitService.submitRating(authorization = authorization, gameId = gameId, request = body)
+            ServerApi.reviewService.submitRating(authorization = authorization, gameId = gameId, request = body)
         } ?: return SubmitRatingResult.Failed(SESSION_ENDED_MESSAGE)
         val reply = readReply(response, RatingResponse::class.java)
         when {

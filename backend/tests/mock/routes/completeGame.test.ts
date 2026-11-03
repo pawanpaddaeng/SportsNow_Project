@@ -12,6 +12,13 @@ const GAME_ID = 42;
 
 cleanUpAfterTests();
 
+function postComplete(token: string, body?: object) {
+  return request(createApp())
+    .post(`/api/games/${GAME_ID}/complete`)
+    .set('Authorization', `Bearer ${token}`)
+    .send(body);
+}
+
 // Interface POST /api/games/{gameId}/complete
 describe('Mocked: POST /api/games/{gameId}/complete', () => {
   // Mocked behavior: the games database is replaced by one game kept in memory that
@@ -45,9 +52,7 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     expect(game.status).toBe('scheduled');
 
     // 3. mark it completed through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/complete`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await postComplete(token);
 
     // 4. check it was completed
     expect(response.status).toBe(200);
@@ -71,10 +76,7 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/complete`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ no_show_user_ids: [7, 8, 7] });
+    const response = await postComplete(token, { no_show_user_ids: [7, 8, 7] });
 
     expect(response.status).toBe(200);
     expect(completeGame).toHaveBeenCalledWith(GAME_ID, organizer.userId, [7, 8]);
@@ -90,10 +92,7 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     const token = signIn(organizer);
     const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/complete`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ no_show_user_ids: ['seven'] });
+    const response = await postComplete(token, { no_show_user_ids: ['seven'] });
 
     expect(response.status).toBe(400);
     expect(response.body.msg).toBe('invalid_request');

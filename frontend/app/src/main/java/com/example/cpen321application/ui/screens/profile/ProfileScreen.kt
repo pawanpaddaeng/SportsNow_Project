@@ -45,23 +45,32 @@ import com.example.cpen321application.user.repository.UserProfile
 // width of the labels in the details card, so the values line up
 private val DETAIL_LABEL_WIDTH = 104.dp
 
+/*  what the Profile screen shows. profile is null until it loads, reputationScore until
+    the score loads. isLoading shows a loading bar and errorMessage a problem
+ */
+data class ProfileUiState(
+    val profile: UserProfile?,
+    val reputationScore: Double? = null,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+
+// what the Profile screen's controls do
+data class ProfileActions(
+    val onEdit: () -> Unit = {},
+    val onRetry: () -> Unit = {},
+    val onTabSelected: (BottomTab) -> Unit = {}
+)
+
 @Composable
-fun ProfileScreen(
-    profile: UserProfile?,
-    modifier: Modifier = Modifier,
-    reputationScore: Double? = null,
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
-    onEdit: () -> Unit = {},
-    onRetry: () -> Unit = {},
-    onTabSelected: (BottomTab) -> Unit = {}
-) {
+fun ProfileScreen(state: ProfileUiState, actions: ProfileActions, modifier: Modifier = Modifier) {
+    val profile = state.profile
     Scaffold(
         modifier = modifier,
         containerColor = Color.White,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Profile, onTabSelected = onTabSelected)
+            AppBottomBar(selectedTab = BottomTab.Profile, onTabSelected = actions.onTabSelected)
         }
     ) { innerPadding ->
         Column(
@@ -72,9 +81,9 @@ fun ProfileScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)
         ) {
-            ProfileHeader(canEdit = profile != null, onEdit = onEdit)
+            ProfileHeader(canEdit = profile != null, onEdit = actions.onEdit)
 
-            if (isLoading) {
+            if (state.isLoading) {
                 LinearProgressIndicator(
                     color = SportsPrimary,
                     trackColor = SportsPrimaryContainer,
@@ -84,11 +93,11 @@ fun ProfileScreen(
 
             if (profile == null) {
                 // nothing to show yet: wait for the first load, or offer to try again
-                if (errorMessage != null) ProfileLoadError(message = errorMessage, onRetry = onRetry)
+                if (state.errorMessage != null) ProfileLoadError(message = state.errorMessage, onRetry = actions.onRetry)
             } else {
-                if (errorMessage != null) ErrorText(errorMessage)
+                if (state.errorMessage != null) ErrorText(state.errorMessage)
                 ProfileIdentity(profile)
-                if (reputationScore != null) ReputationCard(reputationScore)
+                if (state.reputationScore != null) ReputationCard(state.reputationScore)
                 ProfileDetailsCard(profile)
             }
         }

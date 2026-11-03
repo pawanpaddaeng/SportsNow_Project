@@ -150,7 +150,10 @@ interface NetworkConnection {
         @Path("chatId") chatId: Int,
         @Query("before") before: Int?
     ) : Response<ChatMessagesResponse>
+}
 
+// the Player Review component's endpoints
+interface ReviewConnection {
     @GET("api/games/{gameId}/ratings")
     suspend fun getPlayersToRate(
         @Header("Authorization") authorization: String,
@@ -173,5 +176,8 @@ interface NetworkConnection {
 object ServerApi {
     val retrofitService : NetworkConnection by lazy {
         retrofit.create(NetworkConnection::class.java)
+    }
+    val reviewService : ReviewConnection by lazy {
+        retrofit.create(ReviewConnection::class.java)
     }
 }

@@ -12,7 +12,9 @@ import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.ui.screens.profile.EditProfileScreen
+import com.example.cpen321application.ui.screens.profile.ProfileActions
 import com.example.cpen321application.ui.screens.profile.ProfileScreen
+import com.example.cpen321application.ui.screens.profile.ProfileUiState
 
 /*  calls action every time the screen is shown: when it first opens, when the user
     comes back from another screen, and when the app returns to the foreground
@@ -35,17 +37,21 @@ fun ProfileRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
     OnResume(backStackEntry) { profileState.refresh() }
 
     ProfileScreen(
-        profile = profileState.profile,
-        modifier = modifier,
-        reputationScore = profileState.reputationScore,
-        isLoading = profileState.isLoading,
-        errorMessage = profileState.error,
-        onEdit = {
-            profileState.saveError = null
-            app.navController.navigate(Routes.EDIT_PROFILE)
-        },
-        onRetry = { profileState.refresh() },
-        onTabSelected = { tab -> app.openTab(tab) }
+        state = ProfileUiState(
+            profile = profileState.profile,
+            reputationScore = profileState.reputationScore,
+            isLoading = profileState.isLoading,
+            errorMessage = profileState.error
+        ),
+        actions = ProfileActions(
+            onEdit = {
+                profileState.saveError = null
+                app.navController.navigate(Routes.EDIT_PROFILE)
+            },
+            onRetry = { profileState.refresh() },
+            onTabSelected = { tab -> app.openTab(tab) }
+        ),
+        modifier = modifier
     )
 }
 

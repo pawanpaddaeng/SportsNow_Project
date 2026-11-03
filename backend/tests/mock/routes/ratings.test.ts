@@ -15,6 +15,13 @@ const VALID_RATING = { rated_user_id: RATED_ID, punctuality: 5, sportsmanship: 4
 
 cleanUpAfterTests();
 
+function postRating(token: string, rating: object) {
+  return request(createApp())
+    .post(`/api/games/${GAME_ID}/ratings`)
+    .set('Authorization', `Bearer ${token}`)
+    .send(rating);
+}
+
 // Interface POST /api/games/{gameId}/ratings
 describe('Mocked: POST /api/games/{gameId}/ratings', () => {
   // Mocked behavior: createRating is replaced so only the route runs
@@ -27,10 +34,7 @@ describe('Mocked: POST /api/games/{gameId}/ratings', () => {
     const token = signIn(player);
     const createRating = jest.spyOn(ratingsDb, 'createRating').mockResolvedValue({ ok: true });
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/ratings`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_RATING);
+    const response = await postRating(token, VALID_RATING);
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ msg: 'success' });
@@ -48,10 +52,7 @@ describe('Mocked: POST /api/games/{gameId}/ratings', () => {
     const token = signIn(testPlayer());
     const createRating = jest.spyOn(ratingsDb, 'createRating').mockResolvedValue({ ok: true });
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/ratings`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...VALID_RATING, skill: undefined, overall: 6 });
+    const response = await postRating(token, { ...VALID_RATING, skill: undefined, overall: 6 });
 
     expect(response.status).toBe(400);
     expect(response.body.msg).toBe('invalid_request');
@@ -73,10 +74,7 @@ describe('Mocked: POST /api/games/{gameId}/ratings', () => {
     const token = signIn(testPlayer());
     jest.spyOn(ratingsDb, 'createRating').mockResolvedValue({ ok: false, problem });
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/ratings`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_RATING);
+    const response = await postRating(token, VALID_RATING);
 
     expect(response.status).toBe(status);
     expect(response.body.msg).toBe(msg);

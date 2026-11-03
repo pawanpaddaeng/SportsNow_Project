@@ -3,9 +3,7 @@ package com.example.cpen321application.ui.screens.games
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -14,7 +12,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -22,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.ui.components.ChipGroup
 import com.example.cpen321application.ui.components.FieldLabel
+import com.example.cpen321application.ui.components.FormSheet
+import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.sportsFieldColors
 import com.example.cpen321application.ui.theme.*
 import java.util.Locale
@@ -56,7 +55,6 @@ data class JoinRequestAnswers(
     isSending shows progress on Send Request while the request is sent, errorMessage
     shows why it failed (the answers stay so the user can try again)
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JoinRequestSheet(
     details: GameDetails,
@@ -68,65 +66,52 @@ fun JoinRequestSheet(
     var skillLevel by rememberSaveable { mutableStateOf<String?>(null) }
     var playFrequency by rememberSaveable { mutableStateOf<String?>(null) }
     var message by rememberSaveable { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
-        onDismissRequest = { if (!isSending) onDismiss() },
-        sheetState = sheetState,
-        containerColor = Color.White
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    FormSheet(isSending = isSending, onDismiss = onDismiss) {
+        SheetHeader(details = details, onClose = onDismiss, closeEnabled = !isSending)
+
+        ChipGroup(
+            label = "What is your skill level in ${details.sport.lowercase(Locale.getDefault())}? *",
+            options = REQUEST_SKILL_LEVELS,
+            selected = skillLevel,
+            onSelect = { skillLevel = it }
+        )
+
+        // optional, tapping the selected chip again clears it
+        ChipGroup(
+            label = "How often do you play?",
+            options = PLAY_FREQUENCIES,
+            selected = playFrequency,
+            onSelect = { playFrequency = if (it == playFrequency) null else it }
+        )
+
+        MessageField(value = message, onValueChange = { message = it.take(MAX_MESSAGE_LENGTH) })
+
+        Text(
+            text = "${details.organizer.firstName} reviews requests. You will get a notification when they respond.",
+            color = SportsOnSurfaceVariant,
+            fontSize = 12.sp,
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
-        ) {
-            SheetHeader(details = details, onClose = onDismiss, closeEnabled = !isSending)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SportsSurfaceContainer)
+                .padding(12.dp)
+        )
 
-            ChipGroup(
-                label = "What is your skill level in ${details.sport.lowercase(Locale.getDefault())}? *",
-                options = REQUEST_SKILL_LEVELS,
-                selected = skillLevel,
-                onSelect = { skillLevel = it }
-            )
-
-            // optional, tapping the selected chip again clears it
-            ChipGroup(
-                label = "How often do you play?",
-                options = PLAY_FREQUENCIES,
-                selected = playFrequency,
-                onSelect = { playFrequency = if (it == playFrequency) null else it }
-            )
-
-            MessageField(value = message, onValueChange = { message = it.take(MAX_MESSAGE_LENGTH) })
-
-            Text(
-                text = "${details.organizer.firstName} reviews requests. You will get a notification when they respond.",
-                color = SportsOnSurfaceVariant,
-                fontSize = 12.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SportsSurfaceContainer)
-                    .padding(12.dp)
-            )
-
-            if (errorMessage != null) {
-                Text(text = errorMessage, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
-            }
-
-            Buttons(
-                canSend = skillLevel != null && !isSending,
-                isSending = isSending,
-                onCancel = onDismiss,
-                onSend = {
-                    skillLevel?.let { skill ->
-                        onSend(JoinRequestAnswers(skillLevel = skill, playFrequency = playFrequency, message = message))
-                    }
-                }
-            )
+        if (errorMessage != null) {
+            Text(text = errorMessage, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
         }
+
+        Buttons(
+            canSend = skillLevel != null && !isSending,
+            isSending = isSending,
+            onCancel = onDismiss,
+            onSend = {
+                skillLevel?.let { skill ->
+                    onSend(JoinRequestAnswers(skillLevel = skill, playFrequency = playFrequency, message = message))
+                }
+            }
+        )
     }
 }
 
@@ -186,20 +171,12 @@ private fun Buttons(canSend: Boolean, isSending: Boolean, onCancel: () -> Unit, 
         ) {
             Text(text = "Cancel", color = SportsPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
-        Button(
+        FormSubmitButton(
+            text = "Send Request",
+            isSending = isSending,
             onClick = onSend,
             enabled = canSend,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp)
-        ) {
-            if (isSending) {
-                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-            } else {
-                Text(text = "Send Request", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        }
+            modifier = Modifier.weight(1f)
+        )
     }
 }

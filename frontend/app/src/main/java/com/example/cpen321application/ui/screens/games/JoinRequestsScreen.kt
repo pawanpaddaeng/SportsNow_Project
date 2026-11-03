@@ -24,10 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.JoinRequestItem
 import com.example.cpen321application.game.model.JoinRequestsHeader
-import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.TabScaffold
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Join Requests screen shows. header is null until the game loads. isLoading
@@ -59,14 +59,7 @@ data class JoinRequestsActions(
 @Composable
 fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions, modifier: Modifier = Modifier) {
     val header = state.header
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.White,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected)
-        }
-    ) { innerPadding ->
+    TabScaffold(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected, modifier = modifier) { innerPadding ->
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

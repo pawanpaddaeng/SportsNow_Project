@@ -1,13 +1,10 @@
 package com.example.cpen321application.ui.screens.games
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -15,10 +12,10 @@ import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.GameRole
-import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.ScrollingTabScreen
 import com.example.cpen321application.ui.theme.*
 
 // the Game Details actions that wait for the server, each with its own button and what's shown once it's done
@@ -76,44 +73,28 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
     // the player the organizer is asked to confirm removing
     var confirmRemove by remember { mutableStateOf<GamePlayer?>(null) }
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.White,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            AppBottomBar(selectedTab = state.selectedTab, onTabSelected = actions.onTabSelected)
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // a cancelled, completed or started game can't be changed any more
-            val canEdit = details?.role == GameRole.Organizer &&
-                !details.isCancelled && !details.isCompleted && !details.hasStarted
-            BackTitleBar(title = "Game Details", onBack = actions.onBack) {
-                if (canEdit) {
-                    TextButton(onClick = actions.onEdit) {
-                        Text(text = "Edit", color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    }
+    ScrollingTabScreen(selectedTab = state.selectedTab, onTabSelected = actions.onTabSelected, modifier = modifier) {
+        // a cancelled, completed or started game can't be changed any more
+        val canEdit = details?.role == GameRole.Organizer &&
+            !details.isCancelled && !details.isCompleted && !details.hasStarted
+        BackTitleBar(title = "Game Details", onBack = actions.onBack) {
+            if (canEdit) {
+                TextButton(onClick = actions.onEdit) {
+                    Text(text = "Edit", color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
             }
+        }
 
-            if (details == null) {
-                LoadingOrError(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
-            } else {
-                LoadedDetails(
-                    details = details,
-                    state = state,
-                    actions = actions,
-                    onSeeAllPlayers = { showPlayers = true },
-                    onGameAction = { action -> confirmAction = action }
-                )
-            }
+        if (details == null) {
+            LoadingOrError(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
+        } else {
+            LoadedDetails(
+                details = details,
+                state = state,
+                actions = actions,
+                onSeeAllPlayers = { showPlayers = true },
+                onGameAction = { action -> confirmAction = action }
+            )
         }
     }
 
