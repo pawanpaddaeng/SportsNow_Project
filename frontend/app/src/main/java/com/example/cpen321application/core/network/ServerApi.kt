@@ -23,6 +23,7 @@ import com.example.cpen321application.game.dto.PendingJoinRequestsResponse
 import com.example.cpen321application.user.dto.AuthTokenResponse
 import com.example.cpen321application.user.dto.LoginRequest
 import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.PublicProfileResponse
 import com.example.cpen321application.user.dto.RegisterNotifRequest
 import com.example.cpen321application.user.dto.SignUpRequest
 import com.example.cpen321application.user.dto.UpdateProfileRequest
@@ -65,6 +66,12 @@ interface NetworkConnection {
         @Header("Authorization") authorization: String,
         @Body request: UpdateProfileRequest
     ) : Response<ProfileResponse>
+
+    @GET("api/users/{userId}")
+    suspend fun getPublicProfile(
+        @Header("Authorization") authorization: String,
+        @Path("userId") userId: Int
+    ) : Response<PublicProfileResponse>
 
     // the signed in user is the new game's organizer
     @POST("api/games")

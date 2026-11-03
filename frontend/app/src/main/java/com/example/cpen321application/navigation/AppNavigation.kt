@@ -22,6 +22,7 @@ import com.example.cpen321application.navigation.routes.GameDetailsRoute
 import com.example.cpen321application.navigation.routes.HomeRoute
 import com.example.cpen321application.navigation.routes.JoinRequestsRoute
 import com.example.cpen321application.navigation.routes.PickLocationRoute
+import com.example.cpen321application.navigation.routes.PlayerProfilePopup
 import com.example.cpen321application.navigation.routes.ProfileRoute
 import com.example.cpen321application.navigation.routes.SignInRoute
 import com.example.cpen321application.navigation.routes.SignUpRoute
@@ -87,5 +88,8 @@ fun AppNavigation(modifier: Modifier = Modifier, gameToOpen: Int? = null, onGame
         composable(Routes.PICK_LOCATION) { PickLocationRoute(app, modifier) }
         composable(Routes.PROFILE) { ProfileRoute(app, it, modifier) }
         composable(Routes.EDIT_PROFILE) { EditProfileRoute(app, modifier) }
+    }
+    app.profileUserId?.let { userId ->
+        PlayerProfilePopup(app = app, userId = userId, onDismiss = { app.closeProfile() })
     }
 }

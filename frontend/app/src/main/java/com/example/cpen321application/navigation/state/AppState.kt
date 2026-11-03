@@ -3,7 +3,10 @@ package com.example.cpen321application.navigation.state
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -31,6 +34,17 @@ class AppState(
     val discoverState = DiscoverState(context, scope)
     val profileState = ProfileState(context, scope)
     val friendsState = FriendsState(context, scope)
+
+    var profileUserId by mutableStateOf<Int?>(null)
+        private set
+
+    fun openProfile(userId: Int) {
+        profileUserId = userId
+    }
+
+    fun closeProfile() {
+        profileUserId = null
+    }
 
     // a saved token from a previous session signs in automatically, an expired one is renewed later
     fun startDestination(): String {
@@ -69,6 +83,7 @@ class AppState(
         discoverState.clear()
         profileState.clear()
         friendsState.clear()
+        closeProfile()
         navController.navigate(Routes.SIGN_IN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
