@@ -21,16 +21,44 @@ function toFriendUser(row: FriendUserRow): FriendUser {
 // most people a search returns
 const MAX_SEARCH_RESULTS = 20;
 
+// how a search result is connected to the user searching
+export type FriendshipStatus = 'none' | 'friends' | 'request_sent' | 'request_received';
+
+export interface UserSearchResult extends FriendUser {
+  friendshipStatus: FriendshipStatus;
+}
+
+interface UserSearchRow extends FriendUserRow {
+  is_friend: number;
+  request_sent: number;
+  request_received: number;
+}
+
+function toUserSearchResult(row: UserSearchRow): UserSearchResult {
+  let friendshipStatus: FriendshipStatus = 'none';
+  if (row.is_friend) friendshipStatus = 'friends';
+  else if (row.request_sent) friendshipStatus = 'request_sent';
+  else if (row.request_received) friendshipStatus = 'request_received';
+  return { ...toFriendUser(row), friendshipStatus };
+}
+
 /*  users whose name matches or is similar to text, best match first, except the user
     searching. MySQL can't compare how similar names are, so every name is compared here
  */
-export async function searchUsers(text: string, userId: number): Promise<FriendUser[]> {
-  const rows = await selectRows<FriendUserRow>(
-    'SELECT user_id, first_name, last_name FROM users WHERE user_id <> ?',
-    [userId],
+export async function searchUsers(text: string, userId: number): Promise<UserSearchResult[]> {
+  const rows = await selectRows<UserSearchRow>(
+    `SELECT u.user_id, u.first_name, u.last_name,
+            EXISTS (SELECT 1 FROM friendships f WHERE f.user_id = ? AND f.friend_id = u.user_id) AS is_friend,
+            EXISTS (SELECT 1 FROM friend_requests r
+                    WHERE r.sender_id = ? AND r.receiver_id = u.user_id AND r.status = 'pending') AS request_sent,
+            EXISTS (SELECT 1 FROM friend_requests r
+                    WHERE r.sender_id = u.user_id AND r.receiver_id = ? AND r.status = 'pending') AS request_received
+     FROM users u
+     WHERE u.user_id <> ?`,
+    [userId, userId, userId, userId],
   );
   const matches = rows.flatMap((row) => {
-    const user = toFriendUser(row);
+    const user = toUserSearchResult(row);
     const match = matchName(text, `${user.firstName} ${user.lastName}`);
     return match ? [{ user, match }] : [];
   });

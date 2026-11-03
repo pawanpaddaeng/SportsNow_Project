@@ -13,7 +13,9 @@ interface FriendReplyDto {
 data class FriendUserDto(
     @SerializedName("user_id") val userId: Int,
     @field:Required @SerializedName("first_name") val firstName: String,
-    @field:Required @SerializedName("last_name") val lastName: String
+    @field:Required @SerializedName("last_name") val lastName: String,
+    // search results only: "none", "friends", "request_sent" or "request_received"
+    @SerializedName("friendship_status") val friendshipStatus: String? = null
 )
 
 data class FriendRequestDto(

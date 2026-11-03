@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.friend.model.FriendPerson
 import com.example.cpen321application.friend.model.FriendRequestItem
+import com.example.cpen321application.friend.model.FriendshipStatus
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
@@ -118,7 +119,13 @@ private fun LazyListScope.loadStatus(isLoading: Boolean, errorMessage: String?, 
 private fun LazyListScope.searchResults(state: FriendsUiState, actions: FriendsActions) {
     items(state.searchResults, key = { "result${it.userId}" }) { person ->
         PersonCard(person = person) {
-            AddButton(isBusy = person.userId in state.busyUserIds, onClick = { actions.onAddFriend(person) })
+            when (person.status) {
+                FriendshipStatus.None ->
+                    AddButton(isBusy = person.userId in state.busyUserIds, onClick = { actions.onAddFriend(person) })
+                FriendshipStatus.Friends -> StatusPill("Friends")
+                FriendshipStatus.RequestSent -> StatusPill("Request Sent")
+                FriendshipStatus.RequestReceived -> StatusPill("Sent you a request")
+            }
         }
     }
     if (state.searchResults.isEmpty() && !state.isLoading && state.errorMessage == null) {
@@ -227,6 +234,18 @@ private fun PersonCard(person: FriendPerson, trailing: @Composable RowScope.() -
         )
         trailing()
     }
+}
+
+// where a search result stands instead of the Add button, like Discover's "Request pending"
+@Composable
+private fun StatusPill(text: String) {
+    Text(
+        text = text,
+        color = SportsPrimary,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.pillBackground(Color.White, borderColor = SportsPrimary, horizontalPadding = 10.dp)
+    )
 }
 
 @Composable

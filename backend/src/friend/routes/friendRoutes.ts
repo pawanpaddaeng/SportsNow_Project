@@ -50,7 +50,10 @@ export function friendsRouter(): Router {
       }
 
       const users = await searchUsers(text, user.userId);
-      return res.status(200).json({ msg: 'success', users: users.map(friendUserJson) });
+      return res.status(200).json({
+        msg: 'success',
+        users: users.map((found) => ({ ...friendUserJson(found), friendship_status: found.friendshipStatus })),
+      });
     }));
 
   router.get('/api/friends', requireAuth, asyncRoute('Could not load your friends, try again later',
