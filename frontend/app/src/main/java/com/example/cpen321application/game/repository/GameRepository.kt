@@ -12,6 +12,8 @@ import com.example.cpen321application.game.dto.CreateGameResponse
 import com.example.cpen321application.game.dto.DiscoverGameDto
 import com.example.cpen321application.game.dto.GameDetailsResponse
 import com.example.cpen321application.game.dto.GameDto
+import com.example.cpen321application.game.dto.InviteFriendsBody
+import com.example.cpen321application.game.dto.InviteFriendsResponse
 import com.example.cpen321application.game.dto.JoinRequestBody
 import com.example.cpen321application.game.dto.JoinRequestDecisionBody
 import com.example.cpen321application.game.dto.JoinRequestDecisionResponse
@@ -233,6 +235,35 @@ sealed interface PendingJoinRequestsResult {
     // retrying won't help: the game is gone or the user isn't its organizer
     data class Unavailable(val message: String) : PendingJoinRequestsResult
     data class Failed(val message: String) : PendingJoinRequestsResult
+}
+
+sealed interface InviteFriendsResult {
+    data object Sent : InviteFriendsResult
+    data class Failed(val message: String) : InviteFriendsResult
+}
+
+// the organizer invites friends to their game, the server notifies each of them
+suspend fun inviteFriends(context: Context, gameId: Int, friendIds: List<Int>): InviteFriendsResult {
+    val failureMessage = "Could not send your invites, try again"
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.retrofitService.inviteFriends(
+                authorization = authorization,
+                gameId = gameId,
+                request = InviteFriendsBody(friendIds)
+            )
+        } ?: return InviteFriendsResult.Failed(SESSION_ENDED_MESSAGE)
+        val reply = readReply(response, InviteFriendsResponse::class.java)
+        if (reply?.msg == "success") {
+            InviteFriendsResult.Sent
+        } else {
+            InviteFriendsResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
+        }
+    } catch (e: IOException) {
+        InviteFriendsResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        InviteFriendsResult.Failed(failureMessage)
+    }
 }
 
 suspend fun fetchPendingJoinRequests(context: Context, gameId: Int): PendingJoinRequestsResult {

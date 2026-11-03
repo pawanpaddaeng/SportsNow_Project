@@ -1,12 +1,15 @@
 package com.example.cpen321application.ui.screens.games
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -22,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -171,12 +175,13 @@ private fun AttendanceRow(player: GamePlayer, showedUp: Boolean, onChange: (Bool
     }
 }
 
-// everyone in the game, opened from "See all"
+// everyone in the game, opened from "See all". Tapping a player opens their profile
 @Composable
 internal fun PlayersDialog(
     details: GameDetails,
     removingPlayerId: Int?,
     onRemove: (GamePlayer) -> Unit,
+    onOpenProfile: (GamePlayer) -> Unit,
     onDismiss: () -> Unit
 ) {
     // the organizer can remove players until the game starts
@@ -192,8 +197,7 @@ internal fun PlayersDialog(
             ) {
                 details.players.forEach { player ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Avatar(text = player.initial, size = 32.dp, fontSize = 13)
-                        Text(text = player.fullName, color = SportsOnSurface, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                        PlayerName(player = player, onClick = { onOpenProfile(player) })
                         if (player.userId == details.organizer.userId) {
                             Text(text = "Organizer", color = SportsOnSurfaceVariant, fontSize = 12.sp)
                         } else if (canRemove) {
@@ -204,6 +208,22 @@ internal fun PlayersDialog(
             }
         }
     )
+}
+
+// the player's initial and name, tapping them opens their profile
+@Composable
+private fun RowScope.PlayerName(player: GamePlayer, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = "View profile", onClick = onClick)
+    ) {
+        Avatar(text = player.initial, size = 32.dp, fontSize = 13)
+        Text(text = player.fullName, color = SportsOnSurface, fontSize = 16.sp)
+    }
 }
 
 // Remove next to a player, a spinner while they're being removed, disabled while another one is

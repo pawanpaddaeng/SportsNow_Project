@@ -3,6 +3,7 @@ package com.example.cpen321application.ui.screens.games
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -47,6 +48,7 @@ data class JoinRequestsActions(
     val onRetry: (() -> Unit)? = null,
     val onApprove: (JoinRequestItem) -> Unit = {},
     val onDecline: (JoinRequestItem) -> Unit = {},
+    val onOpenProfile: (Int) -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
@@ -84,7 +86,8 @@ fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions,
                 isBusy = request.requestId in state.busyRequestIds,
                 canApprove = header?.isFull == false,
                 onApprove = { actions.onApprove(request) },
-                onDecline = { actions.onDecline(request) }
+                onDecline = { actions.onDecline(request) },
+                onOpenProfile = { actions.onOpenProfile(request.userId) }
             )
         }
 
@@ -132,14 +135,17 @@ private fun Note(text: String) {
     )
 }
 
-// one request: initial, name, details, the message and the two buttons
+/*  one request: initial, name, details, the message and the two buttons. Tapping
+    the initial or name opens the requester's profile
+ */
 @Composable
 private fun RequestCard(
     request: JoinRequestItem,
     isBusy: Boolean,
     canApprove: Boolean,
     onApprove: () -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    onOpenProfile: () -> Unit
 ) {
     val shape = RoundedCornerShape(12.dp)
     Column(
@@ -150,7 +156,13 @@ private fun RequestCard(
             .border(1.dp, SportsOutlineVariant, shape)
             .padding(16.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClickLabel = "View profile", onClick = onOpenProfile)
+        ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier

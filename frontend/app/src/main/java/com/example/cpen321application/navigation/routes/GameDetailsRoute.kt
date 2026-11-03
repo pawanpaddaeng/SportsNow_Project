@@ -15,16 +15,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.core.notifications.GameEvents
+import com.example.cpen321application.friend.repository.FriendResult
+import com.example.cpen321application.friend.repository.fetchFriends
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.toGameDetails
 import com.example.cpen321application.game.repository.GameChangeResult
 import com.example.cpen321application.game.repository.GameDetailsResult
+import com.example.cpen321application.game.repository.InviteFriendsResult
 import com.example.cpen321application.game.repository.JoinRequestResult
 import com.example.cpen321application.game.repository.cancelGame
 import com.example.cpen321application.game.repository.completeGame
 import com.example.cpen321application.game.repository.fetchGameDetails
+import com.example.cpen321application.game.repository.inviteFriends
 import com.example.cpen321application.game.repository.leaveGame
 import com.example.cpen321application.game.repository.removePlayer
 import com.example.cpen321application.game.repository.sendJoinRequest
@@ -35,6 +39,8 @@ import com.example.cpen321application.ui.screens.games.GameAction
 import com.example.cpen321application.ui.screens.games.GameDetailsActions
 import com.example.cpen321application.ui.screens.games.GameDetailsScreen
 import com.example.cpen321application.ui.screens.games.GameDetailsUiState
+import com.example.cpen321application.ui.screens.games.InviteFriendsDialog
+import com.example.cpen321application.ui.screens.games.InviteFriendsUiState
 import com.example.cpen321application.ui.screens.games.JoinRequestSheet
 import kotlinx.coroutines.launch
 
@@ -53,6 +59,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     var busyAction by remember { mutableStateOf<GameAction?>(null) }
     var removingPlayerId by remember { mutableStateOf<Int?>(null) }
     var showJoinSheet by remember { mutableStateOf(false) }
+    var showInviteFriends by remember { mutableStateOf(false) }
     // opened from a Discover card: highlight Discover and go back there after a join request
     val openedFromDiscover = remember {
         navController.previousBackStackEntry?.destination?.route == Routes.DISCOVER
@@ -152,11 +159,13 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onEdit = { navController.navigate(Routes.editGame(gameId)) },
             onDirections = { location -> openDirections(context, location) },
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
+            onInviteFriends = { showInviteFriends = true },
             onOpenChat = { navController.navigate(Routes.gameChat(gameId)) },
             onGameAction = { action -> runAction(action) },
             onCompleteGame = { noShowUserIds -> runAction(GameAction.Complete, noShowUserIds) },
             onRatePlayers = { navController.navigate(Routes.ratePlayers(gameId)) },
             onRemovePlayer = { player -> removeFromGame(player) },
+            onOpenProfile = { userId -> app.openProfile(userId) },
             onRequestToJoin = { showJoinSheet = true },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
@@ -176,6 +185,59 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             }
         )
     }
+
+    if (showInviteFriends && shownDetails != null) InviteFriendsPopup(app, shownDetails) { showInviteFriends = false }
+}
+
+/*  loads the organizer's friends for the picker and invites the ones they tick. The
+    server notifies each friend, its problem (e.g. the game filled up) is shown in the popup
+ */
+@Composable
+private fun InviteFriendsPopup(app: AppState, details: GameDetails, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var state by remember { mutableStateOf(InviteFriendsUiState(isLoading = true)) }
+
+    fun loadFriends() {
+        state = InviteFriendsUiState(isLoading = true)
+        app.scope.launch {
+            val result = try {
+                fetchFriends(context)
+            } finally {
+                state = state.copy(isLoading = false)
+            }
+            state = when (result) {
+                is FriendResult.Done -> state.copy(friends = result.value)
+                is FriendResult.Failed -> state.copy(errorMessage = result.message)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { loadFriends() }
+
+    InviteFriendsDialog(
+        state = state,
+        playerIds = details.players.map { it.userId }.toSet(),
+        onRetry = { loadFriends() },
+        onInvite = { friendIds ->
+            state = state.copy(isSending = true, errorMessage = null)
+            app.scope.launch {
+                val result = try {
+                    inviteFriends(context, details.gameId, friendIds)
+                } finally {
+                    state = state.copy(isSending = false)
+                }
+                when (result) {
+                    InviteFriendsResult.Sent -> {
+                        val sent = if (friendIds.size == 1) "Invite sent" else "${friendIds.size} invites sent"
+                        Toast.makeText(context, sent, Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }
+                    is InviteFriendsResult.Failed -> state = state.copy(errorMessage = result.message)
+                }
+            }
+        },
+        onDismiss = onDismiss
+    )
 }
 
 // sends the answers to the organizer, the server's problem is shown in the popup

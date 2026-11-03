@@ -2,11 +2,19 @@ package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
 import com.example.cpen321application.chat.dto.ChatMessagesResponse
+import com.example.cpen321application.friend.dto.FriendChangeResponse
+import com.example.cpen321application.friend.dto.FriendDecisionBody
+import com.example.cpen321application.friend.dto.FriendRequestsResponse
+import com.example.cpen321application.friend.dto.FriendsResponse
+import com.example.cpen321application.friend.dto.SendFriendRequestBody
+import com.example.cpen321application.friend.dto.UserSearchResponse
 import com.example.cpen321application.game.dto.CompleteGameBody
 import com.example.cpen321application.game.dto.CreateGameRequest
 import com.example.cpen321application.game.dto.CreateGameResponse
 import com.example.cpen321application.game.dto.DiscoverGamesResponse
 import com.example.cpen321application.game.dto.GameDetailsResponse
+import com.example.cpen321application.game.dto.InviteFriendsBody
+import com.example.cpen321application.game.dto.InviteFriendsResponse
 import com.example.cpen321application.game.dto.JoinRequestBody
 import com.example.cpen321application.game.dto.JoinRequestDecisionBody
 import com.example.cpen321application.game.dto.JoinRequestDecisionResponse
@@ -20,6 +28,7 @@ import com.example.cpen321application.review.dto.UserStatsResponse
 import com.example.cpen321application.user.dto.AuthTokenResponse
 import com.example.cpen321application.user.dto.LoginRequest
 import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.PublicProfileResponse
 import com.example.cpen321application.user.dto.RegisterNotifRequest
 import com.example.cpen321application.user.dto.SignUpRequest
 import com.example.cpen321application.user.dto.UpdateProfileRequest
@@ -62,6 +71,12 @@ interface NetworkConnection {
         @Header("Authorization") authorization: String,
         @Body request: UpdateProfileRequest
     ) : Response<ProfileResponse>
+
+    @GET("api/users/{userId}")
+    suspend fun getPublicProfile(
+        @Header("Authorization") authorization: String,
+        @Path("userId") userId: Int
+    ) : Response<PublicProfileResponse>
 
     // the signed in user is the new game's organizer
     @POST("api/games")
@@ -142,6 +157,41 @@ interface NetworkConnection {
         @Path("requestId") requestId: Int,
         @Body request: JoinRequestDecisionBody
     ) : Response<JoinRequestDecisionResponse>
+
+    // the organizer invites friends to their game, the server notifies each of them
+    @POST("api/games/{gameId}/invites")
+    suspend fun inviteFriends(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int,
+        @Body request: InviteFriendsBody
+    ) : Response<InviteFriendsResponse>
+
+    // users whose name matches or is similar to q, best match first
+    @GET("api/users/search")
+    suspend fun searchUsers(
+        @Header("Authorization") authorization: String,
+        @Query("q") query: String
+    ) : Response<UserSearchResponse>
+
+    @GET("api/friends")
+    suspend fun getFriends(@Header("Authorization") authorization: String) : Response<FriendsResponse>
+
+    // requests sent to the signed in user that are waiting for an answer, newest first
+    @GET("api/friends/requests")
+    suspend fun getFriendRequests(@Header("Authorization") authorization: String) : Response<FriendRequestsResponse>
+
+    @POST("api/friends/requests")
+    suspend fun sendFriendRequest(
+        @Header("Authorization") authorization: String,
+        @Body request: SendFriendRequestBody
+    ) : Response<FriendChangeResponse>
+
+    @PATCH("api/friends/requests/{requestId}")
+    suspend fun decideFriendRequest(
+        @Header("Authorization") authorization: String,
+        @Path("requestId") requestId: Int,
+        @Body request: FriendDecisionBody
+    ) : Response<FriendChangeResponse>
 
     // a page of the chat's messages, newest first. A null before gives the newest page
     @GET("api/chats/{chatId}/messages")

@@ -38,15 +38,17 @@ private fun closedMessage(details: GameDetails): String? = when {
 }
 
 /*  buttons at the bottom of Game Details, depending on the user's role and whether the
-    game can still change. The organizer cancels a game that's on and marks it completed
-    once it has started. A player can leave at any time, even mid-game, and the organizer
-    once it's cancelled or completed. Anyone who showed up can rate players once it's completed
+    game can still change. The organizer invites friends and cancels a game that's on,
+    and marks it completed once it has started. A player can leave at any time, even
+    mid-game, and the organizer once it's cancelled or completed. Anyone who showed up
+    can rate players once it's completed
  */
 @Composable
 internal fun ActionButtons(
     details: GameDetails,
     busyAction: GameAction?,
     onOpenChat: () -> Unit,
+    onInviteFriends: () -> Unit,
     onGameAction: (GameAction) -> Unit,
     onRatePlayers: () -> Unit,
     onRequestToJoin: () -> Unit
@@ -66,6 +68,10 @@ internal fun ActionButtons(
     when (details.role) {
         GameRole.Organizer, GameRole.Player -> {
             PrimaryButton(text = "Open Chat", onClick = onOpenChat)
+            // the server only accepts invites before the game starts and while it has spots left
+            if (details.role == GameRole.Organizer && details.state == GameState.Upcoming && details.spotsLeft > 0) {
+                OutlinedActionButton(text = "Invite Friends", onClick = onInviteFriends, color = SportsPrimary)
+            }
             val action = when {
                 details.role == GameRole.Player -> GameAction.Leave
                 details.state == GameState.Upcoming -> GameAction.Cancel

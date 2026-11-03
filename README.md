@@ -113,7 +113,7 @@ Don't add `-v` unless you mean to wipe data: it deletes the MySQL database and C
 
 ```bash
 docker exec mysql_db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/06-create-chats.sql'
-docker exec mysql_db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/07-create-ratings.sql'
+docker exec mysql_db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/08-create-ratings.sql'
 ```
 
 ## Additional Setup

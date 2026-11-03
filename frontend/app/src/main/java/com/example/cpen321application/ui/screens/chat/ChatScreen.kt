@@ -59,7 +59,8 @@ data class ChatActions(
     val onRetry: (() -> Unit)? = null,
     val onSend: (String) -> Unit = {},
     val onRetrySend: (ChatMessage) -> Unit = {},
-    val onLoadOlder: () -> Unit = {}
+    val onLoadOlder: () -> Unit = {},
+    val onOpenProfile: (Int) -> Unit = {}
 )
 
 /*
@@ -93,7 +94,12 @@ fun ChatScreen(state: ChatUiState, actions: ChatActions, modifier: Modifier = Mo
                 .fillMaxWidth()
         ) {
             items(state.messages, key = { it.key }) { message ->
-                MessageRow(message, canRetry = state.canWrite, onRetrySend = { actions.onRetrySend(message) })
+                MessageRow(
+                    message,
+                    canRetry = state.canWrite,
+                    onRetrySend = { actions.onRetrySend(message) },
+                    onOpenProfile = { message.senderId?.let(actions.onOpenProfile) }
+                )
             }
         }
         if (state.canWrite) MessageInput(onSend = actions.onSend)
@@ -161,16 +167,18 @@ private fun ChatStatus(state: ChatUiState, onRetry: (() -> Unit)?) {
     }
 }
 
-// someone else's message on the left with their initial and name, the user's own on the right
+/*  someone else's message on the left with their initial and name, the user's own on the right.
+    Tapping the initial or name opens the sender's profile
+ */
 @Composable
-private fun MessageRow(message: ChatMessage, canRetry: Boolean, onRetrySend: () -> Unit) {
+private fun MessageRow(message: ChatMessage, canRetry: Boolean, onRetrySend: () -> Unit, onOpenProfile: () -> Unit) {
     Row(
         horizontalArrangement = if (message.isMine) Arrangement.End else Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        if (!message.isMine) SenderInitial(message.initial)
+        if (!message.isMine) SenderInitial(message.initial, onClick = onOpenProfile)
         Column(horizontalAlignment = if (message.isMine) Alignment.End else Alignment.Start) {
-            MessageBubble(message)
+            MessageBubble(message, onNameClick = onOpenProfile)
             if (message.failureMessage != null) {
                 Text(
                     text = if (canRetry) "${message.failureMessage}. Tap to try again." else "${message.failureMessage}.",
@@ -186,20 +194,21 @@ private fun MessageRow(message: ChatMessage, canRetry: Boolean, onRetrySend: () 
 }
 
 @Composable
-private fun SenderInitial(initial: String) {
+private fun SenderInitial(initial: String, onClick: () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(32.dp)
             .clip(CircleShape)
             .background(SportsPrimaryContainer)
+            .clickable(onClickLabel = "View profile", onClick = onClick)
     ) {
         Text(text = initial, color = SportsOnPrimaryContainer, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage) {
+private fun MessageBubble(message: ChatMessage, onNameClick: () -> Unit) {
     val textColor = if (message.isMine) Color.White else SportsOnSurface
     Column(
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -210,7 +219,13 @@ private fun MessageBubble(message: ChatMessage) {
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         if (!message.isMine) {
-            Text(text = message.senderName, color = SportsOnSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(
+                text = message.senderName,
+                color = SportsOnSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable(onClickLabel = "View profile", onClick = onNameClick)
+            )
         }
         Text(text = message.text, color = textColor, fontSize = 14.sp)
         Text(text = message.time, color = textColor.copy(alpha = 0.7f), fontSize = 11.sp)

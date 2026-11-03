@@ -25,6 +25,7 @@ data class JoinRequestsHeader(val title: String, val subtitle: String, val isFul
 // a request card: who asked, "Rating 4.7/5 · Intermediate · Plays weekly", "Requested 2h ago" and their message
 data class JoinRequestItem(
     val requestId: Int,
+    val userId: Int,
     val name: String,
     val initial: String,
     val details: String,
@@ -49,6 +50,7 @@ fun PendingJoinRequestDto.toJoinRequestItem(now: Instant = Instant.now()): JoinR
     ).joinToString(" · ")
     return JoinRequestItem(
         requestId = requestId,
+        userId = user.userId,
         name = "${user.firstName} ${user.lastName}".trim(),
         initial = user.firstName.take(1).uppercase(Locale.getDefault()),
         details = details,

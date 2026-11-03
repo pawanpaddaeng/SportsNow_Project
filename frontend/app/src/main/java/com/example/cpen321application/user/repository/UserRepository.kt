@@ -9,10 +9,13 @@ import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.user.dto.LoginRequest
 import com.example.cpen321application.user.dto.ProfileResponse
+import com.example.cpen321application.user.dto.PublicProfileResponse
 import com.example.cpen321application.user.dto.SignUpRequest
 import com.example.cpen321application.user.dto.UpdateProfileRequest
 import com.example.cpen321application.user.dto.UserProfileDto
 import com.example.cpen321application.user.dto.readAuthResponse
+import com.example.cpen321application.user.model.PlayerProfile
+import com.example.cpen321application.user.model.toPlayerProfile
 import com.google.gson.JsonParseException
 import org.json.JSONException
 import org.json.JSONObject
@@ -184,6 +187,33 @@ private fun toProfileResult(reply: ProfileResponse?, failureMessage: String): Pr
         reply?.msg == "success" && user != null -> ProfileResult.Loaded(user.toUserProfile())
         reply?.msg == "invalid_request" && reply.error != null -> ProfileResult.Failed(reply.error)
         else -> ProfileResult.Failed(failureMessage)
+    }
+}
+
+sealed interface PublicProfileResult {
+    data class Loaded(val profile: PlayerProfile) : PublicProfileResult
+    // canRetry is false when the player no longer exists
+    data class Failed(val message: String, val canRetry: Boolean = true) : PublicProfileResult
+}
+
+suspend fun fetchPublicProfile(context: Context, userId: Int): PublicProfileResult {
+    val failureMessage = "Couldn't load this profile, try again"
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.retrofitService.getPublicProfile(authorization = authorization, userId = userId)
+        } ?: return PublicProfileResult.Failed(SESSION_ENDED_MESSAGE)
+        val reply = readReply(response, PublicProfileResponse::class.java)
+        val profile = reply?.profile
+        when {
+            reply?.msg == "success" && profile != null -> PublicProfileResult.Loaded(profile.toPlayerProfile())
+            reply?.msg == "user_not_found" ->
+                PublicProfileResult.Failed("This player no longer exists.", canRetry = false)
+            else -> PublicProfileResult.Failed(failureMessage)
+        }
+    } catch (e: IOException) {
+        PublicProfileResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        PublicProfileResult.Failed(failureMessage)
     }
 }
 
