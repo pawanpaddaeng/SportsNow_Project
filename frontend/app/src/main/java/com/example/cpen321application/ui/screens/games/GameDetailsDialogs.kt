@@ -20,20 +20,12 @@ import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.GameRole
 import com.example.cpen321application.game.model.GameState
+import com.example.cpen321application.ui.components.ConfirmDialog
+import com.example.cpen321application.ui.components.ConfirmText
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 
 // the Game Details screen's dialogs
-
-// what a confirmation dialog says: its question, what happens, and its two buttons
-private data class ConfirmText(
-    val title: String,
-    val body: String,
-    val confirm: String,
-    val dismiss: String,
-    // red confirm button for actions that take something away
-    val destructive: Boolean = true
-)
 
 /*  what confirming the action does to this game. A player leaving before the game starts
     gives up their spot, or leaves mid-game once it started. Anyone leaving a cancelled or
@@ -77,24 +69,7 @@ internal fun ConfirmActionDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val text = confirmText(action, details)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text.title) },
-        text = { Text(text.body) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                if (text.destructive) {
-                    Text(text.confirm, color = MaterialTheme.colorScheme.error)
-                } else {
-                    Text(text.confirm)
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(text.dismiss) }
-        }
-    )
+    ConfirmDialog(text = confirmText(action, details), onConfirm = onConfirm, onDismiss = onDismiss)
 }
 
 // everyone in the game, opened from "See all"
@@ -152,20 +127,15 @@ internal fun ConfirmRemovePlayerDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Remove ${player.fullName}?") },
-        text = {
-            Text(
-                "${player.fullName} will be removed from $gameTitle and notified. " +
-                    "They can send a new request to join later."
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Remove", color = MaterialTheme.colorScheme.error) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Keep") }
-        }
+    ConfirmDialog(
+        text = ConfirmText(
+            title = "Remove ${player.fullName}?",
+            body = "${player.fullName} will be removed from $gameTitle and notified. " +
+                "They can send a new request to join later.",
+            confirm = "Remove",
+            dismiss = "Keep"
+        ),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
     )
 }

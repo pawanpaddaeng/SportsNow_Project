@@ -58,6 +58,10 @@ interface NetworkConnection {
         @Body request: UpdateProfileRequest
     ) : Response<ProfileResponse>
 
+    // deletes the signed in user's account and everything tied to it, msg is "success" with no user
+    @DELETE("api/users/me")
+    suspend fun deleteMyAccount(@Header("Authorization") authorization: String): Response<ProfileResponse>
+
     // the signed in user is the new game's organizer
     @POST("api/games")
     suspend fun createGame(

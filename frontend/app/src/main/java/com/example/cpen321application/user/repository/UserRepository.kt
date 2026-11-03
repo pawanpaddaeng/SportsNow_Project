@@ -27,6 +27,7 @@ import java.util.Locale
 private const val LOAD_FAILED_MESSAGE = "Couldn't load your profile, try again"
 private const val SAVE_FAILED_MESSAGE = "Couldn't save your profile, try again"
 private const val SIGN_UP_FAILED_MESSAGE = "Could not create account, try again"
+private const val DELETE_FAILED_MESSAGE = "Couldn't delete your account, try again"
 
 private val MEMBER_SINCE_FORMAT = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
 
@@ -75,6 +76,11 @@ sealed interface SignUpResult {
 sealed interface ProfileResult {
     data class Loaded(val profile: UserProfile) : ProfileResult
     data class Failed(val message: String) : ProfileResult
+}
+
+sealed interface DeleteAccountResult {
+    data object Deleted : DeleteAccountResult
+    data class Failed(val message: String) : DeleteAccountResult
 }
 
 // the server answers "no_user" (404) when the Google account needs to sign up first
@@ -159,6 +165,23 @@ suspend fun updateMyProfile(context: Context, form: ProfileForm): ProfileResult 
     return requestProfile(context, SAVE_FAILED_MESSAGE) { authorization ->
         ServerApi.retrofitService.updateMyProfile(authorization = authorization, request = request)
     }
+}
+
+// the server deletes the account with its games, spots in games and messages
+suspend fun deleteMyAccount(context: Context): DeleteAccountResult = try {
+    val response = Session.call(context) { authorization ->
+        ServerApi.retrofitService.deleteMyAccount(authorization = authorization)
+    }
+    val reply = response?.let { readReply(it, ProfileResponse::class.java) }
+    when {
+        response == null -> DeleteAccountResult.Failed(SESSION_ENDED_MESSAGE)
+        reply?.msg == "success" -> DeleteAccountResult.Deleted
+        else -> DeleteAccountResult.Failed(reply?.error ?: DELETE_FAILED_MESSAGE)
+    }
+} catch (e: IOException) {
+    DeleteAccountResult.Failed(NETWORK_MESSAGE)
+} catch (e: JsonParseException) {
+    DeleteAccountResult.Failed(DELETE_FAILED_MESSAGE)
 }
 
 private suspend fun requestProfile(
