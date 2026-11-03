@@ -23,6 +23,7 @@ import {
 } from '../db/games';
 import { countPendingJoinRequests, getJoinRequestStatus } from '../db/joinRequests';
 import { parseCoordinates } from '../validation/coordinates';
+import { parseCompleteGame, type CompleteGameBody } from '../validation/completeGame';
 import { parseNewGame, type CreateGameBody } from '../validation/newGame';
 import { discoverGameJson, gameJson, gamePlayerJson, organizedGameJson } from './gameJson';
 import {
@@ -169,6 +170,7 @@ export function gamesRouter(): Router {
         game: gameJson(game),
         organizer: gamePlayerJson(organizer),
         players: players.map(gamePlayerJson),
+        viewer_id: user.userId,
         viewer_role: role,
         pending_requests: role === 'organizer' ? await countPendingJoinRequests(gameId) : null,
         join_request_status: role === 'viewer' ? await getJoinRequestStatus(gameId, user.userId) : null,
@@ -247,17 +249,20 @@ export function gamesRouter(): Router {
     }));
 
   /*  complete game: the organizer marks a game that has started as completed, after
-      which anyone can leave it. Responds with the completed game and notifies its players.
+      which anyone can leave it. The optional no_show_user_ids in the body are the players
+      who didn't show up. Responds with the completed game and notifies its players.
       Errors: 400 invalid_request, 403 forbidden, 404 not_found,
       409 game_cancelled / game_not_started / game_completed
    */
   router.post('/api/games/:gameId/complete', requireAuth, asyncRoute('Could not complete game, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
+    async (req: Request<{ gameId: string }, unknown, CompleteGameBody | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const gameId = requireGameId(req.params.gameId, res);
       if (gameId === null) return;
+      const parsed = parseCompleteGame(req.body);
+      if (!parsed.ok) return invalidRequest(res, parsed.error);
 
-      const result = await completeGame(gameId, user.userId);
+      const result = await completeGame(gameId, user.userId, parsed.value);
       if (!result.ok) return sendError(res, responseFor(COMPLETE_GAME_ERRORS, result.problem));
 
       const game = await readBackGame(gameId, 'completing it');

@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.review.model.formatReputationScore
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.LabelValueRow
@@ -48,6 +49,7 @@ private val DETAIL_LABEL_WIDTH = 104.dp
 fun ProfileScreen(
     profile: UserProfile?,
     modifier: Modifier = Modifier,
+    reputationScore: Double? = null,
     isLoading: Boolean = false,
     errorMessage: String? = null,
     onEdit: () -> Unit = {},
@@ -86,6 +88,7 @@ fun ProfileScreen(
             } else {
                 if (errorMessage != null) ErrorText(errorMessage)
                 ProfileIdentity(profile)
+                if (reputationScore != null) ReputationCard(reputationScore)
                 ProfileDetailsCard(profile)
             }
         }
@@ -142,6 +145,28 @@ private fun ProfileIdentity(profile: UserProfile) {
             textAlign = TextAlign.Center
         )
         Text(text = profile.email, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+    }
+}
+
+// the signed in user's current reputation score
+@Composable
+private fun ReputationCard(score: Double) {
+    SurfaceCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Your rating",
+                color = SportsOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = formatReputationScore(score),
+                color = SportsPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 

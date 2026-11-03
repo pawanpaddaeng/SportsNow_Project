@@ -37,6 +37,7 @@ fun ProfileRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
     ProfileScreen(
         profile = profileState.profile,
         modifier = modifier,
+        reputationScore = profileState.reputationScore,
         isLoading = profileState.isLoading,
         errorMessage = profileState.error,
         onEdit = {

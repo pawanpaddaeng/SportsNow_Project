@@ -42,8 +42,8 @@ data class GameDetailsUiState(
     val selectedTab: BottomTab = BottomTab.Home
 )
 
-/*  onRetry is null when retrying won't help. onGameAction (cancel, complete or leave)
-    and onRemovePlayer are only called after the user confirms
+/*  onRetry is null when retrying won't help. onGameAction (cancel or leave),
+    onCompleteGame and onRemovePlayer are only called after the user confirms
  */
 data class GameDetailsActions(
     val onBack: () -> Unit,
@@ -53,6 +53,8 @@ data class GameDetailsActions(
     val onJoinRequests: () -> Unit = {},
     val onOpenChat: () -> Unit = {},
     val onGameAction: (GameAction) -> Unit = {},
+    val onCompleteGame: (noShowUserIds: List<Int>) -> Unit = {},
+    val onRatePlayers: () -> Unit = {},
     val onRemovePlayer: (GamePlayer) -> Unit = {},
     val onRequestToJoin: () -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
@@ -138,7 +140,16 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
     }
 
     val pendingAction = confirmAction
-    if (pendingAction != null && details != null) {
+    if (pendingAction == GameAction.Complete && details != null) {
+        CompleteGameDialog(
+            details = details,
+            onConfirm = { noShowUserIds ->
+                confirmAction = null
+                actions.onCompleteGame(noShowUserIds)
+            },
+            onDismiss = { confirmAction = null }
+        )
+    } else if (pendingAction != null && details != null) {
         ConfirmActionDialog(
             action = pendingAction,
             details = details,
@@ -198,13 +209,14 @@ private fun LoadedDetails(
         busyAction = state.busyAction,
         onOpenChat = actions.onOpenChat,
         onGameAction = onGameAction,
+        onRatePlayers = actions.onRatePlayers,
         onRequestToJoin = actions.onRequestToJoin
     )
 }
 
 // a spinner while the game loads, or the problem with Retry when onRetry is given
 @Composable
-private fun LoadingOrError(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
+internal fun LoadingOrError(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
     when {
         isLoading -> Column(
             horizontalAlignment = Alignment.CenterHorizontally,

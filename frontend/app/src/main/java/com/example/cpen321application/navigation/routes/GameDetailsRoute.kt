@@ -86,15 +86,15 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     /*  sends an action the user confirmed on the screen, with progress on its button, then
         says it worked or shows the server's problem. After cancelling or completing the
         game reloads; after leaving the user is no longer in it, so go back (Home and
-        Discover reload when shown)
+        Discover reload when shown). noShowUserIds is only used when completing
      */
-    fun runAction(action: GameAction) {
+    fun runAction(action: GameAction, noShowUserIds: List<Int> = emptyList()) {
         busyAction = action
         app.scope.launch {
             val result = try {
                 when (action) {
                     GameAction.Cancel -> cancelGame(context, gameId)
-                    GameAction.Complete -> completeGame(context, gameId)
+                    GameAction.Complete -> completeGame(context, gameId, noShowUserIds)
                     GameAction.Leave -> leaveGame(context, gameId)
                 }
             } finally {
@@ -154,6 +154,8 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onJoinRequests = { navController.navigate(Routes.joinRequests(gameId)) },
             onOpenChat = { navController.navigate(Routes.gameChat(gameId)) },
             onGameAction = { action -> runAction(action) },
+            onCompleteGame = { noShowUserIds -> runAction(GameAction.Complete, noShowUserIds) },
+            onRatePlayers = { navController.navigate(Routes.ratePlayers(gameId)) },
             onRemovePlayer = { player -> removeFromGame(player) },
             onRequestToJoin = { showJoinSheet = true },
             onTabSelected = { tab -> app.openTab(tab) }

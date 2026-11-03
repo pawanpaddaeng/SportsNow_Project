@@ -60,12 +60,19 @@ data class MyGamesResponse(
 data class GamePlayerDto(
     @SerializedName("user_id") val userId: Int,
     @field:Required @SerializedName("first_name") val firstName: String,
-    @field:Required @SerializedName("last_name") val lastName: String
+    @field:Required @SerializedName("last_name") val lastName: String,
+    // the organizer unticked them when marking the game completed
+    @SerializedName("no_show") val noShow: Boolean = false
+)
+
+// body for POST api/games/{gameId}/complete, the players who didn't show up
+data class CompleteGameBody(
+    @SerializedName("no_show_user_ids") val noShowUserIds: List<Int>
 )
 
 /*  reply from GET api/games/{gameId}: msg "success" with the game, its organizer and
     players (organizer included, in join order), otherwise "not_found" or an error code.
-    viewerRole is "organizer", "player" or "viewer". pendingRequests is only set for
+    viewerId is the signed in user's id. viewerRole is "organizer", "player" or "viewer". pendingRequests is only set for
     the organizer, joinRequestStatus only for viewers (null if they never asked)
  */
 data class GameDetailsResponse(
@@ -73,6 +80,7 @@ data class GameDetailsResponse(
     val game: GameDto?,
     val organizer: GamePlayerDto?,
     val players: List<GamePlayerDto>?,
+    @SerializedName("viewer_id") val viewerId: Int,
     @SerializedName("viewer_role") val viewerRole: String?,
     @SerializedName("pending_requests") val pendingRequests: Int?,
     @SerializedName("join_request_status") val joinRequestStatus: String?,
@@ -133,7 +141,9 @@ data class PendingJoinRequestDto(
     @field:Required @SerializedName("skill_level") val skillLevel: String,
     @SerializedName("play_frequency") val playFrequency: String?,
     val message: String?,
-    @field:Required @SerializedName("created_at") val createdAt: String
+    @field:Required @SerializedName("created_at") val createdAt: String,
+    // their reputation score out of 5
+    @SerializedName("reputation_score") val reputationScore: Double
 )
 
 /*  reply from GET api/games/{gameId}/join-requests: msg "success" with the game and its

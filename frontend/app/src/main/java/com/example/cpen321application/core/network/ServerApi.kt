@@ -2,6 +2,7 @@ package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
 import com.example.cpen321application.chat.dto.ChatMessagesResponse
+import com.example.cpen321application.game.dto.CompleteGameBody
 import com.example.cpen321application.game.dto.CreateGameRequest
 import com.example.cpen321application.game.dto.CreateGameResponse
 import com.example.cpen321application.game.dto.DiscoverGamesResponse
@@ -12,6 +13,10 @@ import com.example.cpen321application.game.dto.JoinRequestDecisionResponse
 import com.example.cpen321application.game.dto.JoinRequestResponse
 import com.example.cpen321application.game.dto.MyGamesResponse
 import com.example.cpen321application.game.dto.PendingJoinRequestsResponse
+import com.example.cpen321application.review.dto.PlayersToRateResponse
+import com.example.cpen321application.review.dto.RatingBody
+import com.example.cpen321application.review.dto.RatingResponse
+import com.example.cpen321application.review.dto.UserStatsResponse
 import com.example.cpen321application.user.dto.AuthTokenResponse
 import com.example.cpen321application.user.dto.LoginRequest
 import com.example.cpen321application.user.dto.ProfileResponse
@@ -85,7 +90,8 @@ interface NetworkConnection {
     @POST("api/games/{gameId}/complete")
     suspend fun completeGame(
         @Header("Authorization") authorization: String,
-        @Path("gameId") gameId: Int
+        @Path("gameId") gameId: Int,
+        @Body request: CompleteGameBody
     ) : Response<CreateGameResponse>
 
     @POST("api/games/{gameId}/leave")
@@ -144,6 +150,24 @@ interface NetworkConnection {
         @Path("chatId") chatId: Int,
         @Query("before") before: Int?
     ) : Response<ChatMessagesResponse>
+
+    @GET("api/games/{gameId}/ratings")
+    suspend fun getPlayersToRate(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int
+    ) : Response<PlayersToRateResponse>
+
+    @POST("api/games/{gameId}/ratings")
+    suspend fun submitRating(
+        @Header("Authorization") authorization: String,
+        @Path("gameId") gameId: Int,
+        @Body request: RatingBody
+    ) : Response<RatingResponse>
+
+    @GET("api/users/me/stats")
+    suspend fun getMyStats(
+        @Header("Authorization") authorization: String
+    ) : Response<UserStatsResponse>
 }
 
 object ServerApi {

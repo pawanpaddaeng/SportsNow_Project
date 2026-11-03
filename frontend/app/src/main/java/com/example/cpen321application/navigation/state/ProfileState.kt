@@ -5,6 +5,8 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.cpen321application.review.repository.ReputationScoreResult
+import com.example.cpen321application.review.repository.fetchMyReputationScore
 import com.example.cpen321application.user.repository.ProfileForm
 import com.example.cpen321application.user.repository.ProfileResult
 import com.example.cpen321application.user.repository.UserProfile
@@ -14,9 +16,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-// the signed in user's profile, for the Profile and Edit Profile screens
+// the signed in user's profile and reputation score, for the Profile and Edit Profile screens
 class ProfileState(private val context: Context, private val scope: CoroutineScope) {
     var profile by mutableStateOf<UserProfile?>(null)
+        private set
+    // null until it first loads
+    var reputationScore by mutableStateOf<Double?>(null)
         private set
     var isLoading by mutableStateOf(false)
         private set
@@ -39,6 +44,11 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
                         error = null
                     }
                     is ProfileResult.Failed -> error = result.message
+                }
+                // the score can change after any game, so it's read every time. The last one stays on failure
+                when (val result = fetchMyReputationScore(context)) {
+                    is ReputationScoreResult.Loaded -> reputationScore = result.score
+                    is ReputationScoreResult.Failed -> error = error ?: result.message
                 }
             } finally {
                 isLoading = false
@@ -76,6 +86,7 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
         isLoading = false
         isSaving = false
         profile = null
+        reputationScore = null
         error = null
         saveError = null
     }

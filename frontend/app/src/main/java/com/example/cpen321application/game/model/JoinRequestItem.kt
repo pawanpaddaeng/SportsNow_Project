@@ -7,26 +7,28 @@ import com.example.cpen321application.game.formatDay
 import com.example.cpen321application.game.formatRequestedAgo
 import com.example.cpen321application.game.parseInstant
 import com.example.cpen321application.game.spotsLeftLabel
+import com.example.cpen321application.review.model.formatReputationScore
 import java.time.Instant
 import java.util.Locale
 
 // how the popup's "How often do you play?" answers read on a request card
 private val FREQUENCY_TEXT = mapOf(
-    "rarely" to "plays rarely",
-    "monthly" to "plays monthly",
-    "weekly" to "plays weekly",
-    "several_per_week" to "plays several times a week"
+    "rarely" to "Plays rarely",
+    "monthly" to "Plays monthly",
+    "weekly" to "Plays weekly",
+    "several_per_week" to "Plays several times a week"
 )
 
 // the game at the top of Join Requests: "Volleyball Night" and "Fri, Oct 17 · 8/12 players · 4 spots left"
 data class JoinRequestsHeader(val title: String, val subtitle: String, val isFull: Boolean)
 
-// a request card: who asked, "Intermediate · plays weekly · requested 2h ago" and their message
+// a request card: who asked, "Rating 4.7/5 · Intermediate · Plays weekly", "Requested 2h ago" and their message
 data class JoinRequestItem(
     val requestId: Int,
     val name: String,
     val initial: String,
     val details: String,
+    val requested: String?,
     val message: String?
 )
 
@@ -40,17 +42,17 @@ fun GameDto.toJoinRequestsHeader(): JoinRequestsHeader {
 }
 
 fun PendingJoinRequestDto.toJoinRequestItem(now: Instant = Instant.now()): JoinRequestItem {
-    val requested = parseInstant(createdAt)?.let { "requested ${formatRequestedAgo(it, now)}" }
     val details = listOfNotNull(
+        "Rating ${formatReputationScore(reputationScore)}",
         skillLevel.capitalized(),
-        playFrequency?.let { FREQUENCY_TEXT[it] },
-        requested
+        playFrequency?.let { FREQUENCY_TEXT[it] }
     ).joinToString(" · ")
     return JoinRequestItem(
         requestId = requestId,
         name = "${user.firstName} ${user.lastName}".trim(),
         initial = user.firstName.take(1).uppercase(Locale.getDefault()),
         details = details,
+        requested = parseInstant(createdAt)?.let { "Requested ${formatRequestedAgo(it, now)}" },
         message = message?.takeIf { it.isNotBlank() }
     )
 }

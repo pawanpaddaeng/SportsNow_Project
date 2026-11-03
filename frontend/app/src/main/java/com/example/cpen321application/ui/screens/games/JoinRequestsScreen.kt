@@ -148,7 +148,7 @@ private fun Note(text: String) {
     )
 }
 
-// one request: initial, name, details, the quoted message and the two buttons
+// one request: initial, name, details, the message and the two buttons
 @Composable
 private fun RequestCard(
     request: JoinRequestItem,
@@ -179,12 +179,15 @@ private fun RequestCard(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(text = request.name, color = SportsOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text(text = request.details, color = SportsOnSurfaceVariant, fontSize = 12.sp)
+                if (request.requested != null) {
+                    Text(text = request.requested, color = SportsOnSurfaceVariant, fontSize = 12.sp)
+                }
             }
         }
 
         if (request.message != null) {
             Text(
-                text = "“${request.message}”",
+                text = request.message,
                 color = SportsOnSurface,
                 fontSize = 14.sp,
                 modifier = Modifier

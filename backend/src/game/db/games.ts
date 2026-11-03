@@ -404,17 +404,36 @@ export type CompleteGameProblem = OrganizedGameProblem | 'not_started' | 'comple
 
 export type CompleteGameResult = { ok: true } | { ok: false; problem: CompleteGameProblem };
 
-/*  the organizer marks their game completed once it has started. Players can then
-    leave it, the organizer included. The game stays locked until the end so a
-    concurrent cancel or leave can't change it in between
+/*  the organizer marks their game completed once it has started, with the players who
+    didn't show up. Players can then leave it, the organizer included. An id that isn't
+    a player is skipped since they may have left meanwhile, and the organizer can't be a
+    no-show. The game stays locked until the end so a concurrent cancel or leave can't
+    change it in between
  */
-export async function completeGame(gameId: number, userId: number): Promise<CompleteGameResult> {
+export async function completeGame(
+  gameId: number,
+  userId: number,
+  noShowUserIds: number[] = [],
+): Promise<CompleteGameResult> {
   return inTransaction(async (connection) => {
     const locked = await lockOrganizedGame(connection, gameId, userId);
     if (!locked.ok) return locked;
     if (locked.game.status === 'completed') return { ok: false, problem: 'completed' };
     if (!locked.game.hasStarted) return { ok: false, problem: 'not_started' };
 
+    // kept apart from game_players so leaving the game doesn't erase it from a player's score
+    const noShow = noShowUserIds.length > 0
+      ? `p.user_id <> ? AND p.user_id IN (${noShowUserIds.map(() => '?').join(', ')})`
+      : 'FALSE';
+    await executeWrite(
+      `INSERT INTO game_attendance (game_id, user_id, no_show, played_at)
+       SELECT p.game_id, p.user_id, ${noShow}, g.starts_at
+       FROM game_players p
+       JOIN games g ON g.game_id = p.game_id
+       WHERE p.game_id = ?`,
+      [...(noShowUserIds.length > 0 ? [userId, ...noShowUserIds] : []), gameId],
+      connection,
+    );
     await executeWrite(
       "UPDATE games SET status = 'completed' WHERE game_id = ?",
       [gameId],
@@ -538,24 +557,32 @@ export interface GamePlayer {
   userId: number;
   firstName: string;
   lastName: string;
+  noShow: boolean;
 }
 
 interface GamePlayerRow {
   user_id: number;
   first_name: string;
   last_name: string;
+  no_show: number;
 }
 
 function toPlayer(row: GamePlayerRow): GamePlayer {
-  return { userId: row.user_id, firstName: row.first_name, lastName: row.last_name };
+  return {
+    userId: row.user_id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    noShow: Number(row.no_show) === 1,
+  };
 }
 
 // everyone in the game (organizer included), in the order they joined
 export async function getGamePlayers(gameId: number): Promise<GamePlayer[]> {
   const rows = await selectRows<GamePlayerRow>(
-    `SELECT u.user_id, u.first_name, u.last_name
+    `SELECT u.user_id, u.first_name, u.last_name, COALESCE(a.no_show, FALSE) AS no_show
      FROM game_players p
      JOIN users u ON u.user_id = p.user_id
+     LEFT JOIN game_attendance a ON a.game_id = p.game_id AND a.user_id = p.user_id
      WHERE p.game_id = ?
      ORDER BY p.joined_at, u.user_id`,
     [gameId],
@@ -570,7 +597,7 @@ export async function findOrganizer(game: Game, players: GamePlayer[]): Promise<
   const player = players.find((p) => p.userId === game.organizerId);
   if (player) return player;
   const rows = await selectRows<GamePlayerRow>(
-    'SELECT user_id, first_name, last_name FROM users WHERE user_id = ? LIMIT 1',
+    'SELECT user_id, first_name, last_name, 0 AS no_show FROM users WHERE user_id = ? LIMIT 1',
     [game.organizerId],
   );
   return rows[0] ? toPlayer(rows[0]) : null;
