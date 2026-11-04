@@ -27,6 +27,11 @@ object Routes {
     const val GAME_CHAT = "game_chat/{$GAME_ID_ARG}"
     fun gameChat(gameId: Int) = "game_chat/$gameId"
 
+    // the chat with a friend, build it with friendChat(their user id)
+    const val USER_ID_ARG = "userId"
+    const val FRIEND_CHAT = "friend_chat/{$USER_ID_ARG}"
+    fun friendChat(userId: Int) = "friend_chat/$userId"
+
     // the players of a completed game the user can rate, build it with ratePlayers(id)
     const val RATE_PLAYERS = "rate_players/{$GAME_ID_ARG}"
     fun ratePlayers(gameId: Int) = "rate_players/$gameId"

@@ -13,7 +13,7 @@ cpen321application/
 ├── user/                      User component: sign in, sign up, profile
 ├── game/                      Game component: games, discover, join requests
 ├── friend/                    Social component: user search, friend requests, friends list
-├── chat/                      Message component: game chats
+├── chat/                      Message component: game and friend chats
 ├── review/                    Player Review component: rating players after a game
 ├── navigation/                connects routes to screens and holds shared state
 └── ui/                        screens and reusable UI pieces (drawing only)
@@ -28,7 +28,7 @@ cpen321application/
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |
-| `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. `invitedGameId` reads which game a tapped invite is for |
+| `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. `invitedGameId` reads which game a tapped invite is for, and `messagedFriendId` which friend a tapped message is from |
 | `notifications/GameEvents.kt` | Passes notifications to open screens so they reload (e.g. a new join request) |
 | `notifications/FriendEvents.kt` | Passes friend request notifications on so the Friends tab reloads |
 | `SafeCoroutines.kt` | Coroutine scopes that show a message instead of crashing on an unexpected error |
@@ -80,7 +80,7 @@ cpen321application/
 
 | File | What it does |
 | --- | --- |
-| `repository/ChatRepository.kt` | Loads a page of a chat's earlier messages |
+| `repository/ChatRepository.kt` | Loads a page of a chat's earlier messages, and finds the chat with a friend |
 | `socket/ChatConnection.kt` | The WebSocket to one chat, built on OkHttp: sends messages and reports what arrives |
 | `dto/ChatDtos.kt` | Request and reply classes for the chat endpoint and WebSocket, matching the server's JSON |
 | `model/ChatMessage.kt` | A message as the Chat screen shows it, and its converter |
@@ -105,7 +105,7 @@ cpen321application/
 | `FriendsRoute.kt` | Friends |
 | `GameDetailsRoute.kt` | Game Details, the join request popup and the Invite Friends picker |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
-| `ChatRoute.kt` | Game Chat, opening and closing its connection as the screen is shown and hidden |
+| `ChatRoute.kt` | Game Chat and Friend Chat, sharing the Chat screen and opening and closing its connection as the screen is shown and hidden |
 | `RatePlayersRoute.kt` | Rate Players and its rating form, for the players who showed up to a completed game |
 | `PlayerProfilePopup.kt` | The player profile popup: loads a player's public profile and sends a friend request from it. `AppNavigation` shows it over any screen |
 | `GameFormRoutes.kt` | Create Game, Edit Game, Pick Location |
@@ -120,7 +120,7 @@ cpen321application/
 | `ProfileState.kt` | The signed-in user's profile |
 | `FriendsState.kt` | The search text and results, incoming friend requests and the friends list. Searches shortly after typing pauses |
 
-`state/ChatState.kt` is the exception: it holds one open chat (messages, connection, sending and reconnecting), so it only lives as long as the Chat screen.
+`state/ChatState.kt` is the exception: it holds one open chat (messages, connection, sending and reconnecting), so it only lives as long as the Chat screen. Its `ChatSource` holds what differs between a game's chat and a friend's: the title until it's loaded, the message when the user can't be in the chat, and how to find the chat.
 
 ## ui/
 
@@ -182,6 +182,7 @@ If loading fails after the game was already shown, the old details stay on scree
 3. Any open route for that game reloads. `AppNavigation` also refreshes Home when a join request is approved.
 4. Friend request notifications have a `type` starting with `friend_request` and no `gameId`. They go through `FriendEvents` instead, and `AppNavigation` refreshes the Friends tab.
 5. Tapping a `game_invite` notification opens the app with its data in the intent's extras. `MainActivity` reads the game with `invitedGameId` and `AppNavigation` opens its Game Details, where the friend can send a join request.
+6. A `friend_message` notification has a `friendId` instead of a `gameId`, and `GameEvents` and `FriendEvents` both ignore it. Tapping it works the same way: `MainActivity` reads the friend with `messagedFriendId` and `AppNavigation` opens the chat with them. The server doesn't send one to a user who has that chat open, and a friend's newest message replaces the last one's notification.
 
 **Session ends**
 - Any call whose JWT can't be renewed makes `Session` emit `signInRequired`.
@@ -192,7 +193,7 @@ If loading fails after the game was already shown, the old details stay on scree
 - **Result types:** repository functions never throw for normal problems. They return a sealed result like `Loaded` / `Failed(message)`, and the message is ready to show the user.
 - **DTO vs model:** DTOs match the server's JSON exactly. Models are what the screens show (formatted times, capitalised names). Converters are in `game/model/`.
 - **Live updates:** push notifications go through `GameEvents`. Routes that show a game listen to it and reload when an event for that game arrives. Chat messages arrive over a WebSocket instead, open only while the Chat screen is shown.
-- **Player profiles:** the players list, join requests, game chat and the friends list report a tapped name through their Actions (`onOpenProfile`), and their routes call `app.openProfile(userId)`. `AppNavigation` shows `PlayerProfilePopup` over the current screen, so closing it leaves that screen as it was.
+- **Player profiles:** the players list, join requests, game chat and the friends list report a tapped name through their Actions (`onOpenProfile`), and their routes call `app.openProfile(userId)`. `AppNavigation` shows `PlayerProfilePopup` over the current screen, so closing it leaves that screen as it was. In the friends list only the circle opens the profile, tapping the rest of the row opens the chat.
 - **Passing values between screens:** Pick Location sends the chosen place back through `savedStateHandle`, using the keys in `Routes.kt`.
 - **Config:** `API_BASE_URL`, `GOOGLE_CLIENT_ID` and `MAPS_API_KEY` come from `frontend/local.properties` through `BuildConfig`. See the README.
 - **UiState and Actions:** most screens take a `…UiState` (what to show) and a `…Actions` (what each tap does). Both are defined at the top of the screen's file, so that's the place to start reading a screen.
@@ -210,4 +211,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-Player Review's badges have no frontend code yet apart from the profile popup, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. Tapping a friend opens their profile until friend chat is built. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+Player Review's badges have no frontend code yet apart from the profile popup, and Social doesn't have removing friends or friend profiles yet. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.

@@ -48,32 +48,88 @@ export async function getGameChatId(gameId: number): Promise<number | null> {
   return rows[0]?.chat_id ?? null;
 }
 
+// opens the chat of two new friends, in the transaction making them friends. IGNORE: if
+// they were friends before they keep the same chat
+export async function createFriendChat(connection: Queryable, userId: number, otherUserId: number): Promise<void> {
+  await executeWrite(
+    'INSERT IGNORE INTO chats (user_low_id, user_high_id) VALUES (LEAST(?, ?), GREATEST(?, ?))',
+    [userId, otherUserId, userId, otherUserId],
+    connection,
+  );
+}
+
+// a friend's chat and the name it's shown with
+export interface FriendChat {
+  chatId: number;
+  friendId: number;
+  friendFirstName: string;
+  friendLastName: string;
+}
+
+interface FriendChatRow {
+  chat_id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+}
+
+// the user's chat with their friend, or null if the two aren't friends
+export async function getFriendChat(userId: number, friendId: number): Promise<FriendChat | null> {
+  const rows = await selectRows<FriendChatRow>(
+    `SELECT c.chat_id, u.user_id, u.first_name, u.last_name
+     FROM friendships f
+     JOIN users u ON u.user_id = f.friend_id
+     JOIN chats c ON c.user_low_id = LEAST(f.user_id, f.friend_id) AND c.user_high_id = GREATEST(f.user_id, f.friend_id)
+     WHERE f.user_id = ? AND f.friend_id = ? LIMIT 1`,
+    [userId, friendId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    chatId: row.chat_id,
+    friendId: row.user_id,
+    friendFirstName: row.first_name,
+    friendLastName: row.last_name,
+  };
+}
+
 // what the user may do with a chat
 export interface ChatAccess {
-  // only the game's current players can open its chat
-  isPlayer: boolean;
-  // the game was completed or cancelled, the chat can be read but not written to
+  // only the game's current players, or the two friends while they're friends, can open a chat
+  isMember: boolean;
+  // the game was completed or cancelled, the chat can be read but not written to. Friend chats never close
   isClosed: boolean;
+  isFriendChat: boolean;
 }
 
 interface ChatAccessRow {
-  status: string;
-  is_player: number;
+  // null for a friend chat
+  status: string | null;
+  is_member: number;
+  is_friend_chat: number;
 }
 
 // the user's access to the chat, or null if no chat has the id
 export async function getChatAccess(chatId: number, userId: number): Promise<ChatAccess | null> {
   const rows = await selectRows<ChatAccessRow>(
-    `SELECT g.status,
-            EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = c.game_id AND p.user_id = ?) AS is_player
+    `SELECT g.status, c.game_id IS NULL AS is_friend_chat,
+            EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = c.game_id AND p.user_id = ?)
+            OR EXISTS (SELECT 1 FROM friendships f
+                       WHERE f.user_id = ?
+                         AND f.user_id IN (c.user_low_id, c.user_high_id)
+                         AND f.friend_id IN (c.user_low_id, c.user_high_id)) AS is_member
      FROM chats c
-     JOIN games g ON g.game_id = c.game_id
+     LEFT JOIN games g ON g.game_id = c.game_id
      WHERE c.chat_id = ? LIMIT 1`,
-    [userId, chatId],
+    [userId, userId, chatId],
   );
   const row = rows[0];
   if (!row) return null;
-  return { isPlayer: Number(row.is_player) === 1, isClosed: row.status !== 'scheduled' };
+  return {
+    isMember: Number(row.is_member) === 1,
+    isClosed: row.status !== null && row.status !== 'scheduled',
+    isFriendChat: Number(row.is_friend_chat) === 1,
+  };
 }
 
 function toChatMessage(row: ChatMessageRow): ChatMessage {
@@ -116,13 +172,18 @@ export async function createChatMessage(chatId: number, senderId: number, text: 
   return toChatMessage(row);
 }
 
-// the users who can currently be in the chat: the players of its game
-export async function getChatPlayerIds(chatId: number): Promise<number[]> {
+// the users who can currently be in the chat: the players of its game, or the two friends
+export async function getChatMemberIds(chatId: number): Promise<number[]> {
   const rows = await selectRows<{ user_id: number }>(
     `SELECT p.user_id FROM chats c
      JOIN game_players p ON p.game_id = c.game_id
+     WHERE c.chat_id = ?
+     UNION
+     SELECT f.user_id FROM chats c
+     JOIN friendships f ON f.user_id IN (c.user_low_id, c.user_high_id)
+                       AND f.friend_id IN (c.user_low_id, c.user_high_id)
      WHERE c.chat_id = ?`,
-    [chatId],
+    [chatId, chatId],
   );
   return rows.map((row) => row.user_id);
 }

@@ -7,8 +7,10 @@ import androidx.compose.runtime.setValue
 import com.example.cpen321application.chat.dto.ChatSocketEvent
 import com.example.cpen321application.chat.model.ChatMessage
 import com.example.cpen321application.chat.model.toChatMessage
+import com.example.cpen321application.chat.repository.ChatInfoResult
 import com.example.cpen321application.chat.repository.ChatMessagesResult
 import com.example.cpen321application.chat.repository.fetchChatMessages
+import com.example.cpen321application.chat.repository.fetchFriendChat
 import com.example.cpen321application.chat.socket.ChatConnection
 import com.example.cpen321application.chat.socket.ChatConnectionListener
 import com.example.cpen321application.chat.socket.ChatDisconnect
@@ -26,15 +28,43 @@ import java.util.UUID
 // how long to wait before reconnecting after the connection was lost
 private const val RECONNECT_DELAY_MS = 3_000L
 private const val NOT_SENT_MESSAGE = "Not sent, check your connection"
-private const val NOT_IN_GAME_MESSAGE = "You can't open this chat, you're no longer in this game."
 
-/*  a game's chat while its screen is open: loads the messages, keeps a WebSocket open for
-    new ones and sends the user's. start and stop follow the screen being shown, so the
+/*  what differs between chats: the title until it's loaded, the problem shown when the
+    user can't be in the chat, and how to find the chat
+ */
+class ChatSource(
+    val initialTitle: String,
+    val notAllowedMessage: String,
+    val load: suspend (Context) -> ChatInfoResult
+)
+
+// the chat of a game, for its current players
+fun gameChatSource(gameId: Int) = ChatSource(
+    initialTitle = "Game Chat",
+    notAllowedMessage = "You can't open this chat, you're no longer in this game.",
+    load = { context ->
+        when (val result = fetchGameDetails(context, gameId)) {
+            is GameDetailsResult.Loaded -> ChatInfoResult.Found(result.details.chatId, result.game.title)
+            GameDetailsResult.NotFound -> ChatInfoResult.Unavailable("This game no longer exists.")
+            is GameDetailsResult.Failed -> ChatInfoResult.Failed(result.message)
+        }
+    }
+)
+
+// the chat with a friend, it never closes
+fun friendChatSource(userId: Int) = ChatSource(
+    initialTitle = "Chat",
+    notAllowedMessage = "You can't open this chat, you're no longer friends.",
+    load = { context -> fetchFriendChat(context, userId) }
+)
+
+/*  a chat while its screen is open: loads the messages, keeps a WebSocket open for new
+    ones and sends the user's. start and stop follow the screen being shown, so the
     connection never stays open in the background. A lost connection reconnects by itself
     and reloads the newest messages, in case any arrived while it was down
  */
-class ChatState(private val context: Context, private val gameId: Int, private val scope: CoroutineScope) {
-    var title by mutableStateOf("Game Chat")
+class ChatState(private val context: Context, private val source: ChatSource, private val scope: CoroutineScope) {
+    var title by mutableStateOf(source.initialTitle)
         private set
     // newest first: messages still being sent or that failed, then the stored ones by id
     var messages by mutableStateOf<List<ChatMessage>>(emptyList())
@@ -45,7 +75,7 @@ class ChatState(private val context: Context, private val gameId: Int, private v
         private set
     var error by mutableStateOf<String?>(null)
         private set
-    // retrying won't help: the game is gone or the user isn't in it
+    // retrying won't help: the chat is gone or the user can't be in it
     var isUnavailable by mutableStateOf(false)
         private set
     // the game was completed or cancelled: the messages can be read but no new ones sent
@@ -98,7 +128,7 @@ class ChatState(private val context: Context, private val gameId: Int, private v
                 // nothing new can arrive in a closed chat, so it doesn't need a connection
                 if (!isClosed) connect(id)
             }
-            is ChatMessagesResult.Unavailable -> becomeUnavailable(result.message)
+            ChatMessagesResult.Unavailable -> becomeUnavailable(source.notAllowedMessage)
             is ChatMessagesResult.Failed -> {
                 error = result.message
                 isLoading = false
@@ -107,16 +137,16 @@ class ChatState(private val context: Context, private val gameId: Int, private v
         }
     }
 
-    // the game's chat id and title, or null with the problem shown
+    // the chat's id and title, or null with the problem shown
     private suspend fun loadChatId(): Int? {
-        when (val result = fetchGameDetails(context, gameId)) {
-            is GameDetailsResult.Loaded -> {
-                title = result.game.title
-                if (result.details.chatId == null) becomeUnavailable(NOT_IN_GAME_MESSAGE)
-                return result.details.chatId
+        when (val result = source.load(context)) {
+            is ChatInfoResult.Found -> {
+                title = result.title
+                if (result.chatId == null) becomeUnavailable(source.notAllowedMessage)
+                return result.chatId
             }
-            GameDetailsResult.NotFound -> becomeUnavailable("This game no longer exists.")
-            is GameDetailsResult.Failed -> {
+            is ChatInfoResult.Unavailable -> becomeUnavailable(result.message)
+            is ChatInfoResult.Failed -> {
                 error = result.message
                 reopenAfterDelay()
             }
@@ -185,7 +215,7 @@ class ChatState(private val context: Context, private val gameId: Int, private v
         failSendingMessages()
         when (reason) {
             ChatDisconnect.Lost -> reopenAfterDelay()
-            ChatDisconnect.NotAllowed -> becomeUnavailable(NOT_IN_GAME_MESSAGE)
+            ChatDisconnect.NotAllowed -> becomeUnavailable(source.notAllowedMessage)
             ChatDisconnect.Unauthorized -> {
                 if (wasRejectedJwt) {
                     Session.requireSignIn()

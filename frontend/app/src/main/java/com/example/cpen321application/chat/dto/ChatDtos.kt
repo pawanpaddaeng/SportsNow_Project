@@ -25,6 +25,14 @@ data class ChatMessagesResponse(
     val error: String?
 )
 
+// reply from GET api/friends/{userId}/chat
+data class FriendChatResponse(
+    val msg: String?,
+    @SerializedName("chat_id") val chatId: Int?,
+    val friend: ChatSenderDto?,
+    val error: String?
+)
+
 // what the app sends over the WebSocket. clientId comes back with the reply
 data class SendMessageRequest(
     @SerializedName("chat_id") val chatId: Int,

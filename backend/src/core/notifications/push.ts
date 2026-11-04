@@ -30,6 +30,8 @@ export interface PushMessage {
   body: string;
   // extra values for the app, e.g. { type: 'join_request', gameId: '42' }
   data?: Record<string, string>;
+  // a new notification replaces the one showing with the same tag, instead of adding another
+  tag?: string;
 }
 
 /*  sends a push notification to every device the user is signed into and
@@ -46,6 +48,7 @@ export async function sendPushToUser(userId: number, message: PushMessage): Prom
       tokens,
       notification: { title: message.title, body: message.body },
       data: message.data ?? {},
+      ...(message.tag === undefined ? {} : { android: { notification: { tag: message.tag } } }),
     });
 
     // one response per token, in the same order

@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 3, 2026 | 3 (Use Case 4), 4.1 | Friend chat is built on the same tables, WebSocket and screen as game chat. Added `GET /api/friends/{userId}/chat` and `createFriendChat`. Use Case 4 now starts from the Friends tab. |
 | Nov 3, 2026 | 4.1 | Player ratings are built. Section 4.1 lists Player Review's real interfaces. No-shows are sent when the organiser marks a game completed, so there is no separate no-shows endpoint, and the score is computed when it's read instead of by `updateReputation`. |
 | 2026-11-02 | 4.1 Main Components (User, Player Review, Social) | Built `GET /api/users/{userId}` for the player profile popup (Player Statistics use case). It returns a player's name, age range, games played, reputation score and badges, never their email or birth year. `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. Added `getFriendshipStatus` so the popup knows when to offer Add Friend. |
 | 2026-11-01 | 4.1 Main Components (Social) | Search results now include `friendship_status`, so the Friends tab shows Request Sent instead of Add once a request is sent. |
@@ -180,7 +181,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 [**[Sequence Diagram]**](#seq-uc4)
 
 **Main success scenario**:
-1. User selects “Chat”.
+1. User selects “Friends”.
 2. System displays the list of the user’s friends.
 3. User selects a friend.
 4. System opens the chat with that friend.
@@ -320,13 +321,17 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 4. **Message**
     - **Purpose**: Handles chat messages for both game chat and friend chat.
     - **Rationale**: Game chat and friend chat send and store messages the same way, so one component handles both. We chose a WebSocket connection over polling so messages arrive live and the app doesn't use battery asking for new ones.
-    - **Interfaces**: Game chat is built. Friend chat is *(planned)* and will use the same interfaces.
+    - **Interfaces**: Game chat and friend chat are built and share these interfaces. A chat's members are its game's current players, or the two friends.
         1. `GET /api/chats/{chatId}/messages?before=` → `200 { messages, is_closed }`
-            - **Purpose**: Returns 50 of the chat's earlier messages, newest first, to a current player of the game. `before` is the oldest message id the app already has. `is_closed` is true once the game is completed or cancelled.
+            - **Purpose**: Returns 50 of the chat's earlier messages, newest first, to a member of the chat. `before` is the oldest message id the app already has. `is_closed` is true once the game is completed or cancelled.
         2. WebSocket `send_message { chat_id, text, client_id }` → `new_message { message, client_id }`, or `error { msg, error, client_id }`
-            - **Purpose**: Sends a message and delivers it live to everyone in the chat. The connection needs `?chat_id=` and the user's JWT, and only opens for a current player of the game. Sending fails with `chat_closed` once the game is completed or cancelled, so the chat can still be read but not written to. `client_id` lets the app match a reply to the message it sent.
+            - **Purpose**: Sends a message and delivers it live to everyone in the chat. The connection needs `?chat_id=` and the user's JWT, and only opens for a member of the chat. A friend who doesn't have the chat open gets a push notification. Sending fails with `chat_closed` once the game is completed or cancelled, so the chat can still be read but not written to. `client_id` lets the app match a reply to the message it sent.
         3. `int createGameChat(Queryable connection, int gameId)`
             - **Purpose**: Used by Game to open the chat room for a new game in the same transaction that creates the game, returning its chat id.
+        4. `GET /api/friends/{userId}/chat` → `200 { chat_id, friend }`
+            - **Purpose**: Finds the chat with a friend and the friend's name. Fails with `403 not_friends` if the two aren't friends.
+        5. `void createFriendChat(Queryable connection, int userId, int otherUserId)`
+            - **Purpose**: Used by Social to open two users' chat room in the same transaction that makes them friends.
 
 5. **Social**
     - **Purpose**: Handles friend search, friend requests, removing friends, and viewing friends' profiles.
@@ -347,7 +352,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         7. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }` *(planned)*
             - **Purpose**: Returns a friend's profile with their badges and upcoming games.
         8. `boolean areFriends(int userId, int otherUserId)`
-            - **Purpose**: Used by Message and Game to check that two users are friends before a chat or invite.
+            - **Purpose**: Used by Game to check that two users are friends before an invite.
         9. `String getFriendshipStatus(int userId, int otherUserId)`
             - **Purpose**: Used by User's public profile to say whether the two users are friends or one has a pending request to the other, so the popup shows Add Friend or where the request stands.
 

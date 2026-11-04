@@ -2,9 +2,10 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { logError, logInfo } from '../../core/logger';
+import { type PushMessage, sendPushToUsers } from '../../core/notifications/push';
 import { readId } from '../../core/validation';
 import { checkToken } from '../../user/auth/middleware';
-import { createChatMessage, getChatAccess, getChatPlayerIds } from '../db/chats';
+import { type ChatMessage, createChatMessage, getChatAccess, getChatMemberIds } from '../db/chats';
 import { chatMessageJson } from '../routes/chatJson';
 import { parseSendMessage, type SendMessage } from '../validation/sendMessage';
 
@@ -12,8 +13,10 @@ import { parseSendMessage, type SendMessage } from '../validation/sendMessage';
 const MAX_REQUEST_BYTES = 16 * 1024;
 // how often connections are checked, phones can vanish without closing them
 const HEARTBEAT_MS = 30_000;
-// close code for a user who is no longer a player of the game
-const CLOSE_NOT_A_PLAYER = 4403;
+// close code for a user who can no longer be in the chat, or a chat that is gone
+const CLOSE_NOT_A_MEMBER = 4403;
+// how much of a message its notification shows, in characters
+const PUSH_PREVIEW_LENGTH = 100;
 
 // who a connection belongs to and the one chat it is open for
 interface ChatClient {
@@ -53,6 +56,19 @@ function sendJson(webSocket: WebSocket, reply: object): void {
   }
 }
 
+// the notification for a friend's message, tagged so their messages show as one notification
+function friendMessagePush(message: ChatMessage): PushMessage {
+  // by character, cutting by length could split an emoji in two
+  const characters = Array.from(message.text);
+  const preview = characters.slice(0, PUSH_PREVIEW_LENGTH).join('');
+  return {
+    title: message.senderFirstName,
+    body: characters.length > PUSH_PREVIEW_LENGTH ? `${preview}...` : preview,
+    data: { type: 'friend_message', friendId: String(message.senderId) },
+    tag: `friend-${message.senderId}`,
+  };
+}
+
 /*  decides who is connecting and to which chat: ?chat_id= and the JWT in the Authorization
     header. Returns the new client, or the status to reject with. A closed chat can still
     be opened, sending to it is what fails
@@ -67,7 +83,7 @@ async function checkConnection(req: IncomingMessage): Promise<ChatClient | numbe
 
   const access = await getChatAccess(chatId, auth.user.userId);
   if (!access) return 404;
-  if (!access.isPlayer) return 403;
+  if (!access.isMember) return 403;
   return { userId: auth.user.userId, chatId, isAlive: true };
 }
 
@@ -79,30 +95,42 @@ async function checkConnection(req: IncomingMessage): Promise<ChatClient | numbe
       receives { type: "error", msg, error, client_id } when its message wasn't sent:
                invalid_request, chat_not_found, forbidden, chat_closed or server_error
     Connecting is rejected with 400 (no chat_id or token), 401 (bad token), 403 (not a
-    player of the game), 404 (no such chat) or 500
+    player of the game or a friend), 404 (no such chat) or 500. A friend's message also
+    sends a notification, unless they have the chat open
  */
 export function startChatSocket(port: number): ChatSocket {
   const webSockets = new WebSocketServer({ noServer: true, maxPayload: MAX_REQUEST_BYTES });
   const clients = new Map<WebSocket, ChatClient>();
 
-  /*  sends to the chat's connections, closing those of users no longer in the game. The
-      message is already saved by now, so if the players can't be read only the sender is
+  /*  sends to the chat's connections, closing those of users no longer in the chat. The
+      message is already saved by now, so if the members can't be read only the sender is
       told: it's sent, and the others get it when their chat next loads
    */
   async function broadcast(chatId: number, sender: WebSocket, reply: object): Promise<void> {
-    let playerIds: Set<number>;
+    let memberIds: Set<number>;
     try {
-      playerIds = new Set(await getChatPlayerIds(chatId));
+      memberIds = new Set(await getChatMemberIds(chatId));
     } catch (error) {
-      logError(`Reading the players of chat ${chatId} failed:`, error);
+      logError(`Reading the members of chat ${chatId} failed:`, error);
       sendJson(sender, reply);
       return;
     }
     for (const [webSocket, client] of clients) {
       if (client.chatId !== chatId) continue;
-      if (playerIds.has(client.userId)) sendJson(webSocket, reply);
-      else webSocket.close(CLOSE_NOT_A_PLAYER, 'Not a player of this game');
+      if (memberIds.has(client.userId)) sendJson(webSocket, reply);
+      else webSocket.close(CLOSE_NOT_A_MEMBER, 'Not a member of this chat');
     }
+  }
+
+  // notifies the friend of a new message, unless it already reached them because they have the chat open
+  async function notifyFriend(message: ChatMessage): Promise<void> {
+    const connected = new Set<number>();
+    for (const client of clients.values()) {
+      if (client.chatId === message.chatId) connected.add(client.userId);
+    }
+    const memberIds = await getChatMemberIds(message.chatId);
+    const absent = memberIds.filter((id) => id !== message.senderId && !connected.has(id));
+    await sendPushToUsers(absent, friendMessagePush(message));
   }
 
   // checks again on every message, the user may have left or the game may have ended since connecting
@@ -118,11 +146,13 @@ export function startChatSocket(port: number): ChatSocket {
     const access = await getChatAccess(client.chatId, client.userId);
     if (!access) {
       sendError('chat_not_found', 'This chat does not exist');
+      // e.g. the friend deleted their account, nothing more can be sent here
+      webSocket.close(CLOSE_NOT_A_MEMBER, 'This chat does not exist');
       return;
     }
-    if (!access.isPlayer) {
-      sendError('forbidden', 'Only players of this game can use its chat');
-      webSocket.close(CLOSE_NOT_A_PLAYER, 'Not a player of this game');
+    if (!access.isMember) {
+      sendError('forbidden', "You can't use this chat");
+      webSocket.close(CLOSE_NOT_A_MEMBER, 'Not a member of this chat');
       return;
     }
     if (access.isClosed) {
@@ -136,6 +166,13 @@ export function startChatSocket(port: number): ChatSocket {
       message: chatMessageJson(saved),
       client_id: message.clientId,
     });
+
+    // best effort, the message is already delivered and saved so a failure is only logged
+    if (access.isFriendChat) {
+      notifyFriend(saved).catch((error: unknown) => {
+        logError(`Notifying about a message in chat ${client.chatId} failed:`, error);
+      });
+    }
   }
 
   function handleRequest(webSocket: WebSocket, client: ChatClient, raw: RawData): void {

@@ -16,6 +16,7 @@ import com.example.cpen321application.navigation.routes.CreateGameRoute
 import com.example.cpen321application.navigation.routes.DiscoverRoute
 import com.example.cpen321application.navigation.routes.EditGameRoute
 import com.example.cpen321application.navigation.routes.EditProfileRoute
+import com.example.cpen321application.navigation.routes.FriendChatRoute
 import com.example.cpen321application.navigation.routes.FriendsRoute
 import com.example.cpen321application.navigation.routes.GameChatRoute
 import com.example.cpen321application.navigation.routes.GameDetailsRoute
@@ -27,18 +28,71 @@ import com.example.cpen321application.navigation.routes.ProfileRoute
 import com.example.cpen321application.navigation.routes.RatePlayersRoute
 import com.example.cpen321application.navigation.routes.SignInRoute
 import com.example.cpen321application.navigation.routes.SignUpRoute
+import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.navigation.state.rememberAppState
 
 private val gameIdArgument = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
+private val userIdArgument = listOf(navArgument(Routes.USER_ID_ARG) { type = NavType.IntType })
 
 /*  connects each route to its screen, the shared state lives in AppState. gameToOpen is
-    the game of a tapped invite notification, onGameOpened is called once it's handled
+    the game of a tapped invite notification and friendChatToOpen the friend of a tapped
+    message notification, their callbacks are called once they're handled
  */
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier, gameToOpen: Int? = null, onGameOpened: () -> Unit = {}) {
+fun AppNavigation(
+    modifier: Modifier = Modifier,
+    gameToOpen: Int? = null,
+    onGameOpened: () -> Unit = {},
+    friendChatToOpen: Int? = null,
+    onFriendChatOpened: () -> Unit = {}
+) {
     val app = rememberAppState()
     val startDestination = remember { app.startDestination() }
 
+    ListenForAppEvents(app)
+
+    // signed in from a previous session: register notifications once at start
+    LaunchedEffect(Unit) {
+        if (startDestination == Routes.HOME) {
+            app.registerNotifications()
+        }
+    }
+
+    // a game invite was tapped: open the game so the friend can ask to join (if signed in)
+    OpenFromNotification(gameToOpen?.let(Routes::gameDetails), onGameOpened) { app.navController.navigate(it) }
+    // a friend's message was tapped: open the chat with them (if signed in)
+    OpenFromNotification(friendChatToOpen?.let(Routes::friendChat), onFriendChatOpened) {
+        app.navController.navigate(it)
+    }
+
+    NavHost(
+        navController = app.navController,
+        startDestination = startDestination
+    ) {
+        composable(Routes.SIGN_IN) { SignInRoute(app, it, modifier) }
+        composable(Routes.SIGN_UP) { SignUpRoute(app, modifier) }
+        composable(Routes.HOME) { HomeRoute(app, it, modifier) }
+        composable(Routes.DISCOVER) { DiscoverRoute(app, it, modifier) }
+        composable(Routes.FRIENDS) { FriendsRoute(app, it, modifier) }
+        composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
+        composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
+        composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, it, modifier) }
+        composable(Routes.FRIEND_CHAT, arguments = userIdArgument) { FriendChatRoute(app, it, modifier) }
+        composable(Routes.RATE_PLAYERS, arguments = gameIdArgument) { RatePlayersRoute(app, it, modifier) }
+        composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }
+        composable(Routes.EDIT_GAME, arguments = gameIdArgument) { EditGameRoute(app, it, modifier) }
+        composable(Routes.PICK_LOCATION) { PickLocationRoute(app, modifier) }
+        composable(Routes.PROFILE) { ProfileRoute(app, it, modifier) }
+        composable(Routes.EDIT_PROFILE) { EditProfileRoute(app, modifier) }
+    }
+    app.profileUserId?.let { userId ->
+        PlayerProfilePopup(app = app, userId = userId, onDismiss = { app.closeProfile() })
+    }
+}
+
+// what can happen anywhere in the app, whichever screen is showing
+@Composable
+private fun ListenForAppEvents(app: AppState) {
     // any API call whose session can't be used or renewed asks for sign in through Session
     LaunchedEffect(Unit) {
         Session.signInRequired.collect { app.returnToSignIn() }
@@ -56,42 +110,15 @@ fun AppNavigation(modifier: Modifier = Modifier, gameToOpen: Int? = null, onGame
     LaunchedEffect(Unit) {
         FriendEvents.events.collect { app.friendsState.refresh() }
     }
+}
 
-    // signed in from a previous session: register notifications once at start
-    LaunchedEffect(Unit) {
-        if (startDestination == Routes.HOME) {
-            app.registerNotifications()
+// goes to route once a tapped notification asks for it, only when signed in. onOpened clears the request
+@Composable
+private fun OpenFromNotification(route: String?, onOpened: () -> Unit, navigate: (String) -> Unit) {
+    LaunchedEffect(route) {
+        if (route != null) {
+            if (jwtToken != null) navigate(route)
+            onOpened()
         }
-    }
-
-    // a game invite was tapped: open the game so the friend can ask to join (if signed in)
-    LaunchedEffect(gameToOpen) {
-        if (gameToOpen != null) {
-            if (jwtToken != null) app.navController.navigate(Routes.gameDetails(gameToOpen))
-            onGameOpened()
-        }
-    }
-
-    NavHost(
-        navController = app.navController,
-        startDestination = startDestination
-    ) {
-        composable(Routes.SIGN_IN) { SignInRoute(app, it, modifier) }
-        composable(Routes.SIGN_UP) { SignUpRoute(app, modifier) }
-        composable(Routes.HOME) { HomeRoute(app, it, modifier) }
-        composable(Routes.DISCOVER) { DiscoverRoute(app, it, modifier) }
-        composable(Routes.FRIENDS) { FriendsRoute(app, it, modifier) }
-        composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
-        composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
-        composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, it, modifier) }
-        composable(Routes.RATE_PLAYERS, arguments = gameIdArgument) { RatePlayersRoute(app, it, modifier) }
-        composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }
-        composable(Routes.EDIT_GAME, arguments = gameIdArgument) { EditGameRoute(app, it, modifier) }
-        composable(Routes.PICK_LOCATION) { PickLocationRoute(app, modifier) }
-        composable(Routes.PROFILE) { ProfileRoute(app, it, modifier) }
-        composable(Routes.EDIT_PROFILE) { EditProfileRoute(app, modifier) }
-    }
-    app.profileUserId?.let { userId ->
-        PlayerProfilePopup(app = app, userId = userId, onDismiss = { app.closeProfile() })
     }
 }

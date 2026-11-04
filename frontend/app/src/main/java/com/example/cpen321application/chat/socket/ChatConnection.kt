@@ -14,8 +14,8 @@ import okhttp3.WebSocketListener
 
 // the port of the chat WebSocket when the app talks to the backend directly, without Caddy
 private const val DIRECT_SOCKET_PORT = 8080
-// the server closes the connection with this code when the user is no longer in the game
-private const val CLOSE_NOT_A_PLAYER = 4403
+// the server closes the connection with this code when the user can no longer be in the chat
+private const val CLOSE_NOT_A_MEMBER = 4403
 private const val CLOSE_NORMAL = 1000
 private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
@@ -34,7 +34,7 @@ private fun chatSocketUrl(chatId: Int): String {
 }
 
 /*  why a connection ended: Lost can reconnect, NotAllowed won't help reconnecting (the user
-    isn't in the game or the chat is gone), and Unauthorized means the server rejected the JWT
+    can't be in the chat or it's gone), and Unauthorized means the server rejected the JWT
  */
 enum class ChatDisconnect { Lost, NotAllowed, Unauthorized }
 
@@ -69,7 +69,7 @@ class ChatConnection(private val chatId: Int, jwt: String, private val listener:
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                listener.onDisconnected(if (code == CLOSE_NOT_A_PLAYER) ChatDisconnect.NotAllowed else ChatDisconnect.Lost)
+                listener.onDisconnected(if (code == CLOSE_NOT_A_MEMBER) ChatDisconnect.NotAllowed else ChatDisconnect.Lost)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {

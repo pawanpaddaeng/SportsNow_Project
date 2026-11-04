@@ -13,7 +13,7 @@ export function chatsRouter(): Router {
   /*  a chat's messages, newest first, a page at a time. ?before= is the oldest message_id
       the app has, leave it out for the newest page, and a page with no messages means
       there are no older ones. is_closed says the chat can be read but not written to.
-      Errors: 400 invalid_request, 403 forbidden (not a player of the game), 404 chat_not_found
+      Errors: 400 invalid_request, 403 forbidden (not a player of the game or a friend), 404 chat_not_found
    */
   router.get('/api/chats/:chatId/messages', requireAuth, asyncRoute('Could not load messages, try again later',
     async (req: Request<{ chatId: string }>, res: Response) => {
@@ -29,8 +29,8 @@ export function chatsRouter(): Router {
 
       const access = await getChatAccess(chatId, user.userId);
       if (!access) return res.status(404).json({ msg: 'chat_not_found', error: 'This chat does not exist' });
-      if (!access.isPlayer) {
-        return res.status(403).json({ msg: 'forbidden', error: 'Only players of this game can open its chat' });
+      if (!access.isMember) {
+        return res.status(403).json({ msg: 'forbidden', error: "You can't open this chat" });
       }
 
       const messages = await getChatMessages(chatId, before);

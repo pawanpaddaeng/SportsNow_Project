@@ -1,8 +1,10 @@
 import { Router, type Request, type Response } from 'express';
+import { getFriendChat } from '../../chat/db/chats';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
 import { sendPushToUser } from '../../core/notifications/push';
+import { readId } from '../../core/validation';
 import { type ErrorResponse, logNotificationError, readGameId, responseFor, sendError } from '../../game/routes/gameErrors';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import {
@@ -60,6 +62,23 @@ export function friendsRouter(): Router {
     async (_req: Request, res: Response) => {
       const friends = await getFriends(getAuthUser(res).userId);
       return res.status(200).json({ msg: 'success', friends: friends.map(friendUserJson) });
+    }));
+
+  /*  the chat with a friend and the friend's name, for opening it from the friends list.
+      Its messages then work like a game chat's. Errors: 400 invalid_request, 403 not_friends
+   */
+  router.get('/api/friends/:userId/chat', requireAuth, asyncRoute('Could not open this chat, try again later',
+    async (req: Request<{ userId: string }>, res: Response) => {
+      const friendId = readId(req.params.userId);
+      if (friendId === null) return invalidRequest(res, 'userId must be a positive whole number');
+
+      const chat = await getFriendChat(getAuthUser(res).userId, friendId);
+      if (!chat) return res.status(403).json({ msg: 'not_friends', error: "You're not friends with this person" });
+      return res.status(200).json({
+        msg: 'success',
+        chat_id: chat.chatId,
+        friend: { user_id: chat.friendId, first_name: chat.friendFirstName, last_name: chat.friendLastName },
+      });
     }));
 
   // requests sent to the signed in user that are waiting for an answer, newest first

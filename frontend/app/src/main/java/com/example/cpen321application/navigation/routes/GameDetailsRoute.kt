@@ -61,9 +61,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     var showJoinSheet by remember { mutableStateOf(false) }
     var showInviteFriends by remember { mutableStateOf(false) }
     // opened from a Discover card: highlight Discover and go back there after a join request
-    val openedFromDiscover = remember {
-        navController.previousBackStackEntry?.destination?.route == Routes.DISCOVER
-    }
+    val openedFromDiscover = remember { navController.previousBackStackEntry?.destination?.route == Routes.DISCOVER }
 
     // on failure the last loaded details stay visible with the error above them
     fun loadDetails() {

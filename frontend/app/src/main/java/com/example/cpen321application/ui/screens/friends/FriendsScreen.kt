@@ -60,6 +60,7 @@ data class FriendsActions(
     val onAccept: (FriendRequestItem) -> Unit = {},
     val onDecline: (FriendRequestItem) -> Unit = {},
     val onOpenProfile: (Int) -> Unit = {},
+    val onOpenChat: (Int) -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
@@ -133,7 +134,11 @@ private fun LazyListScope.requestsAndFriends(state: FriendsUiState, actions: Fri
 
     item(key = "friendsHeader") { SectionHeader(title = "Your Friends", count = state.friends.size) }
     items(state.friends, key = { "friend${it.userId}" }) { friend ->
-        PersonCard(person = friend, onClick = { actions.onOpenProfile(friend.userId) })
+        PersonCard(
+            person = friend,
+            onClick = { actions.onOpenChat(friend.userId) },
+            onAvatarClick = { actions.onOpenProfile(friend.userId) }
+        )
     }
     if (state.friends.isEmpty() && !state.isLoading && state.errorMessage == null) {
         item(key = "noFriends") { ListNote("No friends yet. Search for someone by name to send them a request.") }
@@ -179,36 +184,41 @@ private fun SectionHeader(title: String, count: Int) {
     }
 }
 
+// with onClick the circle can be tapped to open the person's profile
 @Composable
-private fun Avatar(initial: String) {
+private fun Avatar(initial: String, onClick: (() -> Unit)? = null) {
+    val tapToOpen = onClick?.let { Modifier.clickable(onClickLabel = "View profile", onClick = it) } ?: Modifier
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
             .background(SportsPrimaryContainer)
+            .then(tapToOpen)
     ) {
         Text(text = initial, color = SportsOnPrimaryContainer, fontSize = 16.sp, fontWeight = FontWeight.Medium)
     }
 }
 
 /*  one person: initial and name in a card like Home's game cards, trailing goes on the right.
-    With onClick the whole card can be tapped, e.g. to open a friend's profile
+    With onClick the card can be tapped to open the chat with a friend, and with onAvatarClick
+    the circle to open their profile instead
  */
 @Composable
 private fun PersonCard(
     person: FriendPerson,
     onClick: (() -> Unit)? = null,
+    onAvatarClick: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {}
 ) {
-    val tapToOpen = onClick?.let { Modifier.clickable(onClickLabel = "View profile", onClick = it) } ?: Modifier
+    val tapToOpen = onClick?.let { Modifier.clickable(onClickLabel = "Open chat", onClick = it) } ?: Modifier
     CardRow(
         modifier = Modifier
             .cardBackground(SportsSurfaceContainer)
             .border(1.dp, SportsOutlineVariant, RoundedCornerShape(12.dp))
             .then(tapToOpen)
     ) {
-        Avatar(person.initial)
+        Avatar(person.initial, onClick = onAvatarClick)
         Text(
             text = person.name,
             color = SportsOnSurface,
