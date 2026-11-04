@@ -1,34 +1,17 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { pool } from '../../../../src/core/db/mysql';
-import { createGame, getGameById } from '../../../../src/game/db/games';
+import { getGameById } from '../../../../src/game/db/games';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
 beforeEach(async () => {
-  organizerId = await createUser({
-    googleId: 'complete-game-test-organizerCompletes',
-    email: 'complete-game-test@example.com',
-    firstName: 'Olivia',
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
+  organizerId = await addUser('Olivia');
 });
 
-// deleting the user also deletes their games, game players and chats (ON DELETE CASCADE),
-// so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(organizerId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface POST /api/games/{gameId}/complete
 describe('Unmocked: POST /api/games/{gameId}/complete', () => {
@@ -38,20 +21,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
   // Expected output: { msg: "success", game } with game.status "completed"
   test('Organizer marks their started game completed', async () => {
     // 1. the organizer's game that started yesterday
-    const gameId = await createGame({
-      organizerId,
-      title: 'Evening Basketball',
-      sport: 'basketball',
-      description: null,
-      startsAt: new Date(Date.now() - ONE_DAY_MS),
-      endsAt: null,
-      locationName: 'UBC Rec Centre',
-      address: '6000 Student Union Blvd',
-      latitude: 49.26,
-      longitude: -123.25,
-      maxPlayers: 10,
-      skillLevel: 'any',
-    });
+    const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
     expect((await getGameById(gameId))?.status).toBe('scheduled');
 
     // 2. mark it completed through the interface

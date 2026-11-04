@@ -1,12 +1,9 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { pool } from '../../../../src/core/db/mysql';
-import { createGame } from '../../../../src/game/db/games';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
+import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 // test files run at the same time on one database and Discover sees everyone's games,
 // so each Discover test searches its own remote spot
 const SEARCH_LATITUDE = 10;
@@ -20,31 +17,12 @@ const DISTANCE_TOLERANCE_M = 10;
 let userId: number;
 let organizerId: number;
 
-function addUser(firstName: string): Promise<number> {
-  return createUser({
-    googleId: `discover-games-test-nearbyClosestFirst-${firstName}`,
-    email: 'discover-games-test@example.com',
-    firstName,
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
-}
-
 // a real upcoming game the given number of degrees north of the search point
-function addGame(title: string, degreesNorth: number): Promise<number> {
-  return createGame({
-    organizerId,
+function addGameNorthOfSearch(title: string, degreesNorth: number): Promise<number> {
+  return addGame(organizerId, {
     title,
-    sport: 'basketball',
-    description: null,
-    startsAt: new Date(Date.now() + ONE_DAY_MS),
-    endsAt: null,
-    locationName: 'Test Field',
-    address: '1 Test Rd',
     latitude: SEARCH_LATITUDE + degreesNorth,
     longitude: SEARCH_LONGITUDE,
-    maxPlayers: 10,
-    skillLevel: 'any',
   });
 }
 
@@ -53,16 +31,7 @@ beforeEach(async () => {
   organizerId = await addUser('Omar');
 });
 
-// deleting the users also deletes their games, game players and chats (ON DELETE CASCADE),
-// so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(userId);
-  await deleteUser(organizerId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface GET /api/games/discover
 describe('Unmocked: GET /api/games/discover', () => {
@@ -73,9 +42,9 @@ describe('Unmocked: GET /api/games/discover', () => {
   //   join_request_status null
   test('Nearby games, closest first', async () => {
     // 1. add the games furthest first, so the order can't come from when they were made
-    const game2Km = await addGame('2 km away', DEGREES_2_KM);
-    const game1Km = await addGame('1 km away', DEGREES_1_KM);
-    const game200M = await addGame('200 m away', DEGREES_200_M);
+    const game2Km = await addGameNorthOfSearch('2 km away', DEGREES_2_KM);
+    const game1Km = await addGameNorthOfSearch('1 km away', DEGREES_1_KM);
+    const game200M = await addGameNorthOfSearch('200 m away', DEGREES_200_M);
 
     // 2. discover games through the interface
     const response = await request(createApp())

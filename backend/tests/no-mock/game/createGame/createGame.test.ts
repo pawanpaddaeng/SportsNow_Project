@@ -1,37 +1,21 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { pool, selectRows } from '../../../../src/core/db/mysql';
+import { selectRows } from '../../../../src/core/db/mysql';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
+import { addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 let organizerId: number;
 let token: string;
 
-// a real user in the database, so the real sign in check accepts their token
 beforeEach(async () => {
-  organizerId = await createUser({
-    googleId: 'create-game-test-createGame',
-    email: 'create-game-test@example.com',
-    firstName: 'Olivia',
-    lastName: 'Organizer',
-    birthYear: 1995,
-  });
+  organizerId = await addUser('Olivia');
   token = createAuthToken(organizerId);
 });
 
-// deleting the user also deletes their games, game players and chats (ON DELETE CASCADE),
-// so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(organizerId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface POST /api/games
 describe('Unmocked: POST /api/games', () => {

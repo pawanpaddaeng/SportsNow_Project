@@ -1,30 +1,16 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { pool } from '../../../../src/core/db/mysql';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
+import { addUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 
-// a real user in the database, so the real sign in check accepts their token
 beforeEach(async () => {
-  userId = await createUser({
-    googleId: 'get-my-games-test-noGames',
-    email: 'get-my-games-test@example.com',
-    firstName: 'Uma',
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
+  userId = await addUser('Uma');
 });
 
-afterEach(async () => {
-  await deleteUser(userId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface GET /api/games/mine
 describe('Unmocked: GET /api/games/mine', () => {

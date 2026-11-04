@@ -1,12 +1,10 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { executeWrite, pool } from '../../../../src/core/db/mysql';
-import { createGame } from '../../../../src/game/db/games';
+import { executeWrite } from '../../../../src/core/db/mysql';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
+import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 // a new player's score: every game counts as perfect until they have played some
 const NEW_PLAYER_SCORE = 5;
 
@@ -15,16 +13,6 @@ let olderRequesterId: number;
 let newerRequesterId: number;
 let declinedRequesterId: number;
 
-function addUser(firstName: string): Promise<number> {
-  return createUser({
-    googleId: `list-join-requests-test-pendingRequests-${firstName}`,
-    email: 'list-join-requests-test@example.com',
-    firstName,
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
-}
-
 beforeEach(async () => {
   organizerId = await addUser('Olivia');
   olderRequesterId = await addUser('Otto');
@@ -32,18 +20,7 @@ beforeEach(async () => {
   declinedRequesterId = await addUser('Dan');
 });
 
-// deleting the users also deletes their games, game players, chats and join requests
-// (ON DELETE CASCADE), so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(organizerId);
-  await deleteUser(olderRequesterId);
-  await deleteUser(newerRequesterId);
-  await deleteUser(declinedRequesterId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface GET /api/games/{gameId}/join-requests
 describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
@@ -55,20 +32,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
   test('Pending requests', async () => {
     // 1. a game with two pending requests and one declined. The newer one is added
     //    first, so the order can't come from when the rows were added
-    const gameId = await createGame({
-      organizerId,
-      title: 'Evening Basketball',
-      sport: 'basketball',
-      description: null,
-      startsAt: new Date(Date.now() + ONE_DAY_MS),
-      endsAt: null,
-      locationName: 'UBC Rec Centre',
-      address: '6000 Student Union Blvd',
-      latitude: 49.26,
-      longitude: -123.25,
-      maxPlayers: 10,
-      skillLevel: 'any',
-    });
+    const gameId = await addGame(organizerId);
     await executeWrite(
       `INSERT INTO join_requests (game_id, user_id, skill_level, play_frequency, message, status, created_at)
        VALUES (?, ?, 'advanced', 'weekly', 'Newer request', 'pending', '2026-01-02 00:00:00')`,

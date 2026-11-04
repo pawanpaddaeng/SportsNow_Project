@@ -1,12 +1,9 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { executeWrite, pool } from '../../../../src/core/db/mysql';
-import { createGame } from '../../../../src/game/db/games';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
+import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../../helpers';
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 // test files run at the same time on one database and Discover sees everyone's games,
 // so each Discover test searches its own remote spot
 const SEARCH_LATITUDE = 30;
@@ -17,33 +14,13 @@ let userId: number;
 let organizerId: number;
 let playerId: number;
 
-function addUser(firstName: string): Promise<number> {
-  return createUser({
-    googleId: `discover-games-test-fullGameStillShows-${firstName}`,
-    email: 'discover-games-test@example.com',
-    firstName,
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
-}
-
 beforeEach(async () => {
   userId = await addUser('Uma');
   organizerId = await addUser('Omar');
   playerId = await addUser('Paul');
 });
 
-// deleting the users also deletes their games, game players and chats (ON DELETE CASCADE),
-// so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(userId);
-  await deleteUser(organizerId);
-  await deleteUser(playerId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface GET /api/games/discover
 describe('Unmocked: GET /api/games/discover', () => {
@@ -53,21 +30,13 @@ describe('Unmocked: GET /api/games/discover', () => {
   // Expected output: { msg: "success", games } with the game, player_count equal to max_players
   test('Full game still shows', async () => {
     // 1. a game for two players: its organizer and one who joined
-    const gameId = await createGame({
-      organizerId,
+    const gameId = await addGame(organizerId, {
       title: 'Full Game',
-      sport: 'basketball',
-      description: null,
-      startsAt: new Date(Date.now() + ONE_DAY_MS),
-      endsAt: null,
-      locationName: 'Test Field',
-      address: '1 Test Rd',
       latitude: SEARCH_LATITUDE,
       longitude: SEARCH_LONGITUDE,
       maxPlayers: MAX_PLAYERS,
-      skillLevel: 'any',
     });
-    await executeWrite('INSERT INTO game_players (game_id, user_id) VALUES (?, ?)', [gameId, playerId]);
+    await addPlayer(gameId, playerId);
 
     // 2. discover games through the interface
     const response = await request(createApp())

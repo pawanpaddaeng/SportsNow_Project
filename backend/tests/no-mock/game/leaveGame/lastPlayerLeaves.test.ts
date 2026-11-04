@@ -1,34 +1,18 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { executeWrite, pool, selectRows } from '../../../../src/core/db/mysql';
-import { createGame, getGameById } from '../../../../src/game/db/games';
+import { executeWrite, selectRows } from '../../../../src/core/db/mysql';
+import { getGameById } from '../../../../src/game/db/games';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
 beforeEach(async () => {
-  organizerId = await createUser({
-    googleId: 'leave-game-test-lastPlayerLeaves',
-    email: 'leave-game-test@example.com',
-    firstName: 'Olivia',
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
+  organizerId = await addUser('Olivia');
 });
 
-// deleting the user also deletes anything of theirs still left (ON DELETE CASCADE),
-// so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(organizerId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface POST /api/games/{gameId}/leave
 describe('Unmocked: POST /api/games/{gameId}/leave', () => {
@@ -39,20 +23,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
   // Expected output: { msg: "success", game: null, game_deleted: true }
   test('Last player leaves and the game is deleted', async () => {
     // 1. a cancelled game whose only player is the organizer
-    const gameId = await createGame({
-      organizerId,
-      title: 'Evening Basketball',
-      sport: 'basketball',
-      description: null,
-      startsAt: new Date(Date.now() + ONE_DAY_MS),
-      endsAt: null,
-      locationName: 'UBC Rec Centre',
-      address: '6000 Student Union Blvd',
-      latitude: 49.26,
-      longitude: -123.25,
-      maxPlayers: 10,
-      skillLevel: 'any',
-    });
+    const gameId = await addGame(organizerId);
     await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [gameId]);
 
     // 2. leave it through the interface

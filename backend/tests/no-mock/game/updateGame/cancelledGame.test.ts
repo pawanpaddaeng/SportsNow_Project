@@ -1,34 +1,18 @@
 import request from 'supertest';
 
 import { createApp } from '../../../../src/app';
-import { executeWrite, pool } from '../../../../src/core/db/mysql';
-import { createGame, getGameById } from '../../../../src/game/db/games';
+import { executeWrite } from '../../../../src/core/db/mysql';
+import { getGameById } from '../../../../src/game/db/games';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { createUser, deleteUser } from '../../../../src/user/db/users';
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
 beforeEach(async () => {
-  organizerId = await createUser({
-    googleId: 'update-game-test-cancelledGame',
-    email: 'update-game-test@example.com',
-    firstName: 'Olivia',
-    lastName: 'Tester',
-    birthYear: 1995,
-  });
+  organizerId = await addUser('Olivia');
 });
 
-// deleting the user also deletes their games, game players and chats (ON DELETE CASCADE),
-// so only what this test made is removed
-afterEach(async () => {
-  await deleteUser(organizerId);
-});
-
-afterAll(async () => {
-  await pool.end();
-});
+cleanUpAfterTests();
 
 // Interface PUT /api/games/{gameId}
 describe('Unmocked: PUT /api/games/{gameId}', () => {
@@ -38,20 +22,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
   // Expected output: { msg: "game_cancelled", error: "This game was cancelled" }
   test('Cancelled game', async () => {
     // 1. a cancelled game
-    const gameId = await createGame({
-      organizerId,
-      title: 'Original Title',
-      sport: 'basketball',
-      description: null,
-      startsAt: new Date(Date.now() + ONE_DAY_MS),
-      endsAt: null,
-      locationName: 'UBC Rec Centre',
-      address: '6000 Student Union Blvd',
-      latitude: 49.26,
-      longitude: -123.25,
-      maxPlayers: 10,
-      skillLevel: 'any',
-    });
+    const gameId = await addGame(organizerId, { title: 'Original Title' });
     await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [gameId]);
 
     // 2. edit it through the interface
