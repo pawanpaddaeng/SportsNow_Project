@@ -2,7 +2,7 @@ import * as push from '../../../../src/core/notifications/push';
 import * as friendsDb from '../../../../src/friend/db/friends';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -29,7 +29,7 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     jest.spyOn(friendsDb, 'areFriends').mockResolvedValue(true);
     const sendPush = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(0);
 
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/invites`)
+    const response = await api.post(`/api/games/${GAME_ID}/invites`).set(withToken(token))
       .send({ friend_ids: FRIEND_IDS });
 
     expect(response.status).toBe(201);

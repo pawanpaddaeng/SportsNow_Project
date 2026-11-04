@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
 
 let organizerId: number;
 let playerIds: number[];
@@ -23,7 +23,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     await Promise.all(playerIds.map((playerId) => addPlayer(gameId, playerId)));
 
     // 2. lower max_players below that through the interface
-    const response = await asUser(organizerId).put(`/api/games/${gameId}`)
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))
       .send(validGameBody({ max_players: 2 }));
 
     // 3. check it was rejected and nothing changed

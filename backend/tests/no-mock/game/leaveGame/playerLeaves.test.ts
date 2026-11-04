@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -29,7 +29,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
     expect((await getGameById(gameId))?.playerCount).toBe(3);
 
     // 2. leave it through the interface
-    const response = await asUser(playerId).post(`/api/games/${gameId}/leave`);
+    const response = await api.post(`/api/games/${gameId}/leave`).set(asUser(playerId));
 
     // 3. check the reply
     expect(response.status).toBe(200);

@@ -1,7 +1,4 @@
-import { addUser, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
-
-// far above any id the tests create
-const MISSING_GAME_ID = 999999999;
+import { addUser, api, asUser, cleanUpAfterTests, MISSING_GAME_ID, validGameBody } from '../../helpers';
 
 let userId: number;
 
@@ -18,7 +15,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
   // Expected behavior: nothing changes
   // Expected output: { msg: "not_found", error: "This game does not exist" }
   test("Game doesn't exist", async () => {
-    const response = await asUser(userId).put(`/api/games/${MISSING_GAME_ID}`)
+    const response = await api.put(`/api/games/${MISSING_GAME_ID}`).set(asUser(userId))
       .send(validGameBody());
 
     expect(response.status).toBe(404);

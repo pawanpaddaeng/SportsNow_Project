@@ -5,6 +5,7 @@ import * as gamesDb from '../../../src/game/db/games';
 import * as ratingsDb from '../../../src/review/db/ratings';
 import type * as MockEnv from '../mockEnv';
 import {
+  api,
   type ApiReply,
   cleanUpAfterTests,
   GAME_ID,
@@ -22,7 +23,7 @@ const VALID_RATING = { rated_user_id: RATED_ID, punctuality: 5, sportsmanship: 4
 cleanUpAfterTests();
 
 async function postRating(token: string, rating: object): Promise<ApiReply> {
-  const response = await withToken(token).post(`/api/games/${GAME_ID}/ratings`)
+  const response = await api.post(`/api/games/${GAME_ID}/ratings`).set(withToken(token))
     .send(rating);
   return response as ApiReply;
 }
@@ -98,7 +99,7 @@ describe('Mocked: GET /api/users/me/stats', () => {
     const token = signIn(player);
     const getReputationScore = jest.spyOn(ratingsDb, 'getReputationScore').mockResolvedValue(4.2);
 
-    const response = await withToken(token).get('/api/users/me/stats');
+    const response = await api.get('/api/users/me/stats').set(withToken(token));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success', reputation_score: 4.2 });
@@ -134,7 +135,7 @@ describe('Mocked: GET /api/games/{gameId}/ratings', () => {
       { userId: RATED_ID, firstName: 'Rae', lastName: 'Rated', rated: true },
     ]);
 
-    const response = await withToken(token).get(`/api/games/${GAME_ID}/ratings`);
+    const response = await api.get(`/api/games/${GAME_ID}/ratings`).set(withToken(token));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -155,7 +156,7 @@ describe('Mocked: GET /api/games/{gameId}/ratings', () => {
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame({ status: 'completed' }));
     jest.spyOn(ratingsDb, 'getPlayersToRate').mockResolvedValue(null);
 
-    const response = await withToken(token).get(`/api/games/${GAME_ID}/ratings`);
+    const response = await api.get(`/api/games/${GAME_ID}/ratings`).set(withToken(token));
 
     expect(response.status).toBe(403);
     expect(response.body.msg).toBe('forbidden');

@@ -1,6 +1,6 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -23,7 +23,7 @@ describe('Mocked: POST /api/games/{gameId}/cancel', () => {
     const cancelGame = jest.spyOn(gamesDb, 'cancelGame').mockRejectedValue(new Error('database down'));
 
     // 3. cancel it through the interface
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/cancel`);
+    const response = await api.post(`/api/games/${GAME_ID}/cancel`).set(withToken(token));
 
     // 4. check the error reply
     expect(response.status).toBe(500);

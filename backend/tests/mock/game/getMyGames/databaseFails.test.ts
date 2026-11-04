@@ -1,6 +1,6 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, signIn, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -23,7 +23,7 @@ describe('Mocked: GET /api/games/mine', () => {
     const getGamesForUser = jest.spyOn(gamesDb, 'getGamesForUser').mockRejectedValue(new Error('database down'));
 
     // 3. get the user's games through the interface
-    const response = await withToken(token).get('/api/games/mine');
+    const response = await api.get('/api/games/mine').set(withToken(token));
 
     // 4. check the error reply
     expect(response.status).toBe(500);

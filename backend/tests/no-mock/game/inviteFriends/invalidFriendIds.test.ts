@@ -1,4 +1,4 @@
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -23,7 +23,7 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
   ])('friend_ids %s is rejected', async (_name, body) => {
     const gameId = await addGame(organizerId);
 
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/invites`)
+    const response = await api.post(`/api/games/${gameId}/invites`).set(asUser(organizerId))
       .send(body);
 
     expect(response.status).toBe(400);

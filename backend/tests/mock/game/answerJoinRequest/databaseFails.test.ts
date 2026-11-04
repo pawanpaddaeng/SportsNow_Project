@@ -1,6 +1,6 @@
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -26,7 +26,8 @@ describe('Mocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => {
       .mockRejectedValue(new Error('database down'));
 
     // 3. approve it through the interface
-    const response = await withToken(token).patch(`/api/games/${GAME_ID}/join-requests/${REQUEST_ID}`)
+    const response = await api.patch(`/api/games/${GAME_ID}/join-requests/${REQUEST_ID}`)
+      .set(withToken(token))
       .send({ decision: 'approve' });
 
     // 4. check the error reply

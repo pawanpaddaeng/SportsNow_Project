@@ -1,4 +1,4 @@
-import { addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 
@@ -15,7 +15,7 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
   // Expected behavior: the request is rejected, nothing changes
   // Expected output: { msg: "invalid_request", error: "gameId must be a positive whole number" }
   test('Bad id', async () => {
-    const response = await asUser(userId).get('/api/games/abc');
+    const response = await api.get('/api/games/abc').set(asUser(userId));
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ msg: 'invalid_request', error: 'gameId must be a positive whole number' });

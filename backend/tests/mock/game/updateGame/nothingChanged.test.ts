@@ -2,6 +2,7 @@ import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
 import {
+  api,
   cleanUpAfterTests,
   GAME_ID,
   letNotificationsFinish,
@@ -37,7 +38,7 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
     // 3. save the same values through the interface
-    const response = await withToken(token).put(`/api/games/${GAME_ID}`)
+    const response = await api.put(`/api/games/${GAME_ID}`).set(withToken(token))
       .send({
         title: game.title,
         sport: game.sport,

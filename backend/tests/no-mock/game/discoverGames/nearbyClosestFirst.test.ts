@@ -1,9 +1,7 @@
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGameAt, addUser, api, asUser, cleanUpAfterTests, SEARCH_LONGITUDE } from '../../helpers';
 
-// test files run at the same time on one database and Discover sees everyone's games,
-// so each Discover test searches its own remote spot
+// this test's own remote spot, see addGameAt in the helpers
 const SEARCH_LATITUDE = 10;
-const SEARCH_LONGITUDE = -150;
 // about how many degrees of latitude make these distances
 const DEGREES_200_M = 0.0018;
 const DEGREES_1_KM = 0.009;
@@ -12,15 +10,6 @@ const DISTANCE_TOLERANCE_M = 10;
 
 let userId: number;
 let organizerId: number;
-
-// a real upcoming game the given number of degrees north of the search point
-function addGameNorthOfSearch(title: string, degreesNorth: number): Promise<number> {
-  return addGame(organizerId, {
-    title,
-    latitude: SEARCH_LATITUDE + degreesNorth,
-    longitude: SEARCH_LONGITUDE,
-  });
-}
 
 beforeEach(async () => {
   userId = await addUser('Uma');
@@ -38,12 +27,12 @@ describe('Unmocked: GET /api/games/discover', () => {
   //   join_request_status null
   test('Nearby games, closest first', async () => {
     // 1. add the games furthest first, so the order can't come from when they were made
-    const game2Km = await addGameNorthOfSearch('2 km away', DEGREES_2_KM);
-    const game1Km = await addGameNorthOfSearch('1 km away', DEGREES_1_KM);
-    const game200M = await addGameNorthOfSearch('200 m away', DEGREES_200_M);
+    const game2Km = await addGameAt(organizerId, SEARCH_LATITUDE + DEGREES_2_KM, { title: '2 km away' });
+    const game1Km = await addGameAt(organizerId, SEARCH_LATITUDE + DEGREES_1_KM, { title: '1 km away' });
+    const game200M = await addGameAt(organizerId, SEARCH_LATITUDE + DEGREES_200_M, { title: '200 m away' });
 
     // 2. discover games through the interface
-    const response = await asUser(userId).get('/api/games/discover')
+    const response = await api.get('/api/games/discover').set(asUser(userId))
       .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE });
 
     // 3. check the order

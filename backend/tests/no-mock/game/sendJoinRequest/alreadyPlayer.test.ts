@@ -1,4 +1,4 @@
-import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -20,7 +20,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     const gameId = await addGame(organizerId);
     await addPlayer(gameId, playerId);
 
-    const response = await asUser(playerId).post(`/api/games/${gameId}/join-requests`)
+    const response = await api.post(`/api/games/${gameId}/join-requests`).set(asUser(playerId))
       .send({ skill_level: 'beginner' });
 
     expect(response.status).toBe(409);

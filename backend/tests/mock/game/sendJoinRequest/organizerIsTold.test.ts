@@ -2,6 +2,7 @@ import * as push from '../../../../src/core/notifications/push';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
 import {
+  api,
   cleanUpAfterTests,
   GAME_ID,
   signIn,
@@ -42,7 +43,7 @@ describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
     const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
 
     // 3. ask to join through the interface
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/join-requests`)
+    const response = await api.post(`/api/games/${GAME_ID}/join-requests`).set(withToken(token))
       .send({ skill_level: 'beginner' });
 
     // 4. check the reply and the notification

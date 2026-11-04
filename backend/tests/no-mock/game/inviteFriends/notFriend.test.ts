@@ -1,4 +1,4 @@
-import { addFriends, addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addFriends, addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let friendId: number;
@@ -24,7 +24,7 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
     await addFriends(organizerId, friendId);
 
     // 2. invite the friend and the stranger through the interface
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/invites`)
+    const response = await api.post(`/api/games/${gameId}/invites`).set(asUser(organizerId))
       .send({ friend_ids: [friendId, strangerId] });
 
     // 3. check it was rejected

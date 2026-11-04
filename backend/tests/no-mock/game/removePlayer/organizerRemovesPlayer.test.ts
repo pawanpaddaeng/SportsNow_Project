@@ -1,4 +1,4 @@
-import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -23,7 +23,7 @@ describe('Unmocked: DELETE /api/games/{gameId}/players/{userId}', () => {
     await addPlayer(gameId, playerId);
 
     // 2. remove the player through the interface
-    const response = await asUser(organizerId).delete(`/api/games/${gameId}/players/${playerId}`);
+    const response = await api.delete(`/api/games/${gameId}/players/${playerId}`).set(asUser(organizerId));
 
     // 3. check the reply
     expect(response.status).toBe(200);

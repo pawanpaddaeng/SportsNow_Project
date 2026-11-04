@@ -1,4 +1,4 @@
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let otherUserId: number;
@@ -19,7 +19,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
   test('Not the organizer', async () => {
     const gameId = await addGame(organizerId);
 
-    const response = await asUser(otherUserId).get(`/api/games/${gameId}/join-requests`);
+    const response = await api.get(`/api/games/${gameId}/join-requests`).set(asUser(otherUserId));
 
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ msg: 'forbidden', error: 'Only the organizer can see join requests' });

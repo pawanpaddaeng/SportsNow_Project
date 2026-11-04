@@ -6,26 +6,15 @@ import { createApp } from '../src/app';
 
 export const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-// the calls a signed in test can make, each already carrying the sign in token
-export interface SignedInApi {
-  get: (path: string) => request.Test;
-  post: (path: string) => request.Test;
-  put: (path: string) => request.Test;
-  patch: (path: string) => request.Test;
-  delete: (path: string) => request.Test;
-}
+// the real server, for tests to call
+export const api = request(createApp());
 
-// calls the real server as whoever holds the token, e.g. withToken(token).get('/api/games/mine')
-export function withToken(token: string): SignedInApi {
-  const api = request(createApp());
-  const authorization = `Bearer ${token}`;
-  return {
-    get: (path: string) => api.get(path).set('Authorization', authorization),
-    post: (path: string) => api.post(path).set('Authorization', authorization),
-    put: (path: string) => api.put(path).set('Authorization', authorization),
-    patch: (path: string) => api.patch(path).set('Authorization', authorization),
-    delete: (path: string) => api.delete(path).set('Authorization', authorization),
-  };
+// the header that signs a call in
+export type AuthHeader = Record<string, string>;
+
+// signs a call in as whoever holds the token, e.g. api.get('/api/games/mine').set(withToken(token))
+export function withToken(token: string): AuthHeader {
+  return { Authorization: `Bearer ${token}` };
 }
 
 // a valid body for creating or editing a game, with overrides for what the test is about

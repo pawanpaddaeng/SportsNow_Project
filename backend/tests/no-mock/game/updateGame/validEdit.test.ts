@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS, validGameBody } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS, validGameBody } from '../../helpers';
 
 let organizerId: number;
 
@@ -23,7 +23,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     const newStartsAt = new Date(Math.floor((Date.now() + 2 * ONE_DAY_MS) / 1000) * 1000);
 
     // 3. edit it through the interface
-    const response = await asUser(organizerId).put(`/api/games/${gameId}`)
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))
       .send(validGameBody({ starts_at: newStartsAt.toISOString() }));
 
     // 4. check the reply

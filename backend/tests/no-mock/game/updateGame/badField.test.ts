@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
 
 let organizerId: number;
 
@@ -20,7 +20,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     const gameId = await addGame(organizerId, { title: 'Original Title' });
 
     // 2. edit it with a sport that isn't allowed through the interface
-    const response = await asUser(organizerId).put(`/api/games/${gameId}`)
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))
       .send(validGameBody({ sport: 'chess' }));
 
     // 3. check it was rejected and nothing changed

@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -21,7 +21,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
     expect((await getGameById(gameId))?.status).toBe('scheduled');
 
     // 2. cancel it through the interface
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/cancel`);
+    const response = await api.post(`/api/games/${gameId}/cancel`).set(asUser(organizerId));
 
     // 3. check it was cancelled
     expect(response.status).toBe(200);

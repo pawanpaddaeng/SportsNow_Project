@@ -1,4 +1,4 @@
-import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 let otherUserId: number;
@@ -23,7 +23,7 @@ describe('Unmocked: GET /api/games/mine', () => {
     await addPlayer(joinedGameId, userId);
 
     // 2. get the user's games through the interface
-    const response = await asUser(userId).get('/api/games/mine');
+    const response = await api.get('/api/games/mine').set(asUser(userId));
 
     // 3. check each game is in the right list
     expect(response.status).toBe(200);

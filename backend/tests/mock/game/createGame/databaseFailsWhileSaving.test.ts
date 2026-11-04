@@ -1,6 +1,6 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer, validGameBody, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, signIn, testOrganizer, validGameBody, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -23,7 +23,7 @@ describe('Mocked: POST /api/games', () => {
     const getGameById = jest.spyOn(gamesDb, 'getGameById');
 
     // 3. create a valid game starting tomorrow through the interface
-    const response = await withToken(token).post('/api/games')
+    const response = await api.post('/api/games').set(withToken(token))
       .send(validGameBody());
 
     // 4. check the error reply, and that the route stopped at the failed save

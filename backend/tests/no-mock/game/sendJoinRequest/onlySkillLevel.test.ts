@@ -1,5 +1,5 @@
 import { selectRows } from '../../../../src/core/db/mysql';
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -22,7 +22,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     const gameId = await addGame(organizerId);
 
     // 2. ask to join with only the required answer through the interface
-    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
+    const response = await api.post(`/api/games/${gameId}/join-requests`).set(asUser(requesterId))
       .send({ skill_level: 'beginner' });
 
     // 3. check the reply

@@ -1,4 +1,4 @@
-import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let viewerId: number;
@@ -23,7 +23,7 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
     await addJoinRequest(gameId, viewerId);
 
     // 2. open the game through the interface
-    const response = await asUser(viewerId).get(`/api/games/${gameId}`);
+    const response = await api.get(`/api/games/${gameId}`).set(asUser(viewerId));
 
     // 3. check the viewer's view
     expect(response.status).toBe(200);

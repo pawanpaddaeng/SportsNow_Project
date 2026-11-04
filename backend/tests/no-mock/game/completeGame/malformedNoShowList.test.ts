@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
@@ -20,7 +20,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
     const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
 
     // 2. complete it with a malformed list through the interface
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/complete`)
+    const response = await api.post(`/api/games/${gameId}/complete`).set(asUser(organizerId))
       .send({ no_show_user_ids: ['seven'] });
 
     // 3. check it was rejected and the game didn't change

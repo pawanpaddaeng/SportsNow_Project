@@ -1,4 +1,4 @@
-import { addGame, addUser, asUser, cleanUpAfterTests, getJoinRequestIds } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, getJoinRequestIds } from '../../helpers';
 
 const TOO_LONG_MESSAGE_LENGTH = 201;
 
@@ -33,7 +33,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
   ])('Bad answers: %s', async (_name, body, error) => {
     const gameId = await addGame(organizerId);
 
-    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
+    const response = await api.post(`/api/games/${gameId}/join-requests`).set(asUser(requesterId))
       .send(body);
 
     expect(response.status).toBe(400);

@@ -1,7 +1,7 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -25,7 +25,7 @@ describe('Mocked: GET /api/games/{gameId}/join-requests', () => {
       .mockRejectedValue(new Error('database down'));
 
     // 3. open the list through the interface
-    const response = await withToken(token).get(`/api/games/${GAME_ID}/join-requests`);
+    const response = await api.get(`/api/games/${GAME_ID}/join-requests`).set(withToken(token));
 
     // 4. check the error reply
     expect(response.status).toBe(500);

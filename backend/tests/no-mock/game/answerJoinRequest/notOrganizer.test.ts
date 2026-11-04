@@ -3,6 +3,7 @@ import {
   addGame,
   addJoinRequest,
   addUser,
+  api,
   asUser,
   cleanUpAfterTests,
   getJoinRequestStatus,
@@ -32,7 +33,8 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. approve it as someone else through the interface
-    const response = await asUser(otherUserId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
+    const response = await api.patch(`/api/games/${gameId}/join-requests/${requestId}`)
+      .set(asUser(otherUserId))
       .send({ decision: 'approve' });
 
     // 3. check it was rejected and nothing changed

@@ -1,7 +1,7 @@
 import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -20,7 +20,7 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const sendPush = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(0);
     jest.spyOn(gamesDb, 'getGameById').mockRejectedValue(new Error('database is down'));
 
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/invites`)
+    const response = await api.post(`/api/games/${GAME_ID}/invites`).set(withToken(token))
       .send({ friend_ids: [5] });
 
     expect(response.status).toBe(500);

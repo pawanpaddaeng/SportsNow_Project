@@ -1,4 +1,4 @@
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -17,7 +17,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
   test('No requests', async () => {
     const gameId = await addGame(organizerId);
 
-    const response = await asUser(organizerId).get(`/api/games/${gameId}/join-requests`);
+    const response = await api.get(`/api/games/${gameId}/join-requests`).set(asUser(organizerId));
 
     expect(response.status).toBe(200);
     expect(response.body.msg).toBe('success');

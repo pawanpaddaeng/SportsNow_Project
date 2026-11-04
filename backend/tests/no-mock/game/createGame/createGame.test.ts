@@ -1,6 +1,6 @@
 import { selectRows } from '../../../../src/core/db/mysql';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addUser, cleanUpAfterTests, getPlayerIds, ONE_DAY_MS, withToken } from '../../helpers';
+import { addUser, api, cleanUpAfterTests, getPlayerIds, ONE_DAY_MS, withToken } from '../../helpers';
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
@@ -28,7 +28,7 @@ describe('Unmocked: POST /api/games', () => {
     const endsAt = new Date(startsAt.getTime() + TWO_HOURS_MS);
 
     // 2. create it through the interface
-    const response = await withToken(token).post('/api/games')
+    const response = await api.post('/api/games').set(withToken(token))
       .send({
         title: 'Evening Basketball',
         sport: 'basketball',

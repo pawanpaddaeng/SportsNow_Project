@@ -1,6 +1,6 @@
 import { selectRows } from '../../../../src/core/db/mysql';
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, getPlayerIds, setGameStatus } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, getPlayerIds, setGameStatus } from '../../helpers';
 
 let organizerId: number;
 
@@ -23,7 +23,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
     await setGameStatus(gameId, 'cancelled');
 
     // 2. leave it through the interface
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/leave`);
+    const response = await api.post(`/api/games/${gameId}/leave`).set(asUser(organizerId));
 
     // 3. check the reply
     expect(response.status).toBe(200);

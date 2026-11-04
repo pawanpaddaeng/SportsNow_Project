@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
 
 let organizerId: number;
 let otherUserId: number;
@@ -20,7 +20,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
   test('Not the organizer', async () => {
     const gameId = await addGame(organizerId, { title: 'Original Title' });
 
-    const response = await asUser(otherUserId).put(`/api/games/${gameId}`)
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(otherUserId))
       .send(validGameBody());
 
     expect(response.status).toBe(403);

@@ -2,6 +2,7 @@ import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
 import {
+  api,
   cleanUpAfterTests,
   GAME_ID,
   letNotificationsFinish,
@@ -37,7 +38,7 @@ describe('Mocked: POST /api/games/{gameId}/cancel', () => {
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
     // 3. cancel it through the interface
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/cancel`);
+    const response = await api.post(`/api/games/${GAME_ID}/cancel`).set(withToken(token));
 
     // 4. let any notifications finish
 

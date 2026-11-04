@@ -1,6 +1,6 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer, validGameBody, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, signIn, testOrganizer, validGameBody, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -22,7 +22,7 @@ describe('Mocked: POST /api/games', () => {
     const createGame = jest.spyOn(gamesDb, 'createGame');
 
     // 3. send a game with no title through the interface
-    const response = await withToken(token).post('/api/games')
+    const response = await api.post('/api/games').set(withToken(token))
       .send(validGameBody({ title: undefined }));
 
     // 4. check it was rejected and nothing was saved

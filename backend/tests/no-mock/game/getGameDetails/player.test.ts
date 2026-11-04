@@ -1,4 +1,4 @@
-import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -22,7 +22,7 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
     await addPlayer(gameId, playerId);
 
     // 2. open the game through the interface
-    const response = await asUser(playerId).get(`/api/games/${gameId}`);
+    const response = await api.get(`/api/games/${gameId}`).set(asUser(playerId));
 
     // 3. check the player's view
     expect(response.status).toBe(200);

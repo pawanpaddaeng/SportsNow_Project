@@ -1,6 +1,6 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -22,7 +22,7 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
 
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/complete`)
+    const response = await api.post(`/api/games/${GAME_ID}/complete`).set(withToken(token))
       .send({ no_show_user_ids: [7, 8, 7] });
 
     expect(response.status).toBe(200);

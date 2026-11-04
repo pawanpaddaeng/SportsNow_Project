@@ -1,5 +1,13 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, setGameStatus, validGameBody } from '../../helpers';
+import {
+  addGame,
+  addUser,
+  api,
+  asUser,
+  cleanUpAfterTests,
+  setGameStatus,
+  validGameBody,
+} from '../../helpers';
 
 let organizerId: number;
 
@@ -21,7 +29,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     await setGameStatus(gameId, 'cancelled');
 
     // 2. edit it through the interface
-    const response = await asUser(organizerId).put(`/api/games/${gameId}`)
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))
       .send(validGameBody());
 
     // 3. check it was rejected and nothing changed

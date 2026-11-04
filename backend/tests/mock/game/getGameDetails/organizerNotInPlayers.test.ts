@@ -3,6 +3,7 @@ import * as gamesDb from '../../../../src/game/db/games';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
 import {
+  api,
   cleanUpAfterTests,
   GAME_ID,
   signIn,
@@ -44,7 +45,7 @@ describe('Mocked: GET /api/games/{gameId}', () => {
     }]);
 
     // 4. open the game through the interface
-    const response = await withToken(token).get(`/api/games/${GAME_ID}`);
+    const response = await api.get(`/api/games/${GAME_ID}`).set(withToken(token));
 
     // 5. check the organizer came from the lookup
     expect(response.status).toBe(200);

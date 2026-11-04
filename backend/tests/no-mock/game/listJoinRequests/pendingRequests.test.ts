@@ -1,5 +1,5 @@
 import { executeWrite } from '../../../../src/core/db/mysql';
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 // a new player's score: every game counts as perfect until they have played some
 const NEW_PLAYER_SCORE = 5;
@@ -46,7 +46,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
     );
 
     // 2. open the list through the interface
-    const response = await asUser(organizerId).get(`/api/games/${gameId}/join-requests`);
+    const response = await api.get(`/api/games/${gameId}/join-requests`).set(asUser(organizerId));
 
     // 3. check only the pending requests are listed, newest first
     expect(response.status).toBe(200);

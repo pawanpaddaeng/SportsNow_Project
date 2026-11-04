@@ -1,4 +1,4 @@
-import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -23,7 +23,8 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const otherRequestId = await addJoinRequest(otherGameId, requesterId);
 
     // 2. answer it under the first game through the interface
-    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${otherRequestId}`)
+    const response = await api.patch(`/api/games/${gameId}/join-requests/${otherRequestId}`)
+      .set(asUser(organizerId))
       .send({ decision: 'approve' });
 
     // 3. check it wasn't found

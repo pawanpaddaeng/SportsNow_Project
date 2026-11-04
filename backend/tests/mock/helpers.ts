@@ -3,9 +3,9 @@ import { type Game } from '../../src/game/db/games';
 import { pool } from '../../src/core/db/mysql';
 import * as usersDb from '../../src/user/db/users';
 import { type User } from '../../src/user/db/users';
-import { ONE_DAY_MS, validGameBody, withToken } from '../sharedHelpers';
+import { api, ONE_DAY_MS, validGameBody, withToken } from '../sharedHelpers';
 
-export { ONE_DAY_MS, validGameBody, withToken };
+export { api, ONE_DAY_MS, validGameBody, withToken };
 
 // setup shared by the mocked tests. Each call makes new objects, so no test sees
 // another test's changes
@@ -78,8 +78,8 @@ export function signIn(user: User): string {
 }
 
 // the reply doesn't wait for notifications, this lets them finish so the test can check them
-export async function letNotificationsFinish(): Promise<void> {
-  await new Promise((resolve) => { setImmediate(resolve); });
+export function letNotificationsFinish(): Promise<void> {
+  return new Promise((resolve) => { setImmediate(resolve); });
 }
 
 // undoes each test's mocks after it, and closes the database pool after the file's tests

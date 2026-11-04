@@ -1,4 +1,4 @@
-import { addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 
@@ -15,7 +15,7 @@ describe('Unmocked: GET /api/games/mine', () => {
   // Expected behavior: nothing changes
   // Expected output: { msg: "no_games" }
   test('No games', async () => {
-    const response = await asUser(userId).get('/api/games/mine');
+    const response = await api.get('/api/games/mine').set(asUser(userId));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'no_games' });

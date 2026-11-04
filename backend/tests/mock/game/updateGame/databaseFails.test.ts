@@ -1,6 +1,7 @@
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
 import {
+  api,
   cleanUpAfterTests,
   GAME_ID,
   signIn,
@@ -31,7 +32,7 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     const updateGame = jest.spyOn(gamesDb, 'updateGame').mockRejectedValue(new Error('database down'));
 
     // 3. edit it through the interface
-    const response = await withToken(token).put(`/api/games/${GAME_ID}`)
+    const response = await api.put(`/api/games/${GAME_ID}`).set(withToken(token))
       .send(validGameBody());
 
     // 4. check the error reply

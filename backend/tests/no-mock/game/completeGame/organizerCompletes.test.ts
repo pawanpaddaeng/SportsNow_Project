@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
@@ -21,7 +21,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
     expect((await getGameById(gameId))?.status).toBe('scheduled');
 
     // 2. mark it completed through the interface
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/complete`);
+    const response = await api.post(`/api/games/${gameId}/complete`).set(asUser(organizerId));
 
     // 3. check it was completed
     expect(response.status).toBe(200);

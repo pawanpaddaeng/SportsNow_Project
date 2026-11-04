@@ -1,4 +1,12 @@
-import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests, setGameStatus } from '../../helpers';
+import {
+  addGame,
+  addJoinRequest,
+  addUser,
+  api,
+  asUser,
+  cleanUpAfterTests,
+  setGameStatus,
+} from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -23,7 +31,8 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     await setGameStatus(gameId, 'cancelled');
 
     // 2. approve it through the interface
-    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
+    const response = await api.patch(`/api/games/${gameId}/join-requests/${requestId}`)
+      .set(asUser(organizerId))
       .send({ decision: 'approve' });
 
     // 3. check it was rejected

@@ -1,33 +1,22 @@
-import { type NewGame } from '../../../../src/game/db/games';
 import {
-  addGame,
+  addGameAt,
   addPlayer,
   addUser,
+  api,
   asUser,
   cleanUpAfterTests,
   ONE_DAY_MS,
+  SEARCH_LONGITUDE,
   setGameStatus,
 } from '../../helpers';
 
-// test files run at the same time on one database and Discover sees everyone's games,
-// so each Discover test searches its own remote spot
+// this test's own remote spot, see addGameAt in the helpers
 const SEARCH_LATITUDE = 20;
-const SEARCH_LONGITUDE = -150;
 // about 60 km of latitude, outside Discover's 50 km limit
 const DEGREES_60_KM = 0.54;
 
 let userId: number;
 let organizerId: number;
-
-// a real game at the search point unless the test says otherwise
-function addGameAtSearch(gameOrganizerId: number, overrides: Partial<NewGame> = {}): Promise<number> {
-  return addGame(gameOrganizerId, {
-    title: 'Hidden Game',
-    latitude: SEARCH_LATITUDE,
-    longitude: SEARCH_LONGITUDE,
-    ...overrides,
-  });
-}
 
 beforeEach(async () => {
   userId = await addUser('Uma');
@@ -45,24 +34,24 @@ describe('Unmocked: GET /api/games/discover', () => {
   // Expected output: { msg: "no_games" }
   test('Games that should not show', async () => {
     // 1. the user's own game
-    await addGameAtSearch(userId);
+    await addGameAt(userId, SEARCH_LATITUDE);
 
     // 2. a game the user already joined
-    const joinedGameId = await addGameAtSearch(organizerId);
+    const joinedGameId = await addGameAt(organizerId, SEARCH_LATITUDE);
     await addPlayer(joinedGameId, userId);
 
     // 3. a cancelled game
-    const cancelledGameId = await addGameAtSearch(organizerId);
+    const cancelledGameId = await addGameAt(organizerId, SEARCH_LATITUDE);
     await setGameStatus(cancelledGameId, 'cancelled');
 
     // 4. a game that already started
-    await addGameAtSearch(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
+    await addGameAt(organizerId, SEARCH_LATITUDE, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
 
     // 5. a game too far away
-    await addGameAtSearch(organizerId, { latitude: SEARCH_LATITUDE + DEGREES_60_KM });
+    await addGameAt(organizerId, SEARCH_LATITUDE + DEGREES_60_KM);
 
     // 6. discover games through the interface
-    const response = await asUser(userId).get('/api/games/discover')
+    const response = await api.get('/api/games/discover').set(asUser(userId))
       .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE });
 
     // 7. check none were listed

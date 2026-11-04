@@ -1,9 +1,15 @@
-import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import {
+  addGameAt,
+  addJoinRequest,
+  addUser,
+  api,
+  asUser,
+  cleanUpAfterTests,
+  SEARCH_LONGITUDE,
+} from '../../helpers';
 
-// test files run at the same time on one database and Discover sees everyone's games,
-// so each Discover test searches its own remote spot
+// this test's own remote spot, see addGameAt in the helpers
 const SEARCH_LATITUDE = -10;
-const SEARCH_LONGITUDE = -150;
 
 let userId: number;
 let organizerId: number;
@@ -23,15 +29,11 @@ describe('Unmocked: GET /api/games/discover', () => {
   // Expected output: { msg: "success", games } with the game, join_request_status "pending"
   test('Request status', async () => {
     // 1. a nearby game the user asked to join
-    const gameId = await addGame(organizerId, {
-      title: 'Requested Game',
-      latitude: SEARCH_LATITUDE,
-      longitude: SEARCH_LONGITUDE,
-    });
+    const gameId = await addGameAt(organizerId, SEARCH_LATITUDE, { title: 'Requested Game' });
     await addJoinRequest(gameId, userId);
 
     // 2. discover games through the interface
-    const response = await asUser(userId).get('/api/games/discover')
+    const response = await api.get('/api/games/discover').set(asUser(userId))
       .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE });
 
     // 3. check the game shows the pending request

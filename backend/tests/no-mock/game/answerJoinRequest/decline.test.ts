@@ -2,6 +2,7 @@ import {
   addGame,
   addJoinRequest,
   addUser,
+  api,
   asUser,
   cleanUpAfterTests,
   getJoinRequestStatus,
@@ -30,7 +31,8 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. decline it through the interface
-    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
+    const response = await api.patch(`/api/games/${gameId}/join-requests/${requestId}`)
+      .set(asUser(organizerId))
       .send({ decision: 'decline' });
 
     // 3. check the reply

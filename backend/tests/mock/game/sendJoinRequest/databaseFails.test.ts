@@ -1,6 +1,6 @@
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, GAME_ID, signIn, testPlayer, withToken } from '../../helpers';
+import { api, cleanUpAfterTests, GAME_ID, signIn, testPlayer, withToken } from '../../helpers';
 
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
@@ -23,7 +23,7 @@ describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
       .mockRejectedValue(new Error('database down'));
 
     // 3. ask to join through the interface
-    const response = await withToken(token).post(`/api/games/${GAME_ID}/join-requests`)
+    const response = await api.post(`/api/games/${GAME_ID}/join-requests`).set(withToken(token))
       .send({ skill_level: 'beginner' });
 
     // 4. check the error reply

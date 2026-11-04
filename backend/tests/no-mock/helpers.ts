@@ -4,14 +4,14 @@ import { executeWrite, pool, selectRows } from '../../src/core/db/mysql';
 import { createGame, type NewGame } from '../../src/game/db/games';
 import { createAuthToken } from '../../src/user/auth/jwt';
 import { createUser, deleteUser } from '../../src/user/db/users';
-import { ONE_DAY_MS, type SignedInApi, validGameBody, withToken } from '../sharedHelpers';
+import { api, type AuthHeader, ONE_DAY_MS, validGameBody, withToken } from '../sharedHelpers';
 
-export { ONE_DAY_MS, validGameBody, withToken };
+export { api, ONE_DAY_MS, validGameBody, withToken };
 
 // setup shared by the unmocked tests, which save real rows in one shared database
 
-// calls the real server signed in as this user
-export function asUser(userId: number): SignedInApi {
+// signs a call in as this user, e.g. api.get('/api/games/mine').set(asUser(userId))
+export function asUser(userId: number): AuthHeader {
   return withToken(createAuthToken(userId));
 }
 
@@ -53,6 +53,18 @@ export function addGame(organizerId: number, overrides: Partial<NewGame> = {}): 
     skillLevel: 'any',
     ...overrides,
   });
+}
+
+// a game id far above any id the tests create
+export const MISSING_GAME_ID = 999999999;
+
+// test files run at the same time on one database and Discover sees everyone's games, so each
+// Discover test searches its own remote spot: this longitude, at a latitude no other test uses
+export const SEARCH_LONGITUDE = -150;
+
+// saves an upcoming game at that latitude of the Discover tests' longitude
+export function addGameAt(organizerId: number, latitude: number, overrides: Partial<NewGame> = {}): Promise<number> {
+  return addGame(organizerId, { latitude, longitude: SEARCH_LONGITUDE, ...overrides });
 }
 
 // puts the user in the game directly, without going through a join request

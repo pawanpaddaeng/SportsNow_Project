@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
@@ -18,7 +18,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
   test('Game already started', async () => {
     const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
 
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/cancel`);
+    const response = await api.post(`/api/games/${gameId}/cancel`).set(asUser(organizerId));
 
     expect(response.status).toBe(409);
     expect(response.body.msg).toBe('game_started');

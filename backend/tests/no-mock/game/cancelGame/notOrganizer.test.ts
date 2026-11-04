@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let otherUserId: number;
@@ -20,7 +20,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
   test('Not the organizer', async () => {
     const gameId = await addGame(organizerId);
 
-    const response = await asUser(otherUserId).post(`/api/games/${gameId}/cancel`);
+    const response = await api.post(`/api/games/${gameId}/cancel`).set(asUser(otherUserId));
 
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ msg: 'forbidden', error: 'Only the organizer can change this game' });

@@ -1,5 +1,5 @@
 import { executeWrite, selectRows } from '../../../../src/core/db/mysql';
-import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -27,7 +27,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     );
 
     // 2. ask again with new answers through the interface
-    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
+    const response = await api.post(`/api/games/${gameId}/join-requests`).set(asUser(requesterId))
       .send({ skill_level: 'advanced', play_frequency: 'weekly', message: 'Second try' });
 
     // 3. check the reply

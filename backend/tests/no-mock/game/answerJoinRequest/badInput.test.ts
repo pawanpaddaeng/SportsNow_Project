@@ -2,6 +2,7 @@ import {
   addGame,
   addJoinRequest,
   addUser,
+  api,
   asUser,
   cleanUpAfterTests,
   getJoinRequestStatus,
@@ -32,7 +33,8 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. send the bad input through the interface
-    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${useBadRequestId ? 'abc' : String(requestId)}`)
+    const response = await api.patch(`/api/games/${gameId}/join-requests/${useBadRequestId ? 'abc' : String(requestId)}`)
+      .set(asUser(organizerId))
       .send({ decision });
 
     // 3. check it was rejected and the request is untouched

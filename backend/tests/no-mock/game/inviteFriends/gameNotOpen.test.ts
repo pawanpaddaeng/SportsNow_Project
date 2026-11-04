@@ -3,6 +3,7 @@ import {
   addGame,
   addPlayer,
   addUser,
+  api,
   asUser,
   cleanUpAfterTests,
   ONE_DAY_MS,
@@ -49,7 +50,7 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
   ] as const)('Organizer cannot invite to a %s game', async (_name, msg, setUpGame) => {
     const gameId = await setUpGame();
 
-    const response = await asUser(organizerId).post(`/api/games/${gameId}/invites`)
+    const response = await api.post(`/api/games/${gameId}/invites`).set(asUser(organizerId))
       .send({ friend_ids: [friendId] });
 
     expect(response.status).toBe(409);
