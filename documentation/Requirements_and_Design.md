@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 3, 2026 | 3.1, 4.1 | Player ratings are built. Section 3.1 now has the real scoring rules, and section 4.1 lists Player Review's real interfaces. No-shows are sent when the organiser marks a game completed, so there is no separate no-shows endpoint, and the score is computed when it's read instead of by `updateReputation`. |
 | 2026-11-02 | 4.1 Main Components (User, Player Review, Social) | Built `GET /api/users/{userId}` for the player profile popup (Player Statistics use case). It returns a player's name, age range, games played, reputation score and badges, never their email or birth year. `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. Added `getFriendshipStatus` so the popup knows when to offer Add Friend. |
 | 2026-11-01 | 4.1 Main Components (Social) | Search results now include `friendship_status`, so the Friends tab shows Request Sent instead of Add once a request is sent. |
 | 2026-11-01 | 4.1 Main Components (Social) | Built friend search, friend requests and the friends list for the new Friends tab. Added `GET /api/friends/requests` so the tab can list incoming requests, and search now also returns similar names so partial names and typos still find people. |
@@ -29,7 +30,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 4. Friend System: A user can search for other users and send, accept, or decline friend requests. A user can remove a friend. Friends can chat in real-time direct chat. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games.
 
-5. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill, and reliability, along with an overall rating, and the organiser marks players who did not show up. Our algorithm computes a reputation score, weighting recent games more heavily, adjusting for the number of ratings, and penalising no-shows and late cancellations. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
+5. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill, and reliability, along with an overall rating, and the organiser marks players who did not show up. Our algorithm computes a reputation score, adjusting for the number of ratings, and penalising no-shows and late cancellations. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
 
 
 ### **3.2. Use Case Diagram**
@@ -301,18 +302,20 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 
 3. **Player Review**
     - **Purpose**: Handles player ratings after a game, no-shows, reputation scores, and badges.
-    - **Rationale**: The reputation score and badges are computed from ratings, so keeping them apart from games keeps the scoring algorithm in one place. We chose to recompute the score after each game over computing it on every profile view so profiles load quickly.
-    - **Interfaces**: `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. The rest are *(planned)*.
-        1. `POST /api/games/{gameId}/ratings` body `{ rated_user_id, punctuality, sportsmanship, skill, reliability, overall }` → `201 { msg: "success" }`
-            - **Purpose**: Records a user's rating of another player after a finished game.
-        2. `POST /api/games/{gameId}/no-shows` body `{ user_ids }` → `200 { msg: "success" }`
-            - **Purpose**: Lets the organiser mark players who did not show up.
-        3. `GET /api/users/{userId}/stats` → `200 { reputation_score, games_played, badges }`
+    - **Rationale**: The reputation score and badges are computed from ratings, so keeping them apart from games keeps the scoring algorithm in one place. We chose to compute the score when it's read over storing it, because players can still rate a game after it's completed.
+    - **Interfaces**:
+        1. `GET /api/games/{gameId}/ratings` → `200 { game_title, organizer_id, players }`
+            - **Purpose**: Returns the other players who showed up to a completed game and whether the user already rated them.
+        2. `POST /api/games/{gameId}/ratings` body `{ rated_user_id, punctuality, sportsmanship, skill, reliability, overall }` → `201 { msg: "success" }`
+            - **Purpose**: Records a user's rating of another player after a finished game. A player can only be rated once per game.
+        3. `GET /api/users/me/stats` → `200 { reputation_score }`
+            - **Purpose**: Returns the signed in user's own score for their profile.
+        4. `double getReputationScore(int userId)`
+            - **Purpose**: Used by Game to show each requester's score on the join request list.
+        5. `Reputation getReputation(int userId)`
+            - **Purpose**: Used by User's public profile to show a player's games played. Its score and badges stay empty for now.
+        6. `GET /api/users/{userId}/stats` → `200 { reputation_score, games_played, badges }` *(planned)*
             - **Purpose**: Returns a user's reputation score, game history, and badges.
-        4. `Reputation getReputation(int userId)`
-            - **Purpose**: Used by User's public profile to show a player's score, badges and games played, and by Game to show each requester's score and badges on the join request list.
-        5. `void updateReputation(int gameId)`
-            - **Purpose**: Recomputes the score of every player in a finished game and awards any new badges.
 
 4. **Message**
     - **Purpose**: Handles chat messages for both game chat and friend chat.

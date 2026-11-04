@@ -14,8 +14,8 @@ backend/src/
 ├── user/             User component: sign up, login, JWTs, profile
 ├── game/             Game component: games, discover, join requests
 ├── friend/           Social component: user search, friend requests, friends list
-├── review/           Player Review component: reputation, so far only games played
-└── chat/             Message component: game chats, message history, WebSocket
+├── chat/             Message component: game chats, message history, WebSocket
+└── review/           Player Review component: ratings and reputation scores
 ```
 
 **Dependency rules**
@@ -79,9 +79,13 @@ backend/src/
 
 | File | What it does |
 | --- | --- |
-| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for), reputation score and badges. Score and badges are empty until ratings are built |
+| `routes/ratingRoutes.ts` | The players a user can rate, submitting a rating, and the user's own score (`GET /api/users/me/stats`) |
+| `db/ratings.ts` | Rating queries, and `getReputationScore`, which `game/` uses to show organizers a requester's score |
+| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for) and reputation score, for the public profile. Its badges are empty for now |
+| `validation/rating.ts` | Checks a rating body: who is rated and the stars in every category |
+| `reputation.ts` | The score rules, with no database so they can be tested on their own |
 
-
+A completed game's players and no-shows are copied to `game_attendance`, because leaving a completed game deletes its `game_players` row and the last player leaving deletes the game. A player's score mustn't change when that happens. Players are sent their own overall score, but never what they were rated in a game.
 
 ## chat/
 
@@ -127,7 +131,7 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 - **Name search:** MySQL can't rank names by how similar they are, so `searchUsers` reads every user's name and compares them on the server. That is fine at this size, but a much larger user base would need a search index.
 - **Times:** stored as UTC in MySQL and sent to the app as ISO 8601 strings, e.g. `"2026-10-18T02:00:00Z"`.
 - **Notifications are best effort:** sending never blocks or fails a reply. The database is the source of truth, and the app reloads when it next opens a screen.
-- **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests, chats, friend requests, friendships) the first time the MySQL container starts. They don't run again on an existing database: a change to a table needs its own script or `ALTER TABLE` run by hand (see the README).
+- **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests, chats, friend requests, friendships, game attendance, player ratings) the first time the MySQL container starts. They don't run again on an existing database: a change to a table needs its own script or `ALTER TABLE` run by hand (see the README).
 - **Route order:** `/api/games/mine` and `/api/games/discover` are registered before `/api/games/:gameId`, so `mine` and `discover` aren't read as game ids.
 
 ## Adding a new endpoint
@@ -140,4 +144,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-The design doc's Player Review component only has `getReputation` so far, without ratings, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+Player Review's stats endpoint and badges aren't built yet, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.

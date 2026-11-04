@@ -57,6 +57,7 @@ fun ProfileRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
     ProfileScreen(
         state = ProfileUiState(
             profile = profileState.profile,
+            reputationScore = profileState.reputationScore,
             isLoading = profileState.isLoading,
             errorMessage = profileState.error,
             busyAction = when {

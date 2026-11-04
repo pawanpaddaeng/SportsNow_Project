@@ -109,10 +109,11 @@ docker compose down
 
 Don't add `-v` unless you mean to wipe data: it deletes the MySQL database and Caddy's certificates (Let's Encrypt only issues 5 certificates per domain per week).
 
-**Update an existing database**: the scripts in `mysql/init` only run on an empty database. To add the chat tables to one made before them, run this once (it keeps your data and is safe to repeat):
+**Update an existing database**: the scripts in `mysql/init` only run on an empty database. To add the chat and rating tables to one made before them, run these once (they keep your data and are safe to repeat):
 
 ```bash
 docker exec mysql_db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/06-create-chats.sql'
+docker exec mysql_db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/08-create-ratings.sql'
 ```
 
 ## Additional Setup

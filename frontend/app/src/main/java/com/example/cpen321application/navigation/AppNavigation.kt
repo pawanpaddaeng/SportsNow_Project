@@ -24,6 +24,7 @@ import com.example.cpen321application.navigation.routes.JoinRequestsRoute
 import com.example.cpen321application.navigation.routes.PickLocationRoute
 import com.example.cpen321application.navigation.routes.PlayerProfilePopup
 import com.example.cpen321application.navigation.routes.ProfileRoute
+import com.example.cpen321application.navigation.routes.RatePlayersRoute
 import com.example.cpen321application.navigation.routes.SignInRoute
 import com.example.cpen321application.navigation.routes.SignUpRoute
 import com.example.cpen321application.navigation.state.rememberAppState
@@ -83,6 +84,7 @@ fun AppNavigation(modifier: Modifier = Modifier, gameToOpen: Int? = null, onGame
         composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
         composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
         composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, it, modifier) }
+        composable(Routes.RATE_PLAYERS, arguments = gameIdArgument) { RatePlayersRoute(app, it, modifier) }
         composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }
         composable(Routes.EDIT_GAME, arguments = gameIdArgument) { EditGameRoute(app, it, modifier) }
         composable(Routes.PICK_LOCATION) { PickLocationRoute(app, modifier) }

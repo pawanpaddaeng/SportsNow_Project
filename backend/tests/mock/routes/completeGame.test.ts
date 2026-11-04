@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createApp } from '../../../src/app';
 import * as gamesDb from '../../../src/game/db/games';
 import type * as MockEnv from '../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../helpers';
+import { type ApiReply, cleanUpAfterTests, signIn, testGame, testOrganizer } from '../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
@@ -11,6 +11,14 @@ jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEn
 const GAME_ID = 42;
 
 cleanUpAfterTests();
+
+async function postComplete(token: string, body?: object): Promise<ApiReply> {
+  const response = await request(createApp())
+    .post(`/api/games/${GAME_ID}/complete`)
+    .set('Authorization', `Bearer ${token}`)
+    .send(body);
+  return response as ApiReply;
+}
 
 // Interface POST /api/games/{gameId}/complete
 describe('Mocked: POST /api/games/{gameId}/complete', () => {
@@ -45,15 +53,50 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     expect(game.status).toBe('scheduled');
 
     // 3. mark it completed through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/complete`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await postComplete(token);
 
     // 4. check it was completed
     expect(response.status).toBe(200);
     expect(response.body.msg).toBe('success');
     expect(response.body.game).toMatchObject({ game_id: GAME_ID, status: 'completed' });
-    expect(completeGame).toHaveBeenCalledWith(GAME_ID, organizer.userId);
+    expect(completeGame).toHaveBeenCalledWith(GAME_ID, organizer.userId, []);
     expect(game.status).toBe('completed');
+  });
+
+  // Mocked behavior: completeGame is replaced so only the route's handling of the body runs.
+  //   Sign in and notifications are mocked only so the route can run
+  // Input: the organizer completes game 42 with players 7 and 8 unticked, 7 sent twice
+  // Expected status code: 200
+  // Expected behavior: completeGame gets each no-show once
+  // Expected output: { msg: "success", game }
+  test('Organizer marks players who did not show up', async () => {
+    const organizer = testOrganizer();
+    const token = signIn(organizer);
+    jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([]);
+    const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId, hasStarted: true, status: 'completed' });
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
+    const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
+
+    const response = await postComplete(token, { no_show_user_ids: [7, 8, 7] });
+
+    expect(response.status).toBe(200);
+    expect(completeGame).toHaveBeenCalledWith(GAME_ID, organizer.userId, [7, 8]);
+  });
+
+  // Mocked behavior: completeGame is replaced to check that it's never reached
+  // Input: the organizer completes game 42 with a no-show id that isn't a user id
+  // Expected status code: 400
+  // Expected behavior: the game is left as it was
+  // Expected output: { msg: "invalid_request" }
+  test('A malformed no-show list is rejected', async () => {
+    const organizer = testOrganizer();
+    const token = signIn(organizer);
+    const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
+
+    const response = await postComplete(token, { no_show_user_ids: ['seven'] });
+
+    expect(response.status).toBe(400);
+    expect(response.body.msg).toBe('invalid_request');
+    expect(completeGame).not.toHaveBeenCalled();
   });
 });

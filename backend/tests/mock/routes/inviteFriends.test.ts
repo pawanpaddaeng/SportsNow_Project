@@ -26,8 +26,8 @@ function mockDatabase(game: Game, friendIds: number[] = FRIEND_IDS) {
   jest.spyOn(gamesDb, 'getGameById').mockImplementation((gameId) =>
     Promise.resolve(gameId === game.gameId ? game : null));
   jest.spyOn(gamesDb, 'getGamePlayers').mockResolvedValue([
-    { userId: game.organizerId, firstName: 'Olivia', lastName: 'Organizer' },
-    { userId: PLAYER_ID, firstName: 'Paul', lastName: 'Player' },
+    { userId: game.organizerId, firstName: 'Olivia', lastName: 'Organizer', noShow: false },
+    { userId: PLAYER_ID, firstName: 'Paul', lastName: 'Player', noShow: false },
   ]);
   jest.spyOn(friendsDb, 'areFriends').mockImplementation((userId, otherUserId) =>
     Promise.resolve(userId === game.organizerId && friendIds.includes(otherUserId)));

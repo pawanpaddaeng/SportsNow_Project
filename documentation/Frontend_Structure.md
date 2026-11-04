@@ -14,6 +14,7 @@ cpen321application/
 ├── game/                      Game component: games, discover, join requests
 ├── friend/                    Social component: user search, friend requests, friends list
 ├── chat/                      Message component: game chats
+├── review/                    Player Review component: rating players after a game
 ├── navigation/                connects routes to screens and holds shared state
 └── ui/                        screens and reusable UI pieces (drawing only)
 ```
@@ -59,6 +60,14 @@ cpen321application/
 | `GameFormat.kt` | Formats times, distances and "spots left" text |
 | `GameOptions.kt` | The sports and skill levels the server accepts |
 
+## review/
+
+| File | What it does |
+| --- | --- |
+| `repository/ReviewRepository.kt` | Loads the players to rate, submits a rating, and loads the user's own score |
+| `dto/ReviewDtos.kt` | Request and reply classes for the ratings endpoints |
+| `model/PlayerRating.kt` | The rating categories, a Rate Players row, its converter, and how a score reads |
+
 ## friend/
 
 | File | What it does |
@@ -97,6 +106,7 @@ cpen321application/
 | `GameDetailsRoute.kt` | Game Details, the join request popup and the Invite Friends picker |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
 | `ChatRoute.kt` | Game Chat, opening and closing its connection as the screen is shown and hidden |
+| `RatePlayersRoute.kt` | Rate Players and its rating form, for the players who showed up to a completed game |
 | `PlayerProfilePopup.kt` | The player profile popup: loads a player's public profile and sends a friend request from it. `AppNavigation` shows it over any screen |
 | `GameFormRoutes.kt` | Create Game, Edit Game, Pick Location |
 
@@ -122,7 +132,7 @@ Screens only draw and report taps. They never call the server.
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
-| `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, and their parts |
+| `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, Rate Players, and their parts |
 | `screens/friends/` | Friends: search, friend requests and the friends list |
 | `screens/profile/` | Profile, Edit Profile |
 | `screens/chat/` | Chat |
@@ -200,4 +210,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-The design doc's Player Review component has no frontend code yet apart from the score and badges in the profile popup, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. Tapping a friend opens their profile until friend chat is built. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+Player Review's badges have no frontend code yet apart from the profile popup, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. Tapping a friend opens their profile until friend chat is built. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.

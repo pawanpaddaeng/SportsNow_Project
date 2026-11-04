@@ -93,26 +93,22 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     /*  sends an action the user confirmed on the screen, with progress on its button, then
         says it worked or shows the server's problem. After cancelling or completing the
         game reloads; after leaving the user is no longer in it, so go back (Home and
-        Discover reload when shown)
+        Discover reload when shown). noShowUserIds is only used when completing
      */
-    fun runAction(action: GameAction) {
+    fun runAction(action: GameAction, noShowUserIds: List<Int> = emptyList()) {
         busyAction = action
         app.scope.launch {
             val result = try {
                 when (action) {
                     GameAction.Cancel -> cancelGame(context, gameId)
-                    GameAction.Complete -> completeGame(context, gameId)
+                    GameAction.Complete -> completeGame(context, gameId, noShowUserIds)
                     GameAction.Leave -> leaveGame(context, gameId)
                 }
             } finally {
                 busyAction = null
             }
-            when (result) {
-                is GameChangeResult.Done -> {
-                    Toast.makeText(context, action.doneMessage, Toast.LENGTH_SHORT).show()
-                    if (action == GameAction.Leave) navController.popBackStack() else loadDetails()
-                }
-                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+            showChangeResult(context, result, action.doneMessage) {
+                if (action == GameAction.Leave) navController.popBackStack() else loadDetails()
             }
         }
     }
@@ -126,13 +122,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             } finally {
                 removingPlayerId = null
             }
-            when (result) {
-                is GameChangeResult.Done -> {
-                    Toast.makeText(context, "${player.fullName} was removed", Toast.LENGTH_SHORT).show()
-                    loadDetails()
-                }
-                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-            }
+            showChangeResult(context, result, "${player.fullName} was removed") { loadDetails() }
         }
     }
 
@@ -162,6 +152,8 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             onInviteFriends = { showInviteFriends = true },
             onOpenChat = { navController.navigate(Routes.gameChat(gameId)) },
             onGameAction = { action -> runAction(action) },
+            onCompleteGame = { noShowUserIds -> runAction(GameAction.Complete, noShowUserIds) },
+            onRatePlayers = { navController.navigate(Routes.ratePlayers(gameId)) },
             onRemovePlayer = { player -> removeFromGame(player) },
             onOpenProfile = { userId -> app.openProfile(userId) },
             onRequestToJoin = { showJoinSheet = true },
@@ -185,6 +177,17 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     }
 
     if (showInviteFriends && shownDetails != null) InviteFriendsPopup(app, shownDetails) { showInviteFriends = false }
+}
+
+// says the change worked and runs onDone, or shows the server's problem
+private fun showChangeResult(context: Context, result: GameChangeResult, doneMessage: String, onDone: () -> Unit) {
+    when (result) {
+        is GameChangeResult.Done -> {
+            Toast.makeText(context, doneMessage, Toast.LENGTH_SHORT).show()
+            onDone()
+        }
+        is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+    }
 }
 
 /*  loads the organizer's friends for the picker and invites the ones they tick. The

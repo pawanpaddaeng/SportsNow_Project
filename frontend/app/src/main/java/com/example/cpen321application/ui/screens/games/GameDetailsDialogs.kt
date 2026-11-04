@@ -5,19 +5,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameDetails
@@ -28,6 +37,7 @@ import com.example.cpen321application.ui.components.ConfirmDialog
 import com.example.cpen321application.ui.components.ConfirmText
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
+import com.example.cpen321application.ui.theme.SportsPrimary
 
 // the Game Details screen's dialogs
 
@@ -74,6 +84,70 @@ internal fun ConfirmActionDialog(
     onDismiss: () -> Unit
 ) {
     ConfirmDialog(text = confirmText(action, details), onConfirm = onConfirm, onDismiss = onDismiss)
+}
+
+/*  marks the game completed: every player starts ticked as having shown up and the
+    organizer unticks anyone who didn't. The organizer isn't listed, they're the one marking it
+ */
+@Composable
+internal fun CompleteGameDialog(
+    details: GameDetails,
+    onConfirm: (noShowUserIds: List<Int>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val text = confirmText(GameAction.Complete, details)
+    val players = details.players.filter { it.userId != details.organizer.userId }
+    var noShowUserIds by remember { mutableStateOf(emptySet<Int>()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text.title) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text(text.body)
+                if (players.isNotEmpty()) {
+                    Text(text = "Untick anyone who didn't show up.", color = SportsOnSurface, fontSize = 14.sp)
+                }
+                players.forEach { player ->
+                    AttendanceRow(
+                        player = player,
+                        showedUp = player.userId !in noShowUserIds,
+                        onChange = { showedUp ->
+                            noShowUserIds = if (showedUp) noShowUserIds - player.userId else noShowUserIds + player.userId
+                        }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(noShowUserIds.toList()) }) { Text(text.confirm) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(text.dismiss) }
+        }
+    )
+}
+
+// a player with a tick for having shown up, the whole row toggles it
+@Composable
+private fun AttendanceRow(player: GamePlayer, showedUp: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = showedUp, role = Role.Checkbox, onValueChange = onChange)
+    ) {
+        Avatar(text = player.initial, size = 32.dp, fontSize = 13)
+        Text(text = player.fullName, color = SportsOnSurface, fontSize = 16.sp, modifier = Modifier.weight(1f))
+        Checkbox(
+            checked = showedUp,
+            onCheckedChange = null,
+            colors = CheckboxDefaults.colors(checkedColor = SportsPrimary)
+        )
+    }
 }
 
 // everyone in the game, opened from "See all". Tapping a player opens their profile

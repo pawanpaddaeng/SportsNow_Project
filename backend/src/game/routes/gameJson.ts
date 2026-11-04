@@ -37,6 +37,7 @@ export function gamePlayerJson(player: GamePlayer) {
     user_id: player.userId,
     first_name: player.firstName,
     last_name: player.lastName,
+    no_show: player.noShow,
   };
 }
 
@@ -48,7 +49,7 @@ export function discoverGameJson(entry: DiscoverGame) {
   };
 }
 
-export function pendingJoinRequestJson(request: PendingJoinRequest) {
+export function pendingJoinRequestJson(request: PendingJoinRequest, reputationScore: number) {
   return {
     request_id: request.requestId,
     user: { user_id: request.userId, first_name: request.firstName, last_name: request.lastName },
@@ -56,5 +57,6 @@ export function pendingJoinRequestJson(request: PendingJoinRequest) {
     play_frequency: request.playFrequency,
     message: request.message,
     created_at: request.createdAt,
+    reputation_score: reputationScore,
   };
 }

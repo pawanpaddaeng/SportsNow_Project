@@ -1,7 +1,6 @@
 package com.example.cpen321application.ui.screens.discover
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -13,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -22,8 +20,8 @@ import com.example.cpen321application.game.SPORTS
 import com.example.cpen321application.game.location.DeviceLocation
 import com.example.cpen321application.game.model.DiscoverGame
 import com.example.cpen321application.game.model.GameLocation
-import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.components.SelectableChip
 import com.example.cpen321application.ui.theme.*
@@ -67,58 +65,43 @@ fun DiscoverScreen(state: DiscoverUiState, actions: DiscoverActions, modifier: M
     val shownGames = state.games.filter { selectedSport == null || it.sport == selectedSport }
     val sportLabel = SPORTS.firstOrNull { it.second == selectedSport }?.first
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.White,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Discover, onTabSelected = actions.onTabSelected)
+    LazyTabScreen(selectedTab = BottomTab.Discover, onTabSelected = actions.onTabSelected, modifier = modifier) {
+        item(key = "header") {
+            Header(place = state.place, isLoading = state.isLoading, onRefresh = actions.onRefresh)
         }
-    ) { innerPadding ->
-        LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            item(key = "header") {
-                Header(place = state.place, isLoading = state.isLoading, onRefresh = actions.onRefresh)
-            }
 
-            item(key = "search_area") {
-                SearchArea(
-                    location = state.location,
-                    place = state.place,
-                    games = shownGames,
-                    onChangeLocation = actions.onChangeLocation,
-                    onUseMyLocation = actions.onUseMyLocation,
-                    onGameClick = actions.onGameClick
+        item(key = "search_area") {
+            SearchArea(
+                location = state.location,
+                place = state.place,
+                games = shownGames,
+                onChangeLocation = actions.onChangeLocation,
+                onUseMyLocation = actions.onUseMyLocation,
+                onGameClick = actions.onGameClick
+            )
+        }
+
+        item(key = "sports") {
+            SportFilter(selectedSport = selectedSport, onSelect = { selectedSport = it })
+        }
+
+        // thin loading bar while the games update, the current list stays visible
+        if (state.isLoading) {
+            item(key = "loading") {
+                LinearProgressIndicator(
+                    color = SportsPrimary,
+                    trackColor = SportsPrimaryContainer,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
 
-            item(key = "sports") {
-                SportFilter(selectedSport = selectedSport, onSelect = { selectedSport = it })
-            }
+        if (state.errorMessage != null) {
+            item(key = "error") { RetryMessage(state.errorMessage, actions.onRetry, Modifier.padding(vertical = 16.dp), "Try again") }
+        }
 
-            // thin loading bar while the games update, the current list stays visible
-            if (state.isLoading) {
-                item(key = "loading") {
-                    LinearProgressIndicator(
-                        color = SportsPrimary,
-                        trackColor = SportsPrimaryContainer,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            if (state.errorMessage != null) {
-                item(key = "error") { RetryMessage(state.errorMessage, actions.onRetry, Modifier.padding(vertical = 16.dp), "Try again") }
-            }
-
-            if (state.hasLoaded) {
-                gameList(games = shownGames, allGames = state.games, sportLabel = sportLabel, onGameClick = actions.onGameClick)
-            }
+        if (state.hasLoaded) {
+            gameList(games = shownGames, allGames = state.games, sportLabel = sportLabel, onGameClick = actions.onGameClick)
         }
     }
 }

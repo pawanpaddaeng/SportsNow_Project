@@ -23,6 +23,7 @@ import {
 } from '../db/games';
 import { countPendingJoinRequests, getJoinRequestStatus } from '../db/joinRequests';
 import { parseCoordinates } from '../validation/coordinates';
+import { parseCompleteGame, type CompleteGameBody } from '../validation/completeGame';
 import { parseNewGame, type CreateGameBody } from '../validation/newGame';
 import { discoverGameJson, gameJson, gamePlayerJson, organizedGameJson } from './gameJson';
 import {
@@ -56,6 +57,20 @@ function notifyGameUsers(gameId: number, organizerId: number, message: PushMessa
     .then((userIds) => sendPushToUsers(userIds, message))
     .then((devices) => { logInfo(`Game ${gameId} "${message.title}" notification sent to ${devices} device(s)`); })
     .catch((error: unknown) => { logError(`Notifying players of game ${gameId} failed:`, error); });
+}
+
+// after the organizer changed the game: reads it back, tells its users and replies with it
+async function replyWithChangedGame(
+  res: Response,
+  gameId: number,
+  organizerId: number,
+  change: string,
+  message: (game: Game) => PushMessage,
+): Promise<Response> {
+  const game = await readBackGame(gameId, change);
+  logInfo(`Game changed id: ${gameId} (${change})`);
+  notifyGameUsers(gameId, organizerId, message(game));
+  return res.status(200).json({ msg: 'success', game: gameJson(game) });
 }
 
 // tells one user about their game, best effort: the app gets its reply without waiting for it
@@ -169,6 +184,7 @@ export function gamesRouter(): Router {
         game: gameJson(game),
         organizer: gamePlayerJson(organizer),
         players: players.map(gamePlayerJson),
+        viewer_id: user.userId,
         viewer_role: role,
         pending_requests: role === 'organizer' ? await countPendingJoinRequests(gameId) : null,
         join_request_status: role === 'viewer' ? await getJoinRequestStatus(gameId, user.userId) : null,
@@ -234,42 +250,35 @@ export function gamesRouter(): Router {
       const result = await cancelGame(gameId, user.userId);
       if (!result.ok) return sendError(res, gameChangeError(result.problem));
 
-      const game = await readBackGame(gameId, 'cancelling it');
-      logInfo(`Game cancelled id: ${gameId}`);
-
-      notifyGameUsers(gameId, user.userId, {
+      return replyWithChangedGame(res, gameId, user.userId, 'cancelling it', (game) => ({
         title: 'Game cancelled',
         body: `${game.title} at ${game.locationName} was cancelled by the organizer`,
         data: { type: 'game_cancelled', gameId: String(gameId) },
-      });
-
-      return res.status(200).json({ msg: 'success', game: gameJson(game) });
+      }));
     }));
 
   /*  complete game: the organizer marks a game that has started as completed, after
-      which anyone can leave it. Responds with the completed game and notifies its players.
+      which anyone can leave it. The optional no_show_user_ids in the body are the players
+      who didn't show up. Responds with the completed game and notifies its players.
       Errors: 400 invalid_request, 403 forbidden, 404 not_found,
       409 game_cancelled / game_not_started / game_completed
    */
   router.post('/api/games/:gameId/complete', requireAuth, asyncRoute('Could not complete game, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
+    async (req: Request<{ gameId: string }, unknown, CompleteGameBody | undefined>, res: Response) => {
       const user = getAuthUser(res);
       const gameId = requireGameId(req.params.gameId, res);
       if (gameId === null) return;
+      const parsed = parseCompleteGame(req.body);
+      if (!parsed.ok) return invalidRequest(res, parsed.error);
 
-      const result = await completeGame(gameId, user.userId);
+      const result = await completeGame(gameId, user.userId, parsed.value);
       if (!result.ok) return sendError(res, responseFor(COMPLETE_GAME_ERRORS, result.problem));
 
-      const game = await readBackGame(gameId, 'completing it');
-      logInfo(`Game completed id: ${gameId}`);
-
-      notifyGameUsers(gameId, user.userId, {
+      return replyWithChangedGame(res, gameId, user.userId, 'completing it', (game) => ({
         title: 'Game completed',
         body: `${game.title} was marked completed by the organizer`,
         data: { type: 'game_completed', gameId: String(gameId) },
-      });
-
-      return res.status(200).json({ msg: 'success', game: gameJson(game) });
+      }));
     }));
 
   /*  leave game: the signed in user stops being a player. Players can leave at any

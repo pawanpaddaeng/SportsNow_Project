@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.review.model.formatReputationScore
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.ConfirmDialog
@@ -54,11 +55,13 @@ private val DETAIL_LABEL_WIDTH = 104.dp
 // the Profile actions the user confirms first, each with its own button
 enum class ProfileAction { SignOut, DeleteAccount }
 
-/*  what the Profile screen shows. profile is null until it loads; isLoading shows a
-    progress bar and errorMessage a problem. busyAction shows progress on that action's button
+/*  what the Profile screen shows. profile is null until it loads, reputationScore until
+    the score loads. isLoading shows a progress bar and errorMessage a problem. busyAction
+    shows progress on that action's button
  */
 data class ProfileUiState(
     val profile: UserProfile?,
+    val reputationScore: Double? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val busyAction: ProfileAction? = null
@@ -110,6 +113,7 @@ fun ProfileScreen(state: ProfileUiState, actions: ProfileActions, modifier: Modi
             } else {
                 if (state.errorMessage != null) ErrorText(state.errorMessage)
                 ProfileIdentity(profile)
+                if (state.reputationScore != null) ReputationCard(state.reputationScore)
                 ProfileDetailsCard(profile)
                 AccountButtons(busyAction = state.busyAction, onProfileAction = { action -> confirmAction = action })
             }
@@ -216,6 +220,28 @@ private fun ProfileIdentity(profile: UserProfile) {
             textAlign = TextAlign.Center
         )
         Text(text = profile.email, color = SportsOnSurfaceVariant, fontSize = 14.sp)
+    }
+}
+
+// the signed in user's current reputation score
+@Composable
+private fun ReputationCard(score: Double) {
+    SurfaceCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Your rating",
+                color = SportsOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = formatReputationScore(score),
+                color = SportsPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 

@@ -3,6 +3,7 @@ import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
 import { sendPushToUser } from '../../core/notifications/push';
+import { getReputationScore } from '../../review/db/ratings';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import { getGameById } from '../db/games';
 import {
@@ -103,7 +104,8 @@ export function joinRequestsRouter(): Router {
       return res.status(200).json({
         msg: 'success',
         game: gameJson(game),
-        requests: requests.map(pendingJoinRequestJson),
+        requests: await Promise.all(requests.map(async (request) =>
+          pendingJoinRequestJson(request, await getReputationScore(request.userId)))),
       });
     }));
 

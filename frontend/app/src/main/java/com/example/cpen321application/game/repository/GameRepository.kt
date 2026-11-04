@@ -6,6 +6,7 @@ import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
 import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
+import com.example.cpen321application.game.dto.CompleteGameBody
 import com.example.cpen321application.game.dto.CreateGameRequest
 import com.example.cpen321application.game.dto.CreateGameResponse
 import com.example.cpen321application.game.dto.DiscoverGameDto
@@ -89,10 +90,14 @@ suspend fun cancelGame(context: Context, gameId: Int): GameChangeResult =
         ServerApi.gameService.cancelGame(authorization = authorization, gameId = gameId)
     }
 
-// the organizer marks their started game completed, the server notifies the game's players
-suspend fun completeGame(context: Context, gameId: Int): GameChangeResult =
+// the organizer marks their started game completed and who didn't show up, the server notifies the game's players
+suspend fun completeGame(context: Context, gameId: Int, noShowUserIds: List<Int>): GameChangeResult =
     changeGame(context, "Could not complete the game, try again") { authorization ->
-        ServerApi.gameService.completeGame(authorization = authorization, gameId = gameId)
+        ServerApi.gameService.completeGame(
+            authorization = authorization,
+            gameId = gameId,
+            request = CompleteGameBody(noShowUserIds)
+        )
     }
 
 /*  takes the user out of the game: a player at any time, the organizer once it's

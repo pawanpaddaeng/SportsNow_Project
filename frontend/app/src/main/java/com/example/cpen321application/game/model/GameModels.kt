@@ -28,8 +28,8 @@ fun gameState(status: String, hasStarted: Boolean): GameState = when {
     else -> GameState.Upcoming
 }
 
-// userId lets the organizer remove the player
-data class GamePlayer(val userId: Int, val firstName: String, val lastName: String) {
+// userId lets the organizer remove the player, noShow is set when the game is marked completed
+data class GamePlayer(val userId: Int, val firstName: String, val lastName: String, val noShow: Boolean = false) {
     val fullName get() = "$firstName $lastName".trim()
     val initial get() = firstName.take(1).uppercase()
 }
@@ -47,6 +47,7 @@ data class GameLocation(
  */
 data class GameDetails(
     val gameId: Int,
+    val viewerId: Int,
     val role: GameRole,
     val sport: String,
     val title: String,
@@ -67,6 +68,9 @@ data class GameDetails(
     val isCompleted get() = state == GameState.Completed
     // a cancelled game counts as not started, it can't be played any more
     val hasStarted get() = state == GameState.InProgress || state == GameState.Completed
+    // players who showed up can rate once the game is completed
+    val canRatePlayers get() = isCompleted && role != GameRole.Viewer &&
+        players.none { it.userId == viewerId && it.noShow }
 }
 
 /*  the Input Game Info form. sport and skillLevel use the server's values
@@ -104,6 +108,7 @@ fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
 
     return GameDetails(
         gameId = game.gameId,
+        viewerId = viewerId,
         role = when (viewerRole) {
             "organizer" -> GameRole.Organizer
             "player" -> GameRole.Player
@@ -117,7 +122,7 @@ fun GameDetailsResponse.toGameDetails(game: GameDto): GameDetails {
         skillLevel = game.skillLevel.capitalized(),
         location = game.toLocation(),
         description = game.description?.takeIf { it.isNotBlank() },
-        players = players.orEmpty().map { GamePlayer(it.userId, it.firstName, it.lastName) },
+        players = players.orEmpty().map { GamePlayer(it.userId, it.firstName, it.lastName, it.noShow) },
         playerCount = game.playerCount,
         maxPlayers = game.maxPlayers,
         pendingRequests = pendingRequests ?: 0,

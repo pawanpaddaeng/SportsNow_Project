@@ -5,6 +5,7 @@ import { friendsRouter } from './friend/routes/friendRoutes';
 import { gamesRouter } from './game/routes/gameRoutes';
 import { invitesRouter } from './game/routes/inviteRoutes';
 import { joinRequestsRouter } from './game/routes/joinRequestRoutes';
+import { ratingsRouter } from './review/routes/ratingRoutes';
 import { authRouter } from './user/routes/authRoutes';
 import { usersRouter } from './user/routes/userRoutes';
 import { publicProfileRouter } from './user/routes/publicProfileRoutes';
@@ -20,6 +21,7 @@ export function createApp(): Express {
   app.use(friendsRouter());
   app.use(usersRouter());
   app.use(chatsRouter());
+  app.use(ratingsRouter());
   app.use(publicProfileRouter());
 
   //simple api to test connection health

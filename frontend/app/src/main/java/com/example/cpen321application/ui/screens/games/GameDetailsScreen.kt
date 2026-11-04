@@ -1,13 +1,10 @@
 package com.example.cpen321application.ui.screens.games
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -15,10 +12,10 @@ import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.game.model.GamePlayer
 import com.example.cpen321application.game.model.GameRole
-import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.ScrollingTabScreen
 import com.example.cpen321application.ui.theme.*
 
 // the Game Details actions that wait for the server, each with its own button and what's shown once it's done
@@ -42,8 +39,8 @@ data class GameDetailsUiState(
     val selectedTab: BottomTab = BottomTab.Home
 )
 
-/*  onRetry is null when retrying won't help. onGameAction (cancel, complete or leave)
-    and onRemovePlayer are only called after the user confirms
+/*  onRetry is null when retrying won't help. onGameAction (cancel or leave),
+    onCompleteGame and onRemovePlayer are only called after the user confirms
  */
 data class GameDetailsActions(
     val onBack: () -> Unit,
@@ -54,6 +51,8 @@ data class GameDetailsActions(
     val onOpenChat: () -> Unit = {},
     val onInviteFriends: () -> Unit = {},
     val onGameAction: (GameAction) -> Unit = {},
+    val onCompleteGame: (noShowUserIds: List<Int>) -> Unit = {},
+    val onRatePlayers: () -> Unit = {},
     val onRemovePlayer: (GamePlayer) -> Unit = {},
     val onOpenProfile: (Int) -> Unit = {},
     val onRequestToJoin: () -> Unit = {},
@@ -72,44 +71,28 @@ fun GameDetailsScreen(state: GameDetailsUiState, actions: GameDetailsActions, mo
     val details = state.details
     val dialogs = remember { OpenDialogs() }
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.White,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            AppBottomBar(selectedTab = state.selectedTab, onTabSelected = actions.onTabSelected)
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // a cancelled, completed or started game can't be changed any more
-            val canEdit = details?.role == GameRole.Organizer &&
-                !details.isCancelled && !details.isCompleted && !details.hasStarted
-            BackTitleBar(title = "Game Details", onBack = actions.onBack) {
-                if (canEdit) {
-                    TextButton(onClick = actions.onEdit) {
-                        Text(text = "Edit", color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    }
+    ScrollingTabScreen(selectedTab = state.selectedTab, onTabSelected = actions.onTabSelected, modifier = modifier) {
+        // a cancelled, completed or started game can't be changed any more
+        val canEdit = details?.role == GameRole.Organizer &&
+            !details.isCancelled && !details.isCompleted && !details.hasStarted
+        BackTitleBar(title = "Game Details", onBack = actions.onBack) {
+            if (canEdit) {
+                TextButton(onClick = actions.onEdit) {
+                    Text(text = "Edit", color = SportsPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
             }
+        }
 
-            if (details == null) {
-                LoadingOrError(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
-            } else {
-                LoadedDetails(
-                    details = details,
-                    state = state,
-                    actions = actions,
-                    onSeeAllPlayers = { dialogs.showPlayers = true },
-                    onGameAction = { action -> dialogs.confirmAction = action }
-                )
-            }
+        if (details == null) {
+            LoadingOrError(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
+        } else {
+            LoadedDetails(
+                details = details,
+                state = state,
+                actions = actions,
+                onSeeAllPlayers = { dialogs.showPlayers = true },
+                onGameAction = { action -> dialogs.confirmAction = action }
+            )
         }
     }
 
@@ -159,7 +142,16 @@ private fun GameDetailsPopups(
     }
 
     val pendingAction = dialogs.confirmAction
-    if (pendingAction != null) {
+    if (pendingAction == GameAction.Complete) {
+        CompleteGameDialog(
+            details = details,
+            onConfirm = { noShowUserIds ->
+                dialogs.confirmAction = null
+                actions.onCompleteGame(noShowUserIds)
+            },
+            onDismiss = { dialogs.confirmAction = null }
+        )
+    } else if (pendingAction != null) {
         ConfirmActionDialog(
             action = pendingAction,
             details = details,
@@ -220,13 +212,14 @@ private fun LoadedDetails(
         onOpenChat = actions.onOpenChat,
         onInviteFriends = actions.onInviteFriends,
         onGameAction = onGameAction,
+        onRatePlayers = actions.onRatePlayers,
         onRequestToJoin = actions.onRequestToJoin
     )
 }
 
 // a spinner while the game loads, or the problem with Retry when onRetry is given
 @Composable
-private fun LoadingOrError(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
+internal fun LoadingOrError(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
     when {
         isLoading -> Column(
             horizontalAlignment = Alignment.CenterHorizontally,
