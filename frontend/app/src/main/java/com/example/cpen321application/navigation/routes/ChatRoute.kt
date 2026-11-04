@@ -11,14 +11,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.core.notifications.GameEvents
 import com.example.cpen321application.core.rememberSafeCoroutineScope
+import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.navigation.state.ChatState
+import com.example.cpen321application.navigation.state.friendChatSource
+import com.example.cpen321application.navigation.state.gameChatSource
 import com.example.cpen321application.ui.screens.chat.ChatActions
 import com.example.cpen321application.ui.screens.chat.ChatScreen
 import com.example.cpen321application.ui.screens.chat.ChatUiState
 
 // notifications that change whether the user can read or write in the game's chat
 private val CHAT_CHANGING_EVENTS = setOf("game_completed", "game_cancelled", "removed_from_game")
+
+private fun NavBackStackEntry.friendUserId(): Int = arguments?.getInt(Routes.USER_ID_ARG) ?: 0
 
 // the players of a game chat with each other, opened from the Game Details button
 @Composable
@@ -27,8 +32,35 @@ fun GameChatRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
     val gameId = backStackEntry.gameId()
     // this screen's scope, so leaving the screen stops its work
     val scope = rememberSafeCoroutineScope()
-    val chat = remember(gameId) { ChatState(context, gameId, scope) }
+    val chat = remember(gameId) { ChatState(context, gameChatSource(gameId), scope) }
 
+    // the game ended or the user was removed while the screen is open: load what's true now.
+    // Only while it's shown, the connection stays closed in the background and it reloads on return
+    LaunchedEffect(gameId) {
+        GameEvents.events.collect { event ->
+            val changesChat = event.type in CHAT_CHANGING_EVENTS && event.gameId == gameId
+            if (changesChat && backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) chat.start()
+        }
+    }
+
+    ChatRoom(app, chat, backStackEntry, modifier)
+}
+
+// two friends chat with each other, opened from the friends list or a message's notification
+@Composable
+fun FriendChatRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Modifier) {
+    val context = LocalContext.current
+    val userId = backStackEntry.friendUserId()
+    // this screen's scope, so leaving the screen stops its work
+    val scope = rememberSafeCoroutineScope()
+    val chat = remember(userId) { ChatState(context, friendChatSource(userId), scope) }
+
+    ChatRoom(app, chat, backStackEntry, modifier)
+}
+
+// the Chat screen for any chat, with its connection following the screen
+@Composable
+private fun ChatRoom(app: AppState, chat: ChatState, backStackEntry: NavBackStackEntry, modifier: Modifier) {
     // the connection is only open while the screen is shown, not with the app in the background
     DisposableEffect(backStackEntry) {
         val observer = LifecycleEventObserver { _, event ->
@@ -42,15 +74,6 @@ fun GameChatRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
         onDispose {
             backStackEntry.lifecycle.removeObserver(observer)
             chat.stop()
-        }
-    }
-
-    // the game ended or the user was removed while the screen is open: load what's true now.
-    // Only while it's shown, the connection stays closed in the background and it reloads on return
-    LaunchedEffect(gameId) {
-        GameEvents.events.collect { event ->
-            val changesChat = event.type in CHAT_CHANGING_EVENTS && event.gameId == gameId
-            if (changesChat && backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) chat.start()
         }
     }
 
