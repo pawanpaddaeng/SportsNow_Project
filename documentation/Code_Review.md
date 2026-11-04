@@ -4,7 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+| _4-Nov-2026_ | Section 2 pictures | Updating codacy report for new CP2 code |
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### 2.1. Commit Hash Where Codacy Ran
 
-`363c564e2122d5faa4a972a74499b5ab6367ec77`
+`7ba4248da9b96ccb74851be2b4eae3cedf0c8f87`
 
 ### 2.2. Unfixed Issues per Codacy Category
 
@@ -28,7 +28,7 @@
 
 There are no unfixed Codacy issues at this commit, so no justifications are needed.
 
-Codacy reports low duplication (8%), but 15% of files are marked as complex. We plan to reduce it in a later milestone by decresing nested code and the number of complex files.
+Codacy reports high duplication but that comes from test files rather than source code.
 
 ---
 
