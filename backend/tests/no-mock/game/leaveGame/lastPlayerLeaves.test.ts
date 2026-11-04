@@ -1,6 +1,6 @@
 import { selectRows } from '../../../../src/core/db/mysql';
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, api, asUser, cleanUpAfterTests, getPlayerIds, setGameStatus } from '../../helpers';
+import { addCancelledGame, addUser, api, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
 
 let organizerId: number;
 
@@ -19,8 +19,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
   // Expected output: { msg: "success", game: null, game_deleted: true }
   test('Last player leaves and the game is deleted', async () => {
     // 1. a cancelled game whose only player is the organizer
-    const gameId = await addGame(organizerId);
-    await setGameStatus(gameId, 'cancelled');
+    const gameId = await addCancelledGame(organizerId);
 
     // 2. leave it through the interface
     const response = await api.post(`/api/games/${gameId}/leave`).set(asUser(organizerId));

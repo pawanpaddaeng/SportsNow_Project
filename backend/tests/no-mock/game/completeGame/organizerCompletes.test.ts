@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -17,7 +17,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
   // Expected output: { msg: "success", game } with game.status "completed"
   test('Organizer marks their started game completed', async () => {
     // 1. the organizer's game that started yesterday
-    const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
+    const gameId = await addStartedGame(organizerId);
     expect((await getGameById(gameId))?.status).toBe('scheduled');
 
     // 2. mark it completed through the interface

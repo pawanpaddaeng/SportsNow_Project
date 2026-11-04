@@ -1,4 +1,4 @@
-import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS, setGameStatus } from '../../helpers';
+import { addCancelledGame, addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -17,12 +17,8 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
   // Expected behavior: the request is rejected
   // Expected output: { msg: "game_cancelled" } and { msg: "game_started" }
   test.each([
-    ['cancelled', 'game_cancelled', async () => {
-      const gameId = await addGame(organizerId);
-      await setGameStatus(gameId, 'cancelled');
-      return gameId;
-    }],
-    ['started', 'game_started', () => addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) })],
+    ['cancelled', 'game_cancelled', () => addCancelledGame(organizerId)],
+    ['started', 'game_started', () => addStartedGame(organizerId)],
   ] as const)('Asking to join a %s game', async (_name, msg, setUpGame) => {
     const gameId = await setUpGame();
 

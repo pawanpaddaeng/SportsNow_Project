@@ -1,12 +1,13 @@
 import {
+  addCancelledGame,
   addFriends,
   addGame,
   addPlayer,
+  addStartedGame,
   addUser,
   api,
   asUser,
   cleanUpAfterTests,
-  ONE_DAY_MS,
   setGameStatus,
 } from '../../helpers';
 
@@ -31,14 +32,10 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
   // Expected behavior: the invite is rejected
   // Expected output: { msg: "game_cancelled" }, { msg: "game_started" } or { msg: "game_full" }
   test.each([
-    ['cancelled', 'game_cancelled', async () => {
-      const gameId = await addGame(organizerId);
-      await setGameStatus(gameId, 'cancelled');
-      return gameId;
-    }],
-    ['started', 'game_started', () => addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) })],
+    ['cancelled', 'game_cancelled', () => addCancelledGame(organizerId)],
+    ['started', 'game_started', () => addStartedGame(organizerId)],
     ['completed', 'game_started', async () => {
-      const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
+      const gameId = await addStartedGame(organizerId);
       await setGameStatus(gameId, 'completed');
       return gameId;
     }],

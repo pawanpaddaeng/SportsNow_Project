@@ -1,13 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import {
-  addGame,
-  addUser,
-  api,
-  asUser,
-  cleanUpAfterTests,
-  setGameStatus,
-  validGameBody,
-} from '../../helpers';
+import { addCancelledGame, addUser, api, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
 
 let organizerId: number;
 
@@ -25,8 +17,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
   // Expected output: { msg: "game_cancelled", error: "This game was cancelled" }
   test('Cancelled game', async () => {
     // 1. a cancelled game
-    const gameId = await addGame(organizerId, { title: 'Original Title' });
-    await setGameStatus(gameId, 'cancelled');
+    const gameId = await addCancelledGame(organizerId, { title: 'Original Title' });
 
     // 2. edit it through the interface
     const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))

@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS, validGameBody } from '../../helpers';
+import { addStartedGame, addUser, api, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
 
 let organizerId: number;
 
@@ -17,10 +17,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
   // Expected output: { msg: "game_started", error } with the reason
   test('Game already started', async () => {
     // 1. a game that started yesterday
-    const gameId = await addGame(organizerId, {
-      title: 'Original Title',
-      startsAt: new Date(Date.now() - ONE_DAY_MS),
-    });
+    const gameId = await addStartedGame(organizerId, { title: 'Original Title' });
 
     // 2. edit it through the interface
     const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))

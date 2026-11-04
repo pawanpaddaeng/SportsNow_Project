@@ -1,5 +1,5 @@
 import { getGameById } from '../../../../src/game/db/games';
-import { addGame, addUser, api, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -17,7 +17,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
   // Expected output: { msg: "invalid_request", error: "no_show_user_ids must be a list of user ids" }
   test('A malformed no-show list is rejected', async () => {
     // 1. the organizer's game that started yesterday
-    const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
+    const gameId = await addStartedGame(organizerId);
 
     // 2. complete it with a malformed list through the interface
     const response = await api.post(`/api/games/${gameId}/complete`).set(asUser(organizerId))

@@ -55,6 +55,18 @@ export function addGame(organizerId: number, overrides: Partial<NewGame> = {}): 
   });
 }
 
+// saves a game that started yesterday
+export function addStartedGame(organizerId: number, overrides: Partial<NewGame> = {}): Promise<number> {
+  return addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS), ...overrides });
+}
+
+// saves an upcoming game that was then cancelled
+export async function addCancelledGame(organizerId: number, overrides: Partial<NewGame> = {}): Promise<number> {
+  const gameId = await addGame(organizerId, overrides);
+  await setGameStatus(gameId, 'cancelled');
+  return gameId;
+}
+
 // a game id far above any id the tests create
 export const MISSING_GAME_ID = 999999999;
 
