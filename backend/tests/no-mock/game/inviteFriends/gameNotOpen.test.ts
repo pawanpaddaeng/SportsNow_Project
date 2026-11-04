@@ -1,9 +1,13 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { executeWrite } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import {
+  addFriends,
+  addGame,
+  addPlayer,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  ONE_DAY_MS,
+  setGameStatus,
+} from '../../helpers';
 
 let organizerId: number;
 let friendId: number;
@@ -13,8 +17,7 @@ beforeEach(async () => {
   organizerId = await addUser('Olivia');
   friendId = await addUser('Fay');
   playerId = await addUser('Paul');
-  await executeWrite('INSERT INTO friendships (user_id, friend_id) VALUES (?, ?), (?, ?)',
-    [organizerId, friendId, friendId, organizerId]);
+  await addFriends(organizerId, friendId);
 });
 
 cleanUpAfterTests();
@@ -29,13 +32,13 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
   test.each([
     ['cancelled', 'game_cancelled', async () => {
       const gameId = await addGame(organizerId);
-      await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [gameId]);
+      await setGameStatus(gameId, 'cancelled');
       return gameId;
     }],
     ['started', 'game_started', () => addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) })],
     ['completed', 'game_started', async () => {
       const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
-      await executeWrite("UPDATE games SET status = 'completed' WHERE game_id = ?", [gameId]);
+      await setGameStatus(gameId, 'completed');
       return gameId;
     }],
     ['full', 'game_full', async () => {
@@ -46,9 +49,7 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
   ] as const)('Organizer cannot invite to a %s game', async (_name, msg, setUpGame) => {
     const gameId = await setUpGame();
 
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/invites`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/invites`)
       .send({ friend_ids: [friendId] });
 
     expect(response.status).toBe(409);

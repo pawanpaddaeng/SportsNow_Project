@@ -1,8 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, cleanUpAfterTests, withToken } from '../../helpers';
 
 let organizerId: number;
 
@@ -24,15 +21,11 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
     const token = createAuthToken(organizerId);
 
     // 2. cancel it once through the interface
-    const first = await request(createApp())
-      .post(`/api/games/${gameId}/cancel`)
-      .set('Authorization', `Bearer ${token}`);
+    const first = await withToken(token).post(`/api/games/${gameId}/cancel`);
     expect(first.status).toBe(200);
 
     // 3. cancel it again and check that's rejected
-    const second = await request(createApp())
-      .post(`/api/games/${gameId}/cancel`)
-      .set('Authorization', `Bearer ${token}`);
+    const second = await withToken(token).post(`/api/games/${gameId}/cancel`);
     expect(second.status).toBe(409);
     expect(second.body).toEqual({ msg: 'game_cancelled', error: 'This game was cancelled' });
   });

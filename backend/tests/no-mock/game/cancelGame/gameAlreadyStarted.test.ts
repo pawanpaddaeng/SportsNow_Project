@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
@@ -22,9 +18,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
   test('Game already started', async () => {
     const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
 
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/cancel`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/cancel`);
 
     expect(response.status).toBe(409);
     expect(response.body.msg).toBe('game_started');

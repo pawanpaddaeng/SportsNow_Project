@@ -1,9 +1,11 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import {
+  addGame,
+  addJoinRequest,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  getJoinRequestStatus,
+} from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -30,16 +32,12 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. send the bad input through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${useBadRequestId ? 'abc' : String(requestId)}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${useBadRequestId ? 'abc' : String(requestId)}`)
       .send({ decision });
 
     // 3. check it was rejected and the request is untouched
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ msg: 'invalid_request', error });
-    const requests = await selectRows<{ status: string }>(
-      'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
-    expect(requests).toEqual([{ status: 'pending' }]);
+    expect(await getJoinRequestStatus(requestId)).toBe('pending');
   });
 });

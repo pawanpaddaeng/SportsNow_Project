@@ -1,15 +1,9 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as mysqlDb from '../../../../src/core/db/mysql';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer, testPlayer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testGame, testPlayer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -27,15 +21,12 @@ describe('Mocked: GET /api/games/{gameId}', () => {
     const token = signIn(testPlayer());
 
     // 2. a game whose organizer can't be found anywhere
-    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(
-      testGame({ gameId: GAME_ID, organizerId: testOrganizer().userId }));
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame());
     jest.spyOn(gamesDb, 'getGamePlayers').mockResolvedValue([]);
     jest.spyOn(mysqlDb, 'selectRows').mockResolvedValue([]);
 
     // 3. open the game through the interface
-    const response = await request(createApp())
-      .get(`/api/games/${GAME_ID}`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await withToken(token).get(`/api/games/${GAME_ID}`);
 
     // 4. check the error reply
     expect(response.status).toBe(500);

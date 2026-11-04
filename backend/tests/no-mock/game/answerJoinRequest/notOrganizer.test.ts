@@ -1,10 +1,12 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import {
+  addGame,
+  addJoinRequest,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  getJoinRequestStatus,
+} from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -30,17 +32,13 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. approve it as someone else through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${createAuthToken(otherUserId)}`)
+    const response = await asUser(otherUserId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'approve' });
 
     // 3. check it was rejected and nothing changed
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ msg: 'forbidden', error: 'Only the organizer can change this game' });
-    const requests = await selectRows<{ status: string }>(
-      'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
-    expect(requests).toEqual([{ status: 'pending' }]);
+    expect(await getJoinRequestStatus(requestId)).toBe('pending');
     expect((await getGameById(gameId))?.playerCount).toBe(1);
   });
 });

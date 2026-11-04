@@ -1,9 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { executeWrite } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS, setGameStatus } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -24,16 +19,14 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
   test.each([
     ['cancelled', 'game_cancelled', async () => {
       const gameId = await addGame(organizerId);
-      await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [gameId]);
+      await setGameStatus(gameId, 'cancelled');
       return gameId;
     }],
     ['started', 'game_started', () => addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) })],
   ] as const)('Asking to join a %s game', async (_name, msg, setUpGame) => {
     const gameId = await setUpGame();
 
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(requesterId)}`)
+    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
       .send({ skill_level: 'beginner' });
 
     expect(response.status).toBe(409);

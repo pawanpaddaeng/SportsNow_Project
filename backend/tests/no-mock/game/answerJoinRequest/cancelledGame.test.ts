@@ -1,9 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { executeWrite } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests, setGameStatus } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -25,12 +20,10 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     // 1. a cancelled game with a pending request
     const gameId = await addGame(organizerId);
     const requestId = await addJoinRequest(gameId, requesterId);
-    await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [gameId]);
+    await setGameStatus(gameId, 'cancelled');
 
     // 2. approve it through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'approve' });
 
     // 3. check it was rejected

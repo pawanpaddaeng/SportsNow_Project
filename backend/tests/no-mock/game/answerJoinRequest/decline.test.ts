@@ -1,9 +1,12 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import {
+  addGame,
+  addJoinRequest,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  getJoinRequestStatus,
+  getPlayerIds,
+} from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -27,9 +30,7 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. decline it through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'decline' });
 
     // 3. check the reply
@@ -39,11 +40,7 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     expect(response.body.game).toMatchObject({ game_id: gameId, player_count: 1 });
 
     // 4. check what was really saved
-    const requests = await selectRows<{ status: string }>(
-      'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
-    expect(requests).toEqual([{ status: 'declined' }]);
-    const players = await selectRows<{ user_id: number }>(
-      'SELECT user_id FROM game_players WHERE game_id = ?', [gameId]);
-    expect(players).toEqual([{ user_id: organizerId }]);
+    expect(await getJoinRequestStatus(requestId)).toBe('declined');
+    expect(await getPlayerIds(gameId)).toEqual([organizerId]);
   });
 });

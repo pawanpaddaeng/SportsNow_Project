@@ -1,14 +1,8 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -24,13 +18,11 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     const organizer = testOrganizer();
     const token = signIn(organizer);
     jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([]);
-    const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId, hasStarted: true, status: 'completed' });
+    const game = testGame({ hasStarted: true, status: 'completed' });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/complete`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).post(`/api/games/${GAME_ID}/complete`)
       .send({ no_show_user_ids: [7, 8, 7] });
 
     expect(response.status).toBe(200);

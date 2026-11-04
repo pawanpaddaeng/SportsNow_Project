@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { executeWrite, selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -31,9 +27,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     );
 
     // 2. ask again with new answers through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(requesterId)}`)
+    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
       .send({ skill_level: 'advanced', play_frequency: 'weekly', message: 'Second try' });
 
     // 3. check the reply

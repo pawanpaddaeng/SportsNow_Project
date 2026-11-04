@@ -1,16 +1,11 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as friendsDb from '../../../../src/friend/db/friends';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
-const GAME_ID = 42;
 // the organizer's friends, neither of them in the game yet
 const FRIEND_IDS = [5, 6];
 
@@ -27,16 +22,14 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
   test('Organizer invites two friends', async () => {
     const organizer = testOrganizer();
     const token = signIn(organizer);
-    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame({ gameId: GAME_ID, organizerId: organizer.userId }));
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame());
     jest.spyOn(gamesDb, 'getGamePlayers').mockResolvedValue([
       { userId: organizer.userId, firstName: 'Olivia', lastName: 'Organizer', noShow: false },
     ]);
     jest.spyOn(friendsDb, 'areFriends').mockResolvedValue(true);
     const sendPush = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(0);
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/invites`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).post(`/api/games/${GAME_ID}/invites`)
       .send({ friend_ids: FRIEND_IDS });
 
     expect(response.status).toBe(201);

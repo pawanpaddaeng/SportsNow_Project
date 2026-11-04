@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addUser, cleanUpAfterTests } from '../../helpers';
+import { addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 // far above any id the tests create
 const MISSING_GAME_ID = 999999999;
@@ -22,9 +18,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
   // Expected behavior: nothing changes
   // Expected output: { msg: "not_found", error: "This game does not exist" }
   test("Game doesn't exist", async () => {
-    const response = await request(createApp())
-      .post(`/api/games/${MISSING_GAME_ID}/cancel`)
-      .set('Authorization', `Bearer ${createAuthToken(userId)}`);
+    const response = await asUser(userId).post(`/api/games/${MISSING_GAME_ID}/cancel`);
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ msg: 'not_found', error: 'This game does not exist' });

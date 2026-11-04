@@ -1,9 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, getJoinRequestIds } from '../../helpers';
 
 const TOO_LONG_MESSAGE_LENGTH = 201;
 
@@ -38,15 +33,11 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
   ])('Bad answers: %s', async (_name, body, error) => {
     const gameId = await addGame(organizerId);
 
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(requesterId)}`)
+    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
       .send(body);
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ msg: 'invalid_request', error });
-    const rows = await selectRows<{ request_id: number }>(
-      'SELECT request_id FROM join_requests WHERE game_id = ?', [gameId]);
-    expect(rows).toEqual([]);
+    expect(await getJoinRequestIds(gameId)).toEqual([]);
   });
 });

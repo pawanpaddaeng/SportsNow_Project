@@ -3,9 +3,15 @@ import { type Game } from '../../src/game/db/games';
 import { pool } from '../../src/core/db/mysql';
 import * as usersDb from '../../src/user/db/users';
 import { type User } from '../../src/user/db/users';
+import { ONE_DAY_MS, validGameBody, withToken } from '../sharedHelpers';
+
+export { ONE_DAY_MS, validGameBody, withToken };
 
 // setup shared by the mocked tests. Each call makes new objects, so no test sees
 // another test's changes
+
+// the id of the test game
+export const GAME_ID = 42;
 
 // the parts of a server reply the tests read
 export interface ApiReply {
@@ -44,7 +50,7 @@ export function testPlayer(): User {
 // an upcoming game organized by testOrganizer, with overrides for what the test is about
 export function testGame(overrides: Partial<Game> = {}): Game {
   return {
-    gameId: 42,
+    gameId: GAME_ID,
     organizerId: 1,
     title: 'Sunday Soccer',
     sport: 'soccer',
@@ -69,6 +75,11 @@ export function testGame(overrides: Partial<Game> = {}): Game {
 export function signIn(user: User): string {
   jest.spyOn(usersDb, 'findUserById').mockResolvedValue(user);
   return createAuthToken(user.userId);
+}
+
+// the reply doesn't wait for notifications, this lets them finish so the test can check them
+export async function letNotificationsFinish(): Promise<void> {
+  await new Promise((resolve) => { setImmediate(resolve); });
 }
 
 // undoes each test's mocks after it, and closes the database pool after the file's tests

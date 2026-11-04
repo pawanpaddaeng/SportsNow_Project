@@ -1,15 +1,17 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../../helpers';
+import {
+  cleanUpAfterTests,
+  GAME_ID,
+  letNotificationsFinish,
+  signIn,
+  testGame,
+  testOrganizer,
+  withToken,
+} from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -28,19 +30,18 @@ describe('Mocked: POST /api/games/{gameId}/cancel', () => {
     const token = signIn(organizer);
 
     // 2. a game that cancels successfully
-    const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId, status: 'cancelled' });
+    const game = testGame({ status: 'cancelled' });
     jest.spyOn(gamesDb, 'cancelGame').mockResolvedValue({ ok: true });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
     // 3. cancel it through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/cancel`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await withToken(token).post(`/api/games/${GAME_ID}/cancel`);
 
-    // 4. the reply doesn't wait for notifications, let them finish
-    await new Promise((resolve) => { setImmediate(resolve); });
+    // 4. let any notifications finish
+
+    await letNotificationsFinish();
 
     // 5. check the reply and the notification
     expect(response.status).toBe(200);

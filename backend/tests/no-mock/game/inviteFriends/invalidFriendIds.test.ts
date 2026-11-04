@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -27,9 +23,7 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
   ])('friend_ids %s is rejected', async (_name, body) => {
     const gameId = await addGame(organizerId);
 
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/invites`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/invites`)
       .send(body);
 
     expect(response.status).toBe(400);

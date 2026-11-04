@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 // test files run at the same time on one database and Discover sees everyone's games,
 // so each Discover test searches its own remote spot
@@ -35,10 +31,8 @@ describe('Unmocked: GET /api/games/discover', () => {
     await addJoinRequest(gameId, userId);
 
     // 2. discover games through the interface
-    const response = await request(createApp())
-      .get('/api/games/discover')
-      .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE })
-      .set('Authorization', `Bearer ${createAuthToken(userId)}`);
+    const response = await asUser(userId).get('/api/games/discover')
+      .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE });
 
     // 3. check the game shows the pending request
     expect(response.status).toBe(200);

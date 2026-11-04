@@ -1,10 +1,13 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { executeWrite } from '../../../../src/core/db/mysql';
 import { type NewGame } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import {
+  addGame,
+  addPlayer,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  ONE_DAY_MS,
+  setGameStatus,
+} from '../../helpers';
 
 // test files run at the same time on one database and Discover sees everyone's games,
 // so each Discover test searches its own remote spot
@@ -50,7 +53,7 @@ describe('Unmocked: GET /api/games/discover', () => {
 
     // 3. a cancelled game
     const cancelledGameId = await addGameAtSearch(organizerId);
-    await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [cancelledGameId]);
+    await setGameStatus(cancelledGameId, 'cancelled');
 
     // 4. a game that already started
     await addGameAtSearch(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
@@ -59,10 +62,8 @@ describe('Unmocked: GET /api/games/discover', () => {
     await addGameAtSearch(organizerId, { latitude: SEARCH_LATITUDE + DEGREES_60_KM });
 
     // 6. discover games through the interface
-    const response = await request(createApp())
-      .get('/api/games/discover')
-      .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE })
-      .set('Authorization', `Bearer ${createAuthToken(userId)}`);
+    const response = await asUser(userId).get('/api/games/discover')
+      .query({ lat: SEARCH_LATITUDE, lng: SEARCH_LONGITUDE });
 
     // 7. check none were listed
     expect(response.status).toBe(200);

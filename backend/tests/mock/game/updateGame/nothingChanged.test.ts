@@ -1,16 +1,18 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../../helpers';
+import {
+  cleanUpAfterTests,
+  GAME_ID,
+  letNotificationsFinish,
+  ONE_DAY_MS,
+  signIn,
+  testGame,
+  testOrganizer,
+  withToken,
+} from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -25,20 +27,17 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
   // Expected output: { msg: "success", game }
   test('Nothing changed', async () => {
     // 1. sign in as the organizer (not what this test checks)
-    const organizer = testOrganizer();
-    const token = signIn(organizer);
+    const token = signIn(testOrganizer());
 
     // 2. a game the edit doesn't change
-    const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId });
+    const game = testGame();
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: false });
     jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
     // 3. save the same values through the interface
-    const response = await request(createApp())
-      .put(`/api/games/${GAME_ID}`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).put(`/api/games/${GAME_ID}`)
       .send({
         title: game.title,
         sport: game.sport,
@@ -51,8 +50,9 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
         skill_level: game.skillLevel,
       });
 
-    // 4. the reply doesn't wait for notifications, let any finish
-    await new Promise((resolve) => { setImmediate(resolve); });
+    // 4. let any notifications finish
+
+    await letNotificationsFinish();
 
     // 5. check the reply, and that nobody was told
     expect(response.status).toBe(200);

@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests, validGameBody } from '../../helpers';
 
 let organizerId: number;
 let playerIds: number[];
@@ -27,20 +23,8 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     await Promise.all(playerIds.map((playerId) => addPlayer(gameId, playerId)));
 
     // 2. lower max_players below that through the interface
-    const response = await request(createApp())
-      .put(`/api/games/${gameId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
-      .send({
-        title: 'New Title',
-        sport: 'basketball',
-        starts_at: new Date(Date.now() + ONE_DAY_MS).toISOString(),
-        location_name: 'UBC Rec Centre',
-        address: '6000 Student Union Blvd',
-        latitude: 49.26,
-        longitude: -123.25,
-        max_players: 2,
-        skill_level: 'any',
-      });
+    const response = await asUser(organizerId).put(`/api/games/${gameId}`)
+      .send(validGameBody({ max_players: 2 }));
 
     // 3. check it was rejected and nothing changed
     expect(response.status).toBe(400);

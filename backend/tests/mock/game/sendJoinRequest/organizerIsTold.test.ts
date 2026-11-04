@@ -1,15 +1,18 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer, testPlayer } from '../../helpers';
+import {
+  cleanUpAfterTests,
+  GAME_ID,
+  signIn,
+  testGame,
+  testOrganizer,
+  testPlayer,
+  withToken,
+} from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
-const GAME_ID = 42;
 const REQUEST_ID = 7;
 
 cleanUpAfterTests();
@@ -29,7 +32,7 @@ describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
 
     // 2. a request that saves successfully
     const organizer = testOrganizer();
-    const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId });
+    const game = testGame();
     jest.spyOn(joinRequestsDb, 'createJoinRequest').mockResolvedValue({
       ok: true,
       requestId: REQUEST_ID,
@@ -39,9 +42,7 @@ describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
     const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
 
     // 3. ask to join through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/join-requests`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).post(`/api/games/${GAME_ID}/join-requests`)
       .send({ skill_level: 'beginner' });
 
     // 4. check the reply and the notification

@@ -1,9 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { executeWrite } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../../helpers';
+import { addFriends, addGame, addPlayer, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -27,13 +22,10 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
     // 1. an upcoming game the player joined, and the player's friend
     const gameId = await addGame(organizerId);
     await addPlayer(gameId, playerId);
-    await executeWrite('INSERT INTO friendships (user_id, friend_id) VALUES (?, ?), (?, ?)',
-      [playerId, friendId, friendId, playerId]);
+    await addFriends(playerId, friendId);
 
     // 2. invite through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/invites`)
-      .set('Authorization', `Bearer ${createAuthToken(playerId)}`)
+    const response = await asUser(playerId).post(`/api/games/${gameId}/invites`)
       .send({ friend_ids: [friendId] });
 
     // 3. check it was rejected

@@ -1,15 +1,9 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -26,9 +20,7 @@ describe('Mocked: POST /api/games/{gameId}/invites', () => {
     const sendPush = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(0);
     jest.spyOn(gamesDb, 'getGameById').mockRejectedValue(new Error('database is down'));
 
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/invites`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).post(`/api/games/${GAME_ID}/invites`)
       .send({ friend_ids: [5] });
 
     expect(response.status).toBe(500);

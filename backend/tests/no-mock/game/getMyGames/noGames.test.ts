@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addUser, cleanUpAfterTests } from '../../helpers';
+import { addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 
@@ -19,9 +15,7 @@ describe('Unmocked: GET /api/games/mine', () => {
   // Expected behavior: nothing changes
   // Expected output: { msg: "no_games" }
   test('No games', async () => {
-    const response = await request(createApp())
-      .get('/api/games/mine')
-      .set('Authorization', `Bearer ${createAuthToken(userId)}`);
+    const response = await asUser(userId).get('/api/games/mine');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'no_games' });

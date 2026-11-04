@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -21,9 +17,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
   test('No requests', async () => {
     const gameId = await addGame(organizerId);
 
-    const response = await request(createApp())
-      .get(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).get(`/api/games/${gameId}/join-requests`);
 
     expect(response.status).toBe(200);
     expect(response.body.msg).toBe('success');

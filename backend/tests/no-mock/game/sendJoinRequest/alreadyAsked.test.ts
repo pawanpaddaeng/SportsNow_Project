@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -24,9 +20,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     const gameId = await addGame(organizerId);
     await addJoinRequest(gameId, requesterId);
 
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(requesterId)}`)
+    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
       .send({ skill_level: 'advanced' });
 
     expect(response.status).toBe(409);

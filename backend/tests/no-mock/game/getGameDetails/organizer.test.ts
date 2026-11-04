@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterIds: number[];
@@ -27,9 +23,7 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
     await Promise.all(requesterIds.map((requesterId) => addJoinRequest(gameId, requesterId)));
 
     // 2. open the game through the interface
-    const response = await request(createApp())
-      .get(`/api/games/${gameId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).get(`/api/games/${gameId}`);
 
     // 3. check the organizer's view
     expect(response.status).toBe(200);

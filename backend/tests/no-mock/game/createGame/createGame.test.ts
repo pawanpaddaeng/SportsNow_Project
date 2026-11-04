@@ -1,9 +1,6 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { selectRows } from '../../../../src/core/db/mysql';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addUser, cleanUpAfterTests, getPlayerIds, ONE_DAY_MS, withToken } from '../../helpers';
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
@@ -31,9 +28,7 @@ describe('Unmocked: POST /api/games', () => {
     const endsAt = new Date(startsAt.getTime() + TWO_HOURS_MS);
 
     // 2. create it through the interface
-    const response = await request(createApp())
-      .post('/api/games')
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).post('/api/games')
       .send({
         title: 'Evening Basketball',
         sport: 'basketball',
@@ -75,9 +70,7 @@ describe('Unmocked: POST /api/games', () => {
       'SELECT organizer_id FROM games WHERE game_id = ?', [gameId]);
     expect(games).toEqual([{ organizer_id: organizerId }]);
 
-    const players = await selectRows<{ user_id: number }>(
-      'SELECT user_id FROM game_players WHERE game_id = ?', [gameId]);
-    expect(players).toEqual([{ user_id: organizerId }]);
+    expect(await getPlayerIds(gameId)).toEqual([organizerId]);
 
     const chats = await selectRows<{ chat_id: number }>(
       'SELECT chat_id FROM chats WHERE game_id = ?', [gameId]);

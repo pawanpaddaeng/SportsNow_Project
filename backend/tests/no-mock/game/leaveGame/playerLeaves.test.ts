@@ -1,10 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -34,9 +29,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
     expect((await getGameById(gameId))?.playerCount).toBe(3);
 
     // 2. leave it through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/leave`)
-      .set('Authorization', `Bearer ${createAuthToken(playerId)}`);
+    const response = await asUser(playerId).post(`/api/games/${gameId}/leave`);
 
     // 3. check the reply
     expect(response.status).toBe(200);
@@ -46,9 +39,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
 
     // 4. check only that player left, and the game still exists
     expect(await getGameById(gameId)).not.toBeNull();
-    const players = await selectRows<{ user_id: number }>(
-      'SELECT user_id FROM game_players WHERE game_id = ?', [gameId]);
-    const playerIds = players.map((player) => player.user_id);
+    const playerIds = await getPlayerIds(gameId);
     expect(playerIds).toHaveLength(2);
     expect(playerIds).toEqual(expect.arrayContaining([organizerId, otherPlayerId]));
   });

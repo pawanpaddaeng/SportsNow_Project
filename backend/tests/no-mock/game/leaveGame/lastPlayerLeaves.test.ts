@@ -1,10 +1,6 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { executeWrite, selectRows } from '../../../../src/core/db/mysql';
+import { selectRows } from '../../../../src/core/db/mysql';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, getPlayerIds, setGameStatus } from '../../helpers';
 
 let organizerId: number;
 
@@ -24,12 +20,10 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
   test('Last player leaves and the game is deleted', async () => {
     // 1. a cancelled game whose only player is the organizer
     const gameId = await addGame(organizerId);
-    await executeWrite("UPDATE games SET status = 'cancelled' WHERE game_id = ?", [gameId]);
+    await setGameStatus(gameId, 'cancelled');
 
     // 2. leave it through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/leave`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/leave`);
 
     // 3. check the reply
     expect(response.status).toBe(200);
@@ -37,9 +31,7 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
 
     // 4. check the game, its players and its chat are really gone
     expect(await getGameById(gameId)).toBeNull();
-    const players = await selectRows<{ user_id: number }>(
-      'SELECT user_id FROM game_players WHERE game_id = ?', [gameId]);
-    expect(players).toEqual([]);
+    expect(await getPlayerIds(gameId)).toEqual([]);
     const chats = await selectRows<{ chat_id: number }>(
       'SELECT chat_id FROM chats WHERE game_id = ?', [gameId]);
     expect(chats).toEqual([]);

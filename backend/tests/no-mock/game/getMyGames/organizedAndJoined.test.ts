@@ -1,13 +1,8 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 let otherUserId: number;
 
-// a real user in the database, with a unique google id
 beforeEach(async () => {
   userId = await addUser('Uma');
   otherUserId = await addUser('Omar');
@@ -28,9 +23,7 @@ describe('Unmocked: GET /api/games/mine', () => {
     await addPlayer(joinedGameId, userId);
 
     // 2. get the user's games through the interface
-    const response = await request(createApp())
-      .get('/api/games/mine')
-      .set('Authorization', `Bearer ${createAuthToken(userId)}`);
+    const response = await asUser(userId).get('/api/games/mine');
 
     // 3. check each game is in the right list
     expect(response.status).toBe(200);

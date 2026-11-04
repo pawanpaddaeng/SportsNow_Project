@@ -1,16 +1,18 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../../helpers';
+import {
+  cleanUpAfterTests,
+  GAME_ID,
+  letNotificationsFinish,
+  signIn,
+  testGame,
+  testOrganizer,
+  validGameBody,
+  withToken,
+} from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -29,31 +31,20 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     const token = signIn(organizer);
 
     // 2. a game whose title changes from the edit
-    const before = testGame({ gameId: GAME_ID, organizerId: organizer.userId, title: 'Old Title' });
-    const after = testGame({ gameId: GAME_ID, organizerId: organizer.userId, title: 'New Title' });
+    const before = testGame({ title: 'Old Title' });
+    const after = testGame({ title: 'New Title' });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
     jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: true });
     const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
     // 3. edit it through the interface
-    const response = await request(createApp())
-      .put(`/api/games/${GAME_ID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        title: 'New Title',
-        sport: 'soccer',
-        starts_at: new Date(Date.now() + ONE_DAY_MS).toISOString(),
-        location_name: 'Jericho Park',
-        address: '3941 Point Grey Rd, Vancouver',
-        latitude: 49.2722,
-        longitude: -123.1957,
-        max_players: 10,
-        skill_level: 'any',
-      });
+    const response = await withToken(token).put(`/api/games/${GAME_ID}`)
+      .send(validGameBody());
 
-    // 4. the reply doesn't wait for notifications, let them finish
-    await new Promise((resolve) => { setImmediate(resolve); });
+    // 4. let any notifications finish
+
+    await letNotificationsFinish();
 
     // 5. check the reply and the notification
     expect(response.status).toBe(200);

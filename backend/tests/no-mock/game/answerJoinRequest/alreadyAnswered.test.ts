@@ -1,8 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, cleanUpAfterTests, withToken } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -28,16 +25,12 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const token = createAuthToken(organizerId);
 
     // 2. answer it once through the interface
-    const first = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${token}`)
+    const first = await withToken(token).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'decline' });
     expect(first.status).toBe(200);
 
     // 3. answer it again and check that's rejected
-    const second = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${token}`)
+    const second = await withToken(token).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'approve' });
     expect(second.status).toBe(409);
     expect(second.body).toEqual({

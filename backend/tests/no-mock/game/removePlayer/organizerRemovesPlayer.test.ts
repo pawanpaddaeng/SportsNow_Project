@@ -1,9 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addPlayer, addUser, asUser, cleanUpAfterTests, getPlayerIds } from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -28,9 +23,7 @@ describe('Unmocked: DELETE /api/games/{gameId}/players/{userId}', () => {
     await addPlayer(gameId, playerId);
 
     // 2. remove the player through the interface
-    const response = await request(createApp())
-      .delete(`/api/games/${gameId}/players/${playerId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).delete(`/api/games/${gameId}/players/${playerId}`);
 
     // 3. check the reply
     expect(response.status).toBe(200);
@@ -38,8 +31,6 @@ describe('Unmocked: DELETE /api/games/{gameId}/players/{userId}', () => {
     expect(response.body.game).toMatchObject({ game_id: gameId, player_count: 1 });
 
     // 4. check only the organizer is left in the game
-    const players = await selectRows<{ user_id: number }>(
-      'SELECT user_id FROM game_players WHERE game_id = ?', [gameId]);
-    expect(players).toEqual([{ user_id: organizerId }]);
+    expect(await getPlayerIds(gameId)).toEqual([organizerId]);
   });
 });

@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { executeWrite } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 // a new player's score: every game counts as perfect until they have played some
 const NEW_PLAYER_SCORE = 5;
@@ -50,9 +46,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
     );
 
     // 2. open the list through the interface
-    const response = await request(createApp())
-      .get(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).get(`/api/games/${gameId}/join-requests`);
 
     // 3. check only the pending requests are listed, newest first
     expect(response.status).toBe(200);

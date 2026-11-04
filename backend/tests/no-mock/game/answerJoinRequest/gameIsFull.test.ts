@@ -1,10 +1,13 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { selectRows } from '../../../../src/core/db/mysql';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addPlayer, addUser, cleanUpAfterTests } from '../../helpers';
+import {
+  addGame,
+  addJoinRequest,
+  addPlayer,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  getJoinRequestStatus,
+} from '../../helpers';
 
 let organizerId: number;
 let playerId: number;
@@ -31,9 +34,7 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. approve it through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'approve' });
 
     // 3. check it was rejected and nothing changed
@@ -42,9 +43,7 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
       msg: 'game_full',
       error: 'This game is full, add spots before approving more players',
     });
-    const requests = await selectRows<{ status: string }>(
-      'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
-    expect(requests).toEqual([{ status: 'pending' }]);
+    expect(await getJoinRequestStatus(requestId)).toBe('pending');
     expect((await getGameById(gameId))?.playerCount).toBe(2);
   });
 });

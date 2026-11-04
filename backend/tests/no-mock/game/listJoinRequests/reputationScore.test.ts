@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { executeWrite } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addJoinRequest, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 // past games the requester played. game_attendance and player_ratings don't reference
 // the games table, so these needn't be real games
@@ -51,9 +47,7 @@ describe('Unmocked: GET /api/games/{gameId}/join-requests', () => {
     );
 
     // 3. open the list through the interface
-    const response = await request(createApp())
-      .get(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).get(`/api/games/${gameId}/join-requests`);
 
     // 4. check the score
     expect(response.status).toBe(200);

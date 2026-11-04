@@ -1,14 +1,8 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testPlayer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testPlayer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const GAME_ID = 42;
 
 cleanUpAfterTests();
 
@@ -29,9 +23,7 @@ describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
       .mockRejectedValue(new Error('database down'));
 
     // 3. ask to join through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${GAME_ID}/join-requests`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).post(`/api/games/${GAME_ID}/join-requests`)
       .send({ skill_level: 'beginner' });
 
     // 4. check the error reply

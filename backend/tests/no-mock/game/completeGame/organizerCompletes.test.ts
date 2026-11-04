@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
@@ -25,9 +21,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
     expect((await getGameById(gameId))?.status).toBe('scheduled');
 
     // 2. mark it completed through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/complete`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/complete`);
 
     // 3. check it was completed
     expect(response.status).toBe(200);

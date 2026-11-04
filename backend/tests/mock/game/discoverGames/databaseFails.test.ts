@@ -1,11 +1,7 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, signIn, testOrganizer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
 const LATITUDE = 49.26;
@@ -30,10 +26,8 @@ describe('Mocked: GET /api/games/discover', () => {
     const getDiscoverGames = jest.spyOn(gamesDb, 'getDiscoverGames').mockRejectedValue(new Error('database down'));
 
     // 3. discover games through the interface
-    const response = await request(createApp())
-      .get('/api/games/discover')
-      .query({ lat: LATITUDE, lng: LONGITUDE })
-      .set('Authorization', `Bearer ${token}`);
+    const response = await withToken(token).get('/api/games/discover')
+      .query({ lat: LATITUDE, lng: LONGITUDE });
 
     // 4. check the error reply
     expect(response.status).toBe(500);

@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -26,9 +22,7 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     const gameId = await addGame(organizerId);
 
     // 2. ask to join through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/join-requests`)
-      .set('Authorization', `Bearer ${createAuthToken(requesterId)}`)
+    const response = await asUser(requesterId).post(`/api/games/${gameId}/join-requests`)
       .send({ skill_level: 'intermediate', play_frequency: 'weekly', message: 'Happy to play any position' });
 
     // 3. check the reply

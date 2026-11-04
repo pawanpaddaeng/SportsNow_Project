@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
 
 let organizerId: number;
 
@@ -24,9 +20,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
     const gameId = await addGame(organizerId, { startsAt: new Date(Date.now() - ONE_DAY_MS) });
 
     // 2. complete it with a malformed list through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/complete`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/complete`)
       .send({ no_show_user_ids: ['seven'] });
 
     // 3. check it was rejected and the game didn't change

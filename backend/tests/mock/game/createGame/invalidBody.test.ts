@@ -1,15 +1,8 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, signIn, testOrganizer, validGameBody, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 cleanUpAfterTests();
 
@@ -29,22 +22,8 @@ describe('Mocked: POST /api/games', () => {
     const createGame = jest.spyOn(gamesDb, 'createGame');
 
     // 3. send a game with no title through the interface
-    const startsAt = new Date(Date.now() + ONE_DAY_MS);
-    const response = await request(createApp())
-      .post('/api/games')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        sport: 'basketball',
-        description: 'Friendly game',
-        starts_at: startsAt.toISOString(),
-        ends_at: new Date(startsAt.getTime() + TWO_HOURS_MS).toISOString(),
-        location_name: 'UBC Rec Centre',
-        address: '6000 Student Union Blvd',
-        latitude: 49.26,
-        longitude: -123.25,
-        max_players: 10,
-        skill_level: 'any',
-      });
+    const response = await withToken(token).post('/api/games')
+      .send(validGameBody({ title: undefined }));
 
     // 4. check it was rejected and nothing was saved
     expect(response.status).toBe(400);

@@ -1,8 +1,4 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addUser, cleanUpAfterTests } from '../../helpers';
+import { addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let userId: number;
 
@@ -19,9 +15,7 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
   // Expected behavior: the request is rejected, nothing changes
   // Expected output: { msg: "invalid_request", error: "gameId must be a positive whole number" }
   test('Bad id', async () => {
-    const response = await request(createApp())
-      .get('/api/games/abc')
-      .set('Authorization', `Bearer ${createAuthToken(userId)}`);
+    const response = await asUser(userId).get('/api/games/abc');
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ msg: 'invalid_request', error: 'gameId must be a positive whole number' });

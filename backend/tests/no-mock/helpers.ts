@@ -1,12 +1,19 @@
 import path from 'path';
 
-import { executeWrite, pool } from '../../src/core/db/mysql';
+import { executeWrite, pool, selectRows } from '../../src/core/db/mysql';
 import { createGame, type NewGame } from '../../src/game/db/games';
+import { createAuthToken } from '../../src/user/auth/jwt';
 import { createUser, deleteUser } from '../../src/user/db/users';
+import { ONE_DAY_MS, type SignedInApi, validGameBody, withToken } from '../sharedHelpers';
+
+export { ONE_DAY_MS, validGameBody, withToken };
 
 // setup shared by the unmocked tests, which save real rows in one shared database
 
-export const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// calls the real server signed in as this user
+export function asUser(userId: number): SignedInApi {
+  return withToken(createAuthToken(userId));
+}
 
 // the users this test file made, so cleanUpAfterTests can remove them
 let addedUserIds: number[] = [];
@@ -60,6 +67,37 @@ export async function addJoinRequest(gameId: number, userId: number): Promise<nu
     [gameId, userId],
   );
   return insertId;
+}
+
+// makes two users friends, which is saved once in each direction
+export async function addFriends(userId: number, friendId: number): Promise<void> {
+  await executeWrite('INSERT INTO friendships (user_id, friend_id) VALUES (?, ?), (?, ?)',
+    [userId, friendId, friendId, userId]);
+}
+
+// puts the game straight into a status, without going through the interface
+export async function setGameStatus(gameId: number, status: 'cancelled' | 'completed'): Promise<void> {
+  await executeWrite('UPDATE games SET status = ? WHERE game_id = ?', [status, gameId]);
+}
+
+// who is really saved as playing in the game
+export async function getPlayerIds(gameId: number): Promise<number[]> {
+  const rows = await selectRows<{ user_id: number }>('SELECT user_id FROM game_players WHERE game_id = ?', [gameId]);
+  return rows.map((row) => row.user_id);
+}
+
+// the join requests really saved for the game
+export async function getJoinRequestIds(gameId: number): Promise<number[]> {
+  const rows = await selectRows<{ request_id: number }>(
+    'SELECT request_id FROM join_requests WHERE game_id = ?', [gameId]);
+  return rows.map((row) => row.request_id);
+}
+
+// the status really saved for the join request, undefined if there is no such request
+export async function getJoinRequestStatus(requestId: number): Promise<string | undefined> {
+  const rows = await selectRows<{ status: string }>(
+    'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
+  return rows[0]?.status;
 }
 
 // removes each test's users after it, and closes the database pool after the file's tests.

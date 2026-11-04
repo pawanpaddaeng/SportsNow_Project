@@ -1,16 +1,11 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as push from '../../../../src/core/notifications/push';
 import * as gamesDb from '../../../../src/game/db/games';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
-const GAME_ID = 42;
 const APPROVED_REQUEST_ID = 7;
 const DECLINED_REQUEST_ID = 8;
 const APPROVED_USER_ID = 2;
@@ -33,7 +28,7 @@ describe('Mocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => {
     const token = signIn(organizer);
 
     // 2. two requests that save successfully
-    const game = testGame({ gameId: GAME_ID, organizerId: organizer.userId });
+    const game = testGame();
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     jest.spyOn(joinRequestsDb, 'decideJoinRequest')
       .mockResolvedValueOnce({ ok: true, requesterId: APPROVED_USER_ID, title: game.title })
@@ -41,15 +36,11 @@ describe('Mocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => {
     const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
 
     // 3. approve the first through the interface
-    const approved = await request(createApp())
-      .patch(`/api/games/${GAME_ID}/join-requests/${APPROVED_REQUEST_ID}`)
-      .set('Authorization', `Bearer ${token}`)
+    const approved = await withToken(token).patch(`/api/games/${GAME_ID}/join-requests/${APPROVED_REQUEST_ID}`)
       .send({ decision: 'approve' });
 
     // 4. decline the second through the interface
-    const declined = await request(createApp())
-      .patch(`/api/games/${GAME_ID}/join-requests/${DECLINED_REQUEST_ID}`)
-      .set('Authorization', `Bearer ${token}`)
+    const declined = await withToken(token).patch(`/api/games/${GAME_ID}/join-requests/${DECLINED_REQUEST_ID}`)
       .send({ decision: 'decline' });
 
     // 5. check the replies and who was told what

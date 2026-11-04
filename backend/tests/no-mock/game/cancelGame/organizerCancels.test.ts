@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests } from '../../helpers';
 
 let organizerId: number;
 
@@ -25,9 +21,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
     expect((await getGameById(gameId))?.status).toBe('scheduled');
 
     // 2. cancel it through the interface
-    const response = await request(createApp())
-      .post(`/api/games/${gameId}/cancel`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`);
+    const response = await asUser(organizerId).post(`/api/games/${gameId}/cancel`);
 
     // 3. check it was cancelled
     expect(response.status).toBe(200);

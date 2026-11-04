@@ -1,9 +1,12 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { selectRows } from '../../../../src/core/db/mysql';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addJoinRequest, addUser, cleanUpAfterTests } from '../../helpers';
+import {
+  addGame,
+  addJoinRequest,
+  addUser,
+  asUser,
+  cleanUpAfterTests,
+  getJoinRequestStatus,
+} from '../../helpers';
 
 let organizerId: number;
 let requesterId: number;
@@ -27,9 +30,7 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     const requestId = await addJoinRequest(gameId, requesterId);
 
     // 2. approve it through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+    const response = await asUser(organizerId).patch(`/api/games/${gameId}/join-requests/${requestId}`)
       .send({ decision: 'approve' });
 
     // 3. check the reply
@@ -39,9 +40,7 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     expect(response.body.game).toMatchObject({ game_id: gameId, player_count: 2 });
 
     // 4. check what was really saved
-    const requests = await selectRows<{ status: string }>(
-      'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
-    expect(requests).toEqual([{ status: 'approved' }]);
+    expect(await getJoinRequestStatus(requestId)).toBe('approved');
     const players = await selectRows<{ user_id: number }>(
       'SELECT user_id FROM game_players WHERE game_id = ? AND user_id = ?', [gameId, requesterId]);
     expect(players).toEqual([{ user_id: requesterId }]);

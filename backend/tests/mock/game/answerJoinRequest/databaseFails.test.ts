@@ -1,14 +1,9 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import * as joinRequestsDb from '../../../../src/game/db/joinRequests';
 import type * as MockEnv from '../../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer } from '../../helpers';
+import { cleanUpAfterTests, GAME_ID, signIn, testOrganizer, withToken } from '../../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
-const GAME_ID = 42;
 const REQUEST_ID = 7;
 
 cleanUpAfterTests();
@@ -31,9 +26,7 @@ describe('Mocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => {
       .mockRejectedValue(new Error('database down'));
 
     // 3. approve it through the interface
-    const response = await request(createApp())
-      .patch(`/api/games/${GAME_ID}/join-requests/${REQUEST_ID}`)
-      .set('Authorization', `Bearer ${token}`)
+    const response = await withToken(token).patch(`/api/games/${GAME_ID}/join-requests/${REQUEST_ID}`)
       .send({ decision: 'approve' });
 
     // 4. check the error reply

@@ -1,9 +1,5 @@
-import request from 'supertest';
-
-import { createApp } from '../../../../src/app';
 import { getGameById } from '../../../../src/game/db/games';
-import { createAuthToken } from '../../../../src/user/auth/jwt';
-import { addGame, addUser, cleanUpAfterTests, ONE_DAY_MS } from '../../helpers';
+import { addGame, addUser, asUser, cleanUpAfterTests, ONE_DAY_MS, validGameBody } from '../../helpers';
 
 let organizerId: number;
 
@@ -27,20 +23,8 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     const newStartsAt = new Date(Math.floor((Date.now() + 2 * ONE_DAY_MS) / 1000) * 1000);
 
     // 3. edit it through the interface
-    const response = await request(createApp())
-      .put(`/api/games/${gameId}`)
-      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
-      .send({
-        title: 'New Title',
-        sport: 'basketball',
-        starts_at: newStartsAt.toISOString(),
-        location_name: 'UBC Rec Centre',
-        address: '6000 Student Union Blvd',
-        latitude: 49.26,
-        longitude: -123.25,
-        max_players: 10,
-        skill_level: 'any',
-      });
+    const response = await asUser(organizerId).put(`/api/games/${gameId}`)
+      .send(validGameBody({ starts_at: newStartsAt.toISOString() }));
 
     // 4. check the reply
     expect(response.status).toBe(200);
