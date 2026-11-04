@@ -3,9 +3,11 @@ package com.example.cpen321application
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,7 +33,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // dark icons even in dark mode, because the app is always light. Same colors as the default light style
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(
+                Color.argb(0xe6, 0xFF, 0xFF, 0xFF),
+                Color.argb(0x80, 0x1b, 0x1b, 0x1b)
+            )
+        )
         createNotificationChannel(this)
         requestNotificationPermission()
         // when recreated (e.g. the phone was rotated) the game is already open
