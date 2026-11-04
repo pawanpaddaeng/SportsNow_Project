@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.JoinRequestItem
@@ -27,7 +25,8 @@ import com.example.cpen321application.game.model.JoinRequestsHeader
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.LazyTabScreen
-import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.ListNote
+import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Join Requests screen shows. header is null until the game loads. isLoading
@@ -76,7 +75,7 @@ fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions,
 
         if (header?.isFull == true && state.requests.isNotEmpty()) {
             item(key = "full") {
-                Note("The game is full. Edit the game to add spots before approving more players.")
+                ListNote("The game is full. Edit the game to add spots before approving more players.")
             }
         }
 
@@ -93,7 +92,7 @@ fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions,
 
         if (header != null) {
             item(key = "footer") {
-                Note(
+                ListNote(
                     if (state.requests.isEmpty()) {
                         "No join requests right now. You'll get a notification when someone asks to join."
                     } else {
@@ -103,36 +102,6 @@ fun JoinRequestsScreen(state: JoinRequestsUiState, actions: JoinRequestsActions,
             }
         }
     }
-}
-
-// thin loading bar while the list updates and the error of a failed update, the current requests stay visible
-private fun LazyListScope.loadStatus(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
-    if (isLoading) {
-        item(key = "loading") {
-            LinearProgressIndicator(
-                color = SportsPrimary,
-                trackColor = SportsPrimaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-
-    if (errorMessage != null) {
-        item(key = "error") {
-            RetryMessage(message = errorMessage, onRetry = onRetry, modifier = Modifier.padding(vertical = 16.dp))
-        }
-    }
-}
-
-@Composable
-private fun Note(text: String) {
-    Text(
-        text = text,
-        color = SportsOnSurfaceVariant,
-        fontSize = 12.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth()
-    )
 }
 
 /*  one request: initial, name, details, the message and the two buttons. Tapping

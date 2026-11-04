@@ -107,12 +107,8 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             } finally {
                 busyAction = null
             }
-            when (result) {
-                is GameChangeResult.Done -> {
-                    Toast.makeText(context, action.doneMessage, Toast.LENGTH_SHORT).show()
-                    if (action == GameAction.Leave) navController.popBackStack() else loadDetails()
-                }
-                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+            showChangeResult(context, result, action.doneMessage) {
+                if (action == GameAction.Leave) navController.popBackStack() else loadDetails()
             }
         }
     }
@@ -126,13 +122,7 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             } finally {
                 removingPlayerId = null
             }
-            when (result) {
-                is GameChangeResult.Done -> {
-                    Toast.makeText(context, "${player.fullName} was removed", Toast.LENGTH_SHORT).show()
-                    loadDetails()
-                }
-                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-            }
+            showChangeResult(context, result, "${player.fullName} was removed") { loadDetails() }
         }
     }
 
@@ -187,6 +177,17 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
     }
 
     if (showInviteFriends && shownDetails != null) InviteFriendsPopup(app, shownDetails) { showInviteFriends = false }
+}
+
+// says the change worked and runs onDone, or shows the server's problem
+private fun showChangeResult(context: Context, result: GameChangeResult, doneMessage: String, onDone: () -> Unit) {
+    when (result) {
+        is GameChangeResult.Done -> {
+            Toast.makeText(context, doneMessage, Toast.LENGTH_SHORT).show()
+            onDone()
+        }
+        is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+    }
 }
 
 /*  loads the organizer's friends for the picker and invites the ones they tick. The

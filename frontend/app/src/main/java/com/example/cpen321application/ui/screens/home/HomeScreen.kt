@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -30,9 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameSummary
-import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.GameStateTag
+import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.Pill
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.theme.*
@@ -65,47 +64,32 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
     var joinedExpanded by rememberSaveable { mutableStateOf(true) }
     var organizedExpanded by rememberSaveable { mutableStateOf(true) }
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.White,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            AppBottomBar(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected)
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            item { HomeHeader(isRefreshing = state.isRefreshing, onRefresh = actions.onRefresh) }
+    LazyTabScreen(selectedTab = BottomTab.Home, onTabSelected = actions.onTabSelected, modifier = modifier) {
+        item { HomeHeader(isRefreshing = state.isRefreshing, onRefresh = actions.onRefresh) }
 
-            refreshStatus(isRefreshing = state.isRefreshing, errorMessage = state.errorMessage)
+        refreshStatus(isRefreshing = state.isRefreshing, errorMessage = state.errorMessage)
 
-            gameSection(
-                title = "Joined Games",
-                games = state.joinedGames,
-                expanded = joinedExpanded,
-                onToggle = { joinedExpanded = !joinedExpanded },
-                emptyText = "You haven't joined any games yet. Check Discover for games near you.",
-                onGameClick = actions.onGameClick
-            )
+        gameSection(
+            title = "Joined Games",
+            games = state.joinedGames,
+            expanded = joinedExpanded,
+            onToggle = { joinedExpanded = !joinedExpanded },
+            emptyText = "You haven't joined any games yet. Check Discover for games near you.",
+            onGameClick = actions.onGameClick
+        )
 
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            gameSection(
-                title = "Organized Games",
-                games = state.organizedGames,
-                expanded = organizedExpanded,
-                onToggle = { organizedExpanded = !organizedExpanded },
-                emptyText = "You haven't organized any games yet.",
-                onGameClick = actions.onGameClick
-            )
+        gameSection(
+            title = "Organized Games",
+            games = state.organizedGames,
+            expanded = organizedExpanded,
+            onToggle = { organizedExpanded = !organizedExpanded },
+            emptyText = "You haven't organized any games yet.",
+            onGameClick = actions.onGameClick
+        )
 
-            item { CreateGameButton(onClick = actions.onCreateGame) }
-        }
+        item { CreateGameButton(onClick = actions.onCreateGame) }
     }
 }
 

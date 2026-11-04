@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.friend.model.FriendPerson
@@ -31,8 +30,9 @@ import com.example.cpen321application.friend.model.FriendshipStatus
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
-import com.example.cpen321application.ui.components.RetryMessage
+import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.cardBackground
+import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.components.sportsFieldColors
 import com.example.cpen321application.ui.theme.*
@@ -101,23 +101,6 @@ fun FriendsScreen(state: FriendsUiState, actions: FriendsActions, modifier: Modi
     }
 }
 
-private fun LazyListScope.loadStatus(isLoading: Boolean, errorMessage: String?, onRetry: (() -> Unit)?) {
-    if (isLoading) {
-        item(key = "loading") {
-            LinearProgressIndicator(
-                color = SportsPrimary,
-                trackColor = SportsPrimaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-    if (errorMessage != null) {
-        item(key = "error") {
-            RetryMessage(message = errorMessage, onRetry = onRetry, modifier = Modifier.padding(vertical = 16.dp))
-        }
-    }
-}
-
 private fun LazyListScope.searchResults(state: FriendsUiState, actions: FriendsActions) {
     items(state.searchResults, key = { "result${it.userId}" }) { person ->
         PersonCard(person = person) {
@@ -131,7 +114,7 @@ private fun LazyListScope.searchResults(state: FriendsUiState, actions: FriendsA
         }
     }
     if (state.searchResults.isEmpty() && !state.isLoading && state.errorMessage == null) {
-        item(key = "noResults") { Note("No one found with that name.") }
+        item(key = "noResults") { ListNote("No one found with that name.") }
     }
 }
 
@@ -153,7 +136,7 @@ private fun LazyListScope.requestsAndFriends(state: FriendsUiState, actions: Fri
         PersonCard(person = friend, onClick = { actions.onOpenProfile(friend.userId) })
     }
     if (state.friends.isEmpty() && !state.isLoading && state.errorMessage == null) {
-        item(key = "noFriends") { Note("No friends yet. Search for someone by name to send them a request.") }
+        item(key = "noFriends") { ListNote("No friends yet. Search for someone by name to send them a request.") }
     }
 }
 
@@ -194,17 +177,6 @@ private fun SectionHeader(title: String, count: Int) {
             modifier = Modifier.pillBackground(SportsSurfaceContainer, borderColor = null)
         )
     }
-}
-
-@Composable
-private fun Note(text: String) {
-    Text(
-        text = text,
-        color = SportsOnSurfaceVariant,
-        fontSize = 12.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth()
-    )
 }
 
 @Composable
