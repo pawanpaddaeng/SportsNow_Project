@@ -2,7 +2,7 @@ import request from 'supertest';
 
 import { createApp } from '../../../src/app';
 import * as gamesDb from '../../../src/game/db/games';
-import * as ratingsDb from '../../../src/review/db/ratings';
+import * as ratingsDb from '../../../src/playerReview/db/ratings';
 import type * as MockEnv from '../mockEnv';
 import {
   api,

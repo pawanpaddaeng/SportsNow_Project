@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
-import { type FriendshipStatus, getFriendshipStatus } from '../../friend/db/friends';
-import { getReputation, type Reputation } from '../../review/db/reputation';
+import { type FriendshipStatus, getFriendshipStatus } from '../../social/db/friends';
+import { getReputation, type Reputation } from '../../playerReview/db/reputation';
 import { getAuthUser, requireAuth } from '../auth/middleware';
 import { findUserById, type User } from '../db/users';
 import { MIN_AGE } from '../validation/profile';

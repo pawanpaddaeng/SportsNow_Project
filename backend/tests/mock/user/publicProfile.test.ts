@@ -1,5 +1,5 @@
-import * as friendsDb from '../../../src/friend/db/friends';
-import * as reputationDb from '../../../src/review/db/reputation';
+import * as friendsDb from '../../../src/social/db/friends';
+import * as reputationDb from '../../../src/playerReview/db/reputation';
 import * as usersDb from '../../../src/user/db/users';
 import { type User } from '../../../src/user/db/users';
 import { ageRange } from '../../../src/user/routes/publicProfileRoutes';

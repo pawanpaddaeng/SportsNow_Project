@@ -1,4 +1,4 @@
-import { createGameChat } from '../../chat/db/chats';
+import { createGameChat } from '../../message/db/chats';
 import { executeWrite, inTransaction, type Queryable, selectRows } from '../../core/db/mysql';
 import type { JoinRequestStatus } from './joinRequests';
 

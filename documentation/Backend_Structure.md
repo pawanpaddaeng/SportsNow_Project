@@ -2,7 +2,7 @@
 
 The backend lives in `backend/src/`. It is a Node.js server written in TypeScript with Express, and it stores data in MySQL. It runs with Docker Compose (see the README).
 
-The code is grouped by the components in the design doc (User, Game, Social, Message), plus shared code in `core/`. This matches the frontend layout.
+The code is grouped by the components in the design doc (User, Game, Player Review, Message, Social), plus shared code in `core/`. The frontend groups its code the same way, but still uses the older folder names `review/`, `chat/` and `friend/` for Player Review, Message and Social.
 
 ## Folder overview
 
@@ -13,17 +13,17 @@ backend/src/
 ├── core/             shared by every component
 ├── user/             User component: sign up, login, JWTs, profile
 ├── game/             Game component: games, discover, join requests
-├── friend/           Social component: user search, friend requests, friends list
-├── chat/             Message component: game chats, message history, WebSocket
-└── review/           Player Review component: ratings and reputation scores
+├── social/           Social component: user search, friend requests, friends list
+├── message/          Message component: game chats, message history, WebSocket
+└── playerReview/     Player Review component: ratings and reputation scores
 ```
 
 **Dependency rules**
-- `core/` imports nothing from `user/`, `game/`, `friend/` or `chat/`.
+- `core/` imports nothing from `user/`, `game/`, `social/` or `message/`.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
-- `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
-- `user/routes/publicProfileRoutes.ts` imports `getReputation` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
-- `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id, and `friend/` imports it to open and find two friends' chat. `chat/` never imports from `game/` or `friend/`, it reads their tables with SQL.
+- `social/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `social/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
+- `user/routes/publicProfileRoutes.ts` imports `getReputation` from `playerReview/` and `getFriendshipStatus` from `social/db/friends.ts` to build a player's public profile. `playerReview/` imports only from `core/` and reads the game tables with SQL.
+- `message/` may import from `user/` (to check the JWT). `game/` imports `message/db/chats.ts` to open a new game's chat and read its id, and `social/` imports it to open and find two friends' chat. `message/` never imports from `game/` or `social/`, it reads their tables with SQL.
 
 ## core/
 
@@ -67,7 +67,7 @@ backend/src/
 | `validation/invite.ts` | Checks an invite body: `friend_ids` is a list of 1 to 100 user ids |
 | `validation/coordinates.ts` | Checks the `lat` and `lng` query values for Discover |
 
-## friend/
+## social/
 
 | File | What it does |
 | --- | --- |
@@ -75,7 +75,7 @@ backend/src/
 | `db/friends.ts` | Friend queries: search, friends list, `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline (accepting also opens the two friends' chat) |
 | `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
 
-## review/
+## playerReview/
 
 | File | What it does |
 | --- | --- |
@@ -87,7 +87,7 @@ backend/src/
 
 A completed game's players and no-shows are copied to `game_attendance`, because leaving a completed game deletes its `game_players` row and the last player leaving deletes the game. A player's score mustn't change when that happens. Players are sent their own overall score, but never what they were rated in a game.
 
-## chat/
+## message/
 
 | File | What it does |
 | --- | --- |

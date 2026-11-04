@@ -1,4 +1,4 @@
-import { gameScore, type PlayedGame, type RatingScores, reputationScore } from '../../../src/review/reputation';
+import { gameScore, type PlayedGame, type RatingScores, reputationScore } from '../../../src/playerReview/reputation';
 
 function stars(value: number): RatingScores {
   return { punctuality: value, sportsmanship: value, skill: value, reliability: value, overall: value };

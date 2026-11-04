@@ -1,4 +1,4 @@
-import { areFriends } from '../../friend/db/friends';
+import { areFriends } from '../../social/db/friends';
 import { type GameChangeProblem, getGameById, getGamePlayers } from './games';
 
 /*  why the organizer can't invite these users: the game can't be changed (it's gone,

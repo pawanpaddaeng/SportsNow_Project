@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getGameChatId } from '../../chat/db/chats';
+import { getGameChatId } from '../../message/db/chats';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logError, logInfo } from '../../core/logger';

@@ -1,5 +1,5 @@
 import { createApp } from './app';
-import { startChatSocket } from './chat/socket/chatSocket';
+import { startChatSocket } from './message/socket/chatSocket';
 import { env } from './core/config/env';
 import { logInfo } from './core/logger';
 

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getFriendChat } from '../../chat/db/chats';
+import { getFriendChat } from '../../message/db/chats';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';

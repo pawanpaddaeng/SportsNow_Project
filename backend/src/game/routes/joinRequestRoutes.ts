@@ -3,7 +3,7 @@ import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
 import { sendPushToUser } from '../../core/notifications/push';
-import { getReputationScore } from '../../review/db/ratings';
+import { getReputationScore } from '../../playerReview/db/ratings';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import { getGameById } from '../db/games';
 import {

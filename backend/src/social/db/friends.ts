@@ -1,4 +1,4 @@
-import { createFriendChat } from '../../chat/db/chats';
+import { createFriendChat } from '../../message/db/chats';
 import { executeWrite, inTransaction, type Queryable, selectRows } from '../../core/db/mysql';
 import { matchName } from '../search/nameMatch';
 

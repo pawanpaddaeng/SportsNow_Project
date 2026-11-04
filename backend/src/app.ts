@@ -1,11 +1,11 @@
 import express, { type Express } from 'express';
-import { chatsRouter } from './chat/routes/chatRoutes';
+import { chatsRouter } from './message/routes/chatRoutes';
 import { handleRouteErrors } from './core/http/asyncRoute';
-import { friendsRouter } from './friend/routes/friendRoutes';
+import { friendsRouter } from './social/routes/friendRoutes';
 import { gamesRouter } from './game/routes/gameRoutes';
 import { invitesRouter } from './game/routes/inviteRoutes';
 import { joinRequestsRouter } from './game/routes/joinRequestRoutes';
-import { ratingsRouter } from './review/routes/ratingRoutes';
+import { ratingsRouter } from './playerReview/routes/ratingRoutes';
 import { authRouter } from './user/routes/authRoutes';
 import { usersRouter } from './user/routes/userRoutes';
 import { publicProfileRouter } from './user/routes/publicProfileRoutes';

@@ -1,5 +1,5 @@
 import * as push from '../../../../src/core/notifications/push';
-import * as friendsDb from '../../../../src/friend/db/friends';
+import * as friendsDb from '../../../../src/social/db/friends';
 import * as gamesDb from '../../../../src/game/db/games';
 import type * as MockEnv from '../../mockEnv';
 import { api, cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../../helpers';
