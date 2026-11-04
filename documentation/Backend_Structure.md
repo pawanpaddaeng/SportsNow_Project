@@ -23,7 +23,7 @@ backend/src/
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
 - `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
 - `user/routes/publicProfileRoutes.ts` imports `getReputation` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
-- `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id. `chat/` never imports from `game/`, it reads the game tables with SQL.
+- `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id, and `friend/` imports it to open and find two friends' chat. `chat/` never imports from `game/` or `friend/`, it reads their tables with SQL.
 
 ## core/
 
@@ -71,8 +71,8 @@ backend/src/
 
 | File | What it does |
 | --- | --- |
-| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
-| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline |
+| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId`, `GET /api/friends/:userId/chat` |
+| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline (accepting also opens the two friends' chat) |
 | `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
 
 ## review/
@@ -91,13 +91,15 @@ A completed game's players and no-shows are copied to `game_attendance`, because
 
 | File | What it does |
 | --- | --- |
-| `routes/chatRoutes.ts` | `GET /api/chats/:chatId/messages`, a page of earlier messages for a current player |
+| `routes/chatRoutes.ts` | `GET /api/chats/:chatId/messages`, a page of earlier messages for a current member of the chat |
 | `routes/chatJson.ts` | The JSON shape of a message, the same from the endpoint and the WebSocket |
-| `socket/chatSocket.ts` | The WebSocket server: checks who connects, sends messages to everyone in the chat, and drops dead connections |
-| `db/chats.ts` | Chat queries: create a game's chat, read access, read a page of messages, save a message |
+| `socket/chatSocket.ts` | The WebSocket server: checks who connects, sends messages to everyone in the chat, drops dead connections, and notifies a friend who doesn't have the chat open |
+| `db/chats.ts` | Chat queries: create a game's or two friends' chat, find a friend's chat, read access, read a page of messages, save a message |
 | `validation/sendMessage.ts` | Checks a `send_message` request: its type, chat id and text |
 
-A chat has no stored open or closed state. It's closed when its game's status is `completed` or `cancelled`, and its readers are the game's current players, so both are always up to date. Deleting a game deletes its chat and messages (`ON DELETE CASCADE`).
+A chat is either a game's (`game_id` set) or two friends' (`user_low_id` and `user_high_id` set, lowest id first). It has no stored open or closed state or members. A game's chat is closed when the game's status is `completed` or `cancelled`, and its readers are the game's current players. A friend chat never closes, and its readers are the two users while `friendships` says they're friends. So all of this is always up to date. Deleting a game deletes its chat and messages, and deleting a user deletes their friend chats and messages, for both people (`ON DELETE CASCADE`).
+
+Two friends' chat is created when the request is accepted, in the same transaction. If removing friends is added, the chat row should stay: access is lost right away because it's read from `friendships`, and becoming friends again finds the same chat and its history.
 
 The endpoints are listed in the Requirements and Design doc (section 4.1 Main Components). Every endpoint except sign up, login and `/health` needs `Authorization: Bearer <jwt>`.
 
@@ -144,4 +146,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-Player Review's stats endpoint and badges aren't built yet, Social doesn't have removing friends or friend profiles yet, and friend chat isn't part of `chat/` yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+Player Review's stats endpoint and badges aren't built yet, and Social doesn't have removing friends or friend profiles yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
