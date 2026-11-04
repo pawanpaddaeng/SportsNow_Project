@@ -1,15 +1,15 @@
 import request from 'supertest';
 
-import { createApp } from '../../../src/app';
-import * as friendsDb from '../../../src/friend/db/friends';
-import * as gamesDb from '../../../src/game/db/games';
-import { type Game } from '../../../src/game/db/games';
-import * as push from '../../../src/core/notifications/push';
-import type * as MockEnv from '../mockEnv';
-import { cleanUpAfterTests, signIn, testGame, testOrganizer, testPlayer } from '../helpers';
+import { createApp } from '../../../../src/app';
+import * as friendsDb from '../../../../src/friend/db/friends';
+import * as gamesDb from '../../../../src/game/db/games';
+import { type Game } from '../../../../src/game/db/games';
+import * as push from '../../../../src/core/notifications/push';
+import type * as MockEnv from '../../mockEnv';
+import { cleanUpAfterTests, signIn, testGame, testOrganizer, testPlayer } from '../../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
-jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
+jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
 const GAME_ID = 42;
 // the organizer's friends, neither of them in the game yet

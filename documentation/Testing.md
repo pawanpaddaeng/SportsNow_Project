@@ -33,15 +33,15 @@ Each test has comments that say its input, the status code we expect, what shoul
 
 | **Interface** | **Describe Group Location, No Mocks** | **Describe Group Location, With Mocks** | **Mocked Components** |
 | ------------- | ------------------------------------- | --------------------------------------- | --------------------- |
-| **POST /api/games** | `backend/tests/no-mock/game/createGame.test.ts` | `backend/tests/mock/game/createGame.test.ts` | Games DB, Firebase push |
-| **GET /api/games/mine** | `backend/tests/no-mock/game/getMyGames.test.ts` | `backend/tests/mock/game/getMyGames.test.ts` | Games DB |
-| **GET /api/games/discover** | `backend/tests/no-mock/game/discoverGames.test.ts` | `backend/tests/mock/game/discoverGames.test.ts` | Games DB |
-| **GET /api/games/{gameId}** | `backend/tests/no-mock/game/getGameDetails.test.ts` | `backend/tests/mock/game/getGameDetails.test.ts` | Games DB, Users DB |
-| **PUT /api/games/{gameId}** | `backend/tests/no-mock/game/updateGame.test.ts` | `backend/tests/mock/game/updateGame.test.ts` | Games DB, Firebase push |
-| **POST /api/games/{gameId}/cancel** | `backend/tests/no-mock/game/cancelGame.test.ts` | `backend/tests/mock/game/cancelGame.test.ts` | Games DB, Firebase push |
-| **POST /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/sendJoinRequest.test.ts` | `backend/tests/mock/game/sendJoinRequest.test.ts` | Join Requests DB, Firebase push |
-| **GET /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/listJoinRequests.test.ts` | `backend/tests/mock/game/listJoinRequests.test.ts` | Games DB, Join Requests DB |
-| **PATCH /api/games/{gameId}/join-requests/{requestId}** | `backend/tests/no-mock/game/answerJoinRequest.test.ts` | `backend/tests/mock/game/answerJoinRequest.test.ts` | Join Requests DB, Firebase push |
+| **POST /api/games** | `backend/tests/no-mock/game/createGame/createGame.test.ts` | `backend/tests/mock/game/createGame/` | Games DB, Firebase push |
+| **GET /api/games/mine** | `backend/tests/no-mock/game/getMyGames/` | `backend/tests/mock/game/getMyGames/` | Games DB |
+| **GET /api/games/discover** | `backend/tests/no-mock/game/discoverGames/` | `backend/tests/mock/game/discoverGames/` | Games DB |
+| **GET /api/games/{gameId}** | `backend/tests/no-mock/game/getGameDetails/` | `backend/tests/mock/game/getGameDetails/` | Games DB, Users DB |
+| **PUT /api/games/{gameId}** | `backend/tests/no-mock/game/updateGame/` | `backend/tests/mock/game/updateGame/` | Games DB, Firebase push |
+| **POST /api/games/{gameId}/cancel** | `backend/tests/no-mock/game/cancelGame/cancelGame.test.ts` | `backend/tests/mock/game/cancelGame/cancelGame.test.ts` | Games DB, Firebase push |
+| **POST /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/sendJoinRequest/sendJoinRequest.test.ts` | `backend/tests/mock/game/sendJoinRequest/sendJoinRequest.test.ts` | Join Requests DB, Firebase push |
+| **GET /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/listJoinRequests/listJoinRequests.test.ts` | `backend/tests/mock/game/listJoinRequests/listJoinRequests.test.ts` | Games DB, Join Requests DB |
+| **PATCH /api/games/{gameId}/join-requests/{requestId}** | `backend/tests/no-mock/game/answerJoinRequest/answerJoinRequest.test.ts` | `backend/tests/mock/game/answerJoinRequest/answerJoinRequest.test.ts` | Join Requests DB, Firebase push |
 
 We will add links to the line where each `describe` group starts at CP2, once the test files exist.
 
@@ -104,7 +104,7 @@ Each interface's group with mocks also has a test where the database function th
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
 | No mocks | Bad id | `/api/games/abc` | 400 | Returns `{ msg: "invalid_request" }` |
 | With mocks | Database fails | `getGameById` throws | 500 | Returns `{ msg: "server_error" }` |
-| With mocks | Organizer not in players list | `getGamePlayers` doesn't return the organizer, `findUserById` does | 200 | `organizer` comes from the user lookup |
+| With mocks | Organizer not in players list | `getGamePlayers` doesn't return the organizer, the user lookup in `findOrganizer` does | 200 | `organizer` comes from the user lookup |
 | With mocks | Organizer not found | Neither lookup finds the organizer | 500 | Returns `{ msg: "server_error" }` |
 
 **PUT /api/games/{gameId}** (edit a game)

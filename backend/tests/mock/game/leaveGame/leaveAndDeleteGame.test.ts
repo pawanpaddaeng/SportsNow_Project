@@ -1,13 +1,13 @@
 import request from 'supertest';
 
-import { createApp } from '../../../src/app';
-import * as mysql from '../../../src/core/db/mysql';
-import { pool, type SqlValue } from '../../../src/core/db/mysql';
-import type * as MockEnv from '../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer } from '../helpers';
+import { createApp } from '../../../../src/app';
+import * as mysql from '../../../../src/core/db/mysql';
+import { pool, type SqlValue } from '../../../../src/core/db/mysql';
+import type * as MockEnv from '../../mockEnv';
+import { cleanUpAfterTests, signIn, testOrganizer } from '../../helpers';
 
 // the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
-jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
+jest.mock('../../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../../mockEnv'));
 
 const GAME_ID = 42;
 
