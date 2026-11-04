@@ -33,15 +33,15 @@ Each test has comments that say its input, the status code we expect, what shoul
 
 | **Interface** | **Describe Group Location, No Mocks** | **Describe Group Location, With Mocks** | **Mocked Components** |
 | ------------- | ------------------------------------- | --------------------------------------- | --------------------- |
-| **POST /api/games** | `backend/tests/no-mock/createGame.test.ts` | `backend/tests/mock/createGame.test.ts` | Games DB, Firebase push |
-| **GET /api/games/mine** | `backend/tests/no-mock/getMyGames.test.ts` | `backend/tests/mock/getMyGames.test.ts` | Games DB |
-| **GET /api/games/discover** | `backend/tests/no-mock/discoverGames.test.ts` | `backend/tests/mock/discoverGames.test.ts` | Games DB |
-| **GET /api/games/{gameId}** | `backend/tests/no-mock/getGameDetails.test.ts` | `backend/tests/mock/getGameDetails.test.ts` | Games DB, Users DB |
-| **PUT /api/games/{gameId}** | `backend/tests/no-mock/updateGame.test.ts` | `backend/tests/mock/updateGame.test.ts` | Games DB, Firebase push |
-| **POST /api/games/{gameId}/cancel** | `backend/tests/no-mock/cancelGame.test.ts` | `backend/tests/mock/cancelGame.test.ts` | Games DB, Firebase push |
-| **POST /api/games/{gameId}/join-requests** | `backend/tests/no-mock/sendJoinRequest.test.ts` | `backend/tests/mock/sendJoinRequest.test.ts` | Join Requests DB, Firebase push |
-| **GET /api/games/{gameId}/join-requests** | `backend/tests/no-mock/listJoinRequests.test.ts` | `backend/tests/mock/listJoinRequests.test.ts` | Games DB, Join Requests DB |
-| **PATCH /api/games/{gameId}/join-requests/{requestId}** | `backend/tests/no-mock/answerJoinRequest.test.ts` | `backend/tests/mock/answerJoinRequest.test.ts` | Join Requests DB, Firebase push |
+| **POST /api/games** | `backend/tests/no-mock/game/createGame.test.ts` | `backend/tests/mock/game/createGame.test.ts` | Games DB, Firebase push |
+| **GET /api/games/mine** | `backend/tests/no-mock/game/getMyGames.test.ts` | `backend/tests/mock/game/getMyGames.test.ts` | Games DB |
+| **GET /api/games/discover** | `backend/tests/no-mock/game/discoverGames.test.ts` | `backend/tests/mock/game/discoverGames.test.ts` | Games DB |
+| **GET /api/games/{gameId}** | `backend/tests/no-mock/game/getGameDetails.test.ts` | `backend/tests/mock/game/getGameDetails.test.ts` | Games DB, Users DB |
+| **PUT /api/games/{gameId}** | `backend/tests/no-mock/game/updateGame.test.ts` | `backend/tests/mock/game/updateGame.test.ts` | Games DB, Firebase push |
+| **POST /api/games/{gameId}/cancel** | `backend/tests/no-mock/game/cancelGame.test.ts` | `backend/tests/mock/game/cancelGame.test.ts` | Games DB, Firebase push |
+| **POST /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/sendJoinRequest.test.ts` | `backend/tests/mock/game/sendJoinRequest.test.ts` | Join Requests DB, Firebase push |
+| **GET /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/listJoinRequests.test.ts` | `backend/tests/mock/game/listJoinRequests.test.ts` | Games DB, Join Requests DB |
+| **PATCH /api/games/{gameId}/join-requests/{requestId}** | `backend/tests/no-mock/game/answerJoinRequest.test.ts` | `backend/tests/mock/game/answerJoinRequest.test.ts` | Join Requests DB, Firebase push |
 
 We will add links to the line where each `describe` group starts at CP2, once the test files exist.
 
