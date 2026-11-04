@@ -4,7 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| Nov 3, 2026 | 3.1, 4.1 | Player ratings are built. Section 3.1 now has the real scoring rules, and section 4.1 lists Player Review's real interfaces. No-shows are sent when the organiser marks a game completed, so there is no separate no-shows endpoint, and the score is computed when it's read instead of by `updateReputation`. |
+| Nov 3, 2026 | 4.1 | Player ratings are built. Section 4.1 lists Player Review's real interfaces. No-shows are sent when the organiser marks a game completed, so there is no separate no-shows endpoint, and the score is computed when it's read instead of by `updateReputation`. |
 | 2026-11-02 | 4.1 Main Components (User, Player Review, Social) | Built `GET /api/users/{userId}` for the player profile popup (Player Statistics use case). It returns a player's name, age range, games played, reputation score and badges, never their email or birth year. `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. Added `getFriendshipStatus` so the popup knows when to offer Add Friend. |
 | 2026-11-01 | 4.1 Main Components (Social) | Search results now include `friendship_status`, so the Friends tab shows Request Sent instead of Add once a request is sent. |
 | 2026-11-01 | 4.1 Main Components (Social) | Built friend search, friend requests and the friends list for the new Friends tab. Added `GET /api/friends/requests` so the tab can list incoming requests, and search now also returns similar names so partial names and typos still find people. |
@@ -143,7 +143,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 
 <a id="uc3r"></a>
-#### **Use Case 3: Join Game**
+#### **Use Case 3: Join Request**
 
 **Description**: A player sends a request to join a game, stating their skill level, how often they play, and an optional message. The request waits for the organiser’s approval.
 
@@ -435,10 +435,10 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 <br><br>
 
 2. <a id="seq-uc2"></a> [**Use Case 2: Discover Game**](#uc2r)\
-![Sequence Diagram UC2](images//UC2%20-%20Discover_ver3.png)
+![Sequence Diagram UC2](images/UC2%20-%20Discover_ver3.png)
 <br><br>
 
-3. <a id="seq-uc3"></a> [**Use Case 3: Join Game**](#uc3r)\
+3. <a id="seq-uc3"></a> [**Use Case 3: Join Request**](#uc3r)\
 ![Sequence Diagram UC3](images/UC3%20-%20Join%20Game_ver3.png)
 <br><br>
 
@@ -447,7 +447,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 <br><br>
 
 5. <a id="seq-uc5"></a> [**Use Case 5: Rate Players**](#uc5r)\
-![Sequence Diagram UC5](images/UC5%20-%20Rating_ver2.5.png)
+![Sequence Diagram UC5](images/UC5%20-%20Rating_ver3.png)
 <br><br>
 
 ### **4.7. Design of Non-Functional Requirements**
