@@ -3,6 +3,7 @@ package com.example.cpen321application.navigation.routes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
+import com.example.cpen321application.navigation.Routes
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.ui.screens.friends.FriendsActions
 import com.example.cpen321application.ui.screens.friends.FriendsScreen
@@ -34,6 +35,7 @@ fun FriendsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
             onAccept = { friends.answer(it, accept = true) },
             onDecline = { friends.answer(it, accept = false) },
             onOpenProfile = { userId -> app.openProfile(userId) },
+            onOpenChat = { userId -> app.navController.navigate(Routes.friendChat(userId)) },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
         modifier = modifier

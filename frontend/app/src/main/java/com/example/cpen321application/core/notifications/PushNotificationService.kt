@@ -40,6 +40,10 @@ fun createNotificationChannel(context: Context) {
 fun invitedGameId(intent: Intent): Int? =
     if (intent.getStringExtra("type") == "game_invite") intent.getStringExtra("gameId")?.toIntOrNull() else null
 
+// the friend whose chat to open when the app was opened by tapping their message's notification, like invitedGameId
+fun messagedFriendId(intent: Intent): Int? =
+    if (intent.getStringExtra("type") == "friend_message") intent.getStringExtra("friendId")?.toIntOrNull() else null
+
 /*
     Receives push notifications from Firebase. Android only shows notifications
     by itself while the app is in the background, so this shows them while the
@@ -67,11 +71,13 @@ class PushNotificationService : FirebaseMessagingService() {
 
         val title = message.notification?.title ?: message.data["title"] ?: return
         val body = message.notification?.body ?: message.data["body"] ?: ""
-        showNotification(title, body, message.data)
+        showNotification(title, body, message.data, message.notification?.tag)
     }
 
-    // tapping it opens the app with messageData as the intent's extras, see invitedGameId
-    private fun showNotification(title: String, body: String, messageData: Map<String, String>) {
+    /*  tapping it opens the app with messageData as the intent's extras, see invitedGameId.
+        With a tag it replaces the notification showing with that tag, e.g. a friend's last message
+     */
+    private fun showNotification(title: String, body: String, messageData: Map<String, String>, tag: String?) {
         // Android 13+ only shows notifications once the user allowed them
         val allowed = ContextCompat.checkSelfPermission(
             this, Manifest.permission.POST_NOTIFICATIONS
@@ -99,7 +105,8 @@ class PushNotificationService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .build()
 
+        // tagged ones use id 0 like those Android shows by itself in the background, so they replace each other
         NotificationManagerCompat.from(this)
-            .notify(notificationId, notification)
+            .notify(tag, if (tag == null) notificationId else 0, notification)
     }
 }

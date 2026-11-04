@@ -28,6 +28,7 @@ import com.example.cpen321application.navigation.routes.ProfileRoute
 import com.example.cpen321application.navigation.routes.RatePlayersRoute
 import com.example.cpen321application.navigation.routes.SignInRoute
 import com.example.cpen321application.navigation.routes.SignUpRoute
+import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.navigation.state.rememberAppState
 
 private val gameIdArgument = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
@@ -48,23 +49,7 @@ fun AppNavigation(
     val app = rememberAppState()
     val startDestination = remember { app.startDestination() }
 
-    // any API call whose session can't be used or renewed asks for sign in through Session
-    LaunchedEffect(Unit) {
-        Session.signInRequired.collect { app.returnToSignIn() }
-    }
-
-    // a join request was approved, or the user was removed from a game, while the app is
-    // open: the game now belongs on Home, or no longer does
-    LaunchedEffect(Unit) {
-        GameEvents.events.collect { event ->
-            if (event.type == "join_request_approved" || event.type == "removed_from_game") app.homeState.refresh()
-        }
-    }
-
-    // a friend request arrived or was answered while the app is open
-    LaunchedEffect(Unit) {
-        FriendEvents.events.collect { app.friendsState.refresh() }
-    }
+    ListenForAppEvents(app)
 
     // signed in from a previous session: register notifications once at start
     LaunchedEffect(Unit) {
@@ -76,7 +61,9 @@ fun AppNavigation(
     // a game invite was tapped: open the game so the friend can ask to join (if signed in)
     OpenFromNotification(gameToOpen?.let(Routes::gameDetails), onGameOpened) { app.navController.navigate(it) }
     // a friend's message was tapped: open the chat with them (if signed in)
-    OpenFromNotification(friendChatToOpen?.let(Routes::friendChat), onFriendChatOpened) { app.navController.navigate(it) }
+    OpenFromNotification(friendChatToOpen?.let(Routes::friendChat), onFriendChatOpened) {
+        app.navController.navigate(it)
+    }
 
     NavHost(
         navController = app.navController,
@@ -100,6 +87,28 @@ fun AppNavigation(
     }
     app.profileUserId?.let { userId ->
         PlayerProfilePopup(app = app, userId = userId, onDismiss = { app.closeProfile() })
+    }
+}
+
+// what can happen anywhere in the app, whichever screen is showing
+@Composable
+private fun ListenForAppEvents(app: AppState) {
+    // any API call whose session can't be used or renewed asks for sign in through Session
+    LaunchedEffect(Unit) {
+        Session.signInRequired.collect { app.returnToSignIn() }
+    }
+
+    // a join request was approved, or the user was removed from a game, while the app is
+    // open: the game now belongs on Home, or no longer does
+    LaunchedEffect(Unit) {
+        GameEvents.events.collect { event ->
+            if (event.type == "join_request_approved" || event.type == "removed_from_game") app.homeState.refresh()
+        }
+    }
+
+    // a friend request arrived or was answered while the app is open
+    LaunchedEffect(Unit) {
+        FriendEvents.events.collect { app.friendsState.refresh() }
     }
 }
 

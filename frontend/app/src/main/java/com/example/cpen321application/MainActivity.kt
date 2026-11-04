@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.cpen321application.core.notifications.createNotificationChannel
 import com.example.cpen321application.core.notifications.invitedGameId
+import com.example.cpen321application.core.notifications.messagedFriendId
 import com.example.cpen321application.navigation.AppNavigation
 import com.example.cpen321application.ui.theme.CPEN321ApplicationTheme
 
@@ -30,6 +31,8 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     // the game of a tapped invite notification, AppNavigation opens it and clears it
     private var gameToOpen by mutableStateOf<Int?>(null)
+    // the friend of a tapped message notification, AppNavigation opens their chat and clears it
+    private var friendChatToOpen by mutableStateOf<Int?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,15 +46,17 @@ class MainActivity : ComponentActivity() {
         )
         createNotificationChannel(this)
         requestNotificationPermission()
-        // when recreated (e.g. the phone was rotated) the game is already open
-        if (savedInstanceState == null) gameToOpen = invitedGameId(intent)
+        // when recreated (e.g. the phone was rotated) the game or chat is already open
+        if (savedInstanceState == null) readNotification(intent)
         setContent {
             CPEN321ApplicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     AppNavigation(
                         modifier = Modifier.padding(innerPadding),
                         gameToOpen = gameToOpen,
-                        onGameOpened = { gameToOpen = null }
+                        onGameOpened = { gameToOpen = null },
+                        friendChatToOpen = friendChatToOpen,
+                        onFriendChatOpened = { friendChatToOpen = null }
                     )
                 }
             }
@@ -61,7 +66,13 @@ class MainActivity : ComponentActivity() {
     // a notification tapped while the app is already open can arrive here instead of onCreate
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        readNotification(intent)
+    }
+
+    // what a tapped notification should open, if the app was opened by one
+    private fun readNotification(intent: Intent) {
         gameToOpen = invitedGameId(intent)
+        friendChatToOpen = messagedFriendId(intent)
     }
 
     // Android 13+ asks the user before an app can show notifications
