@@ -1,0 +1,87 @@
+import request from 'supertest';
+
+import { createApp } from '../../../../src/app';
+import { executeWrite, pool, selectRows } from '../../../../src/core/db/mysql';
+import { createGame } from '../../../../src/game/db/games';
+import { createAuthToken } from '../../../../src/user/auth/jwt';
+import { createUser, deleteUser } from '../../../../src/user/db/users';
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+let organizerId: number;
+let requesterId: number;
+
+function addUser(firstName: string): Promise<number> {
+  return createUser({
+    googleId: `answer-join-request-test-${Date.now()}-${Math.random()}`,
+    email: 'answer-join-request-test@example.com',
+    firstName,
+    lastName: 'Tester',
+    birthYear: 1995,
+  });
+}
+
+beforeEach(async () => {
+  organizerId = await addUser('Olivia');
+  requesterId = await addUser('Rae');
+});
+
+// deleting the users also deletes their games, game players, chats and join requests
+// (ON DELETE CASCADE), so only what this test made is removed
+afterEach(async () => {
+  await deleteUser(organizerId);
+  await deleteUser(requesterId);
+});
+
+afterAll(async () => {
+  await pool.end();
+});
+
+// Interface PATCH /api/games/{gameId}/join-requests/{requestId}
+describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => {
+  // Input: the organizer sends { decision: "approve" } for a pending request
+  // Expected status code: 200
+  // Expected behavior: the request is approved and the person joins the game
+  // Expected output: { msg: "success", request, game } with status "approved" and player_count up by one
+  test('Approve', async () => {
+    // 1. a game with a pending request
+    const gameId = await createGame({
+      organizerId,
+      title: 'Evening Basketball',
+      sport: 'basketball',
+      description: null,
+      startsAt: new Date(Date.now() + ONE_DAY_MS),
+      endsAt: null,
+      locationName: 'UBC Rec Centre',
+      address: '6000 Student Union Blvd',
+      latitude: 49.26,
+      longitude: -123.25,
+      maxPlayers: 10,
+      skillLevel: 'any',
+    });
+    const { insertId: requestId } = await executeWrite(
+      "INSERT INTO join_requests (game_id, user_id, skill_level, status) VALUES (?, ?, 'beginner', 'pending')",
+      [gameId, requesterId],
+    );
+
+    // 2. approve it through the interface
+    const response = await request(createApp())
+      .patch(`/api/games/${gameId}/join-requests/${requestId}`)
+      .set('Authorization', `Bearer ${createAuthToken(organizerId)}`)
+      .send({ decision: 'approve' });
+
+    // 3. check the reply
+    expect(response.status).toBe(200);
+    expect(response.body.msg).toBe('success');
+    expect(response.body.request).toEqual({ request_id: requestId, status: 'approved' });
+    expect(response.body.game).toMatchObject({ game_id: gameId, player_count: 2 });
+
+    // 4. check what was really saved
+    const requests = await selectRows<{ status: string }>(
+      'SELECT status FROM join_requests WHERE request_id = ?', [requestId]);
+    expect(requests).toEqual([{ status: 'approved' }]);
+    const players = await selectRows<{ user_id: number }>(
+      'SELECT user_id FROM game_players WHERE game_id = ? AND user_id = ?', [gameId, requesterId]);
+    expect(players).toEqual([{ user_id: requesterId }]);
+  });
+});
