@@ -1,3 +1,4 @@
+import { createFriendChat } from '../../chat/db/chats';
 import { executeWrite, inTransaction, type Queryable, selectRows } from '../../core/db/mysql';
 import { matchName } from '../search/nameMatch';
 
@@ -222,8 +223,9 @@ export type DecideFriendRequestResult =
 
 const SELECT_FRIEND_REQUEST = 'SELECT request_id, sender_id, receiver_id, status FROM friend_requests WHERE request_id = ?';
 
-/*  the receiver accepts or declines a pending request, accepting makes the two friends.
-    A request sent to someone else counts as not found, so its id reveals nothing
+/*  the receiver accepts or declines a pending request, accepting makes the two friends
+    and opens their chat. A request sent to someone else counts as not found, so its id
+    reveals nothing
  */
 export async function decideFriendRequest(
   requestId: number,
@@ -247,6 +249,7 @@ export async function decideFriendRequest(
         [request.sender_id, receiverId, receiverId, request.sender_id],
         connection,
       );
+      await createFriendChat(connection, request.sender_id, receiverId);
     }
     await executeWrite(
       'UPDATE friend_requests SET status = ?, responded_at = CURRENT_TIMESTAMP WHERE request_id = ?',
