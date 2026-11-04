@@ -14,7 +14,7 @@ let userId: number;
 // a real user in the database, so the real sign in check accepts their token
 beforeEach(async () => {
   userId = await createUser({
-    googleId: `update-game-test-${Date.now()}-${Math.random()}`,
+    googleId: 'update-game-test-gameDoesNotExist',
     email: 'update-game-test@example.com',
     firstName: 'Uma',
     lastName: 'Tester',

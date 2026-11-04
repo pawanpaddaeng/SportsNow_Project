@@ -14,7 +14,7 @@ let token: string;
 // a real user in the database, so the real sign in check accepts their token
 beforeEach(async () => {
   organizerId = await createUser({
-    googleId: `create-game-test-${Date.now()}-${Math.random()}`,
+    googleId: 'create-game-test-createGame',
     email: 'create-game-test@example.com',
     firstName: 'Olivia',
     lastName: 'Organizer',
@@ -82,8 +82,8 @@ describe('Unmocked: POST /api/games', () => {
       status: 'scheduled',
       has_started: false,
     });
-    expect(new Date(response.body.game.starts_at).getTime()).toBe(startsAt.getTime());
-    expect(new Date(response.body.game.ends_at).getTime()).toBe(endsAt.getTime());
+    expect(new Date(response.body.game.starts_at as string).getTime()).toBe(startsAt.getTime());
+    expect(new Date(response.body.game.ends_at as string).getTime()).toBe(endsAt.getTime());
 
     // 4. check what was really saved
     const gameId: number = response.body.game.game_id;

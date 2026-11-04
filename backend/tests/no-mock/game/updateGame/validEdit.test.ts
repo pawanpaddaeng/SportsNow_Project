@@ -12,7 +12,7 @@ let organizerId: number;
 
 beforeEach(async () => {
   organizerId = await createUser({
-    googleId: `update-game-test-${Date.now()}-${Math.random()}`,
+    googleId: 'update-game-test-validEdit',
     email: 'update-game-test@example.com',
     firstName: 'Olivia',
     lastName: 'Tester',
@@ -76,7 +76,7 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     expect(response.status).toBe(200);
     expect(response.body.msg).toBe('success');
     expect(response.body.game).toMatchObject({ game_id: gameId, title: 'New Title' });
-    expect(new Date(response.body.game.starts_at).getTime()).toBe(newStartsAt.getTime());
+    expect(new Date(response.body.game.starts_at as string).getTime()).toBe(newStartsAt.getTime());
 
     // 5. check what was really saved
     const saved = await getGameById(gameId);

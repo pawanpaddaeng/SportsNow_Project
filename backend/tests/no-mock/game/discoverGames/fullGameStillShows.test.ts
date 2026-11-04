@@ -19,7 +19,7 @@ let playerId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `discover-games-test-${Date.now()}-${Math.random()}`,
+    googleId: `discover-games-test-fullGameStillShows-${firstName}`,
     email: 'discover-games-test@example.com',
     firstName,
     lastName: 'Tester',

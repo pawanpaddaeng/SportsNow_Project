@@ -22,7 +22,7 @@ let organizerId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `discover-games-test-${Date.now()}-${Math.random()}`,
+    googleId: `discover-games-test-nearbyClosestFirst-${firstName}`,
     email: 'discover-games-test@example.com',
     firstName,
     lastName: 'Tester',
@@ -91,9 +91,10 @@ describe('Unmocked: GET /api/games/discover', () => {
     expect(games.map((entry) => entry.game.game_id)).toEqual([game200M, game1Km, game2Km]);
 
     // 4. check each one's distance and request status
-    const expectedDistances = [200, 1000, 2000];
-    games.forEach((entry, index) => {
-      expect(Math.abs(entry.distance_m - (expectedDistances[index] ?? 0))).toBeLessThan(DISTANCE_TOLERANCE_M);
+    const expectedDistances = new Map([[game200M, 200], [game1Km, 1000], [game2Km, 2000]]);
+    games.forEach((entry) => {
+      const expectedDistance = expectedDistances.get(entry.game.game_id) ?? 0;
+      expect(Math.abs(entry.distance_m - expectedDistance)).toBeLessThan(DISTANCE_TOLERANCE_M);
       expect(entry.join_request_status).toBeNull();
     });
   });

@@ -12,7 +12,7 @@ let organizerId: number;
 
 beforeEach(async () => {
   organizerId = await createUser({
-    googleId: `send-join-request-test-${Date.now()}-${Math.random()}`,
+    googleId: 'send-join-request-test-ownGame',
     email: 'send-join-request-test@example.com',
     firstName: 'Olivia',
     lastName: 'Tester',

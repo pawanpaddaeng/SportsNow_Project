@@ -14,7 +14,7 @@ let otherPlayerId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `leave-game-test-${Date.now()}-${Math.random()}`,
+    googleId: `leave-game-test-playerLeaves-${firstName}`,
     email: 'leave-game-test@example.com',
     firstName,
     lastName: 'Tester',

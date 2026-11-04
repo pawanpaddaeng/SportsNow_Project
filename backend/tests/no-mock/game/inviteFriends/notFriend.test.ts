@@ -14,7 +14,7 @@ let strangerId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `invite-friends-test-${Date.now()}-${Math.random()}`,
+    googleId: `invite-friends-test-notFriend-${firstName}`,
     email: 'invite-friends-test@example.com',
     firstName,
     lastName: 'Tester',

@@ -13,7 +13,7 @@ let otherUserId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `list-join-requests-test-${Date.now()}-${Math.random()}`,
+    googleId: `list-join-requests-test-notOrganizer-${firstName}`,
     email: 'list-join-requests-test@example.com',
     firstName,
     lastName: 'Tester',

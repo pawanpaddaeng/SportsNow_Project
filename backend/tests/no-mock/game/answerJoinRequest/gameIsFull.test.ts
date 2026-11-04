@@ -14,7 +14,7 @@ let requesterId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `answer-join-request-test-${Date.now()}-${Math.random()}`,
+    googleId: `answer-join-request-test-gameIsFull-${firstName}`,
     email: 'answer-join-request-test@example.com',
     firstName,
     lastName: 'Tester',

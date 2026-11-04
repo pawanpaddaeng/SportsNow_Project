@@ -13,7 +13,7 @@ let viewerId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `game-details-test-${Date.now()}-${Math.random()}`,
+    googleId: `game-details-test-viewer-${firstName}`,
     email: 'game-details-test@example.com',
     firstName,
     lastName: 'Tester',

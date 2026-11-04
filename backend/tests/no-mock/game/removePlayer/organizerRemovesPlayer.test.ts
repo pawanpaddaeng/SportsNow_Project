@@ -13,7 +13,7 @@ let playerId: number;
 
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `remove-player-test-${Date.now()}-${Math.random()}`,
+    googleId: `remove-player-test-organizerRemovesPlayer-${firstName}`,
     email: 'remove-player-test@example.com',
     firstName,
     lastName: 'Tester',

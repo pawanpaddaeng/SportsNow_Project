@@ -14,7 +14,7 @@ let otherUserId: number;
 // a real user in the database, with a unique google id
 function addUser(firstName: string): Promise<number> {
   return createUser({
-    googleId: `get-my-games-test-${Date.now()}-${Math.random()}`,
+    googleId: `get-my-games-test-organizedAndJoined-${firstName}`,
     email: 'get-my-games-test@example.com',
     firstName,
     lastName: 'Tester',
