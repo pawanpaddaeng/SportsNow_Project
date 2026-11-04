@@ -1,15 +1,11 @@
-import request from 'supertest';
-
-import { createApp } from '../../../src/app';
 import * as friendsDb from '../../../src/friend/db/friends';
 import * as reputationDb from '../../../src/review/db/reputation';
 import * as usersDb from '../../../src/user/db/users';
 import { type User } from '../../../src/user/db/users';
 import { ageRange } from '../../../src/user/routes/publicProfileRoutes';
 import type * as MockEnv from '../mockEnv';
-import { cleanUpAfterTests, signIn, testOrganizer, testPlayer } from '../helpers';
+import { api, cleanUpAfterTests, signIn, testOrganizer, testPlayer, withToken } from '../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
 
 cleanUpAfterTests();
@@ -38,9 +34,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
     mockUsers([organizer, player]);
     const status = jest.spyOn(friendsDb, 'getFriendshipStatus').mockResolvedValue('request_sent');
 
-    const response = await request(createApp())
-      .get(`/api/users/${player.userId}`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get(`/api/users/${player.userId}`).set(withToken(token));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -73,9 +67,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
     mockUsers([organizer]);
     const status = jest.spyOn(friendsDb, 'getFriendshipStatus');
 
-    const response = await request(createApp())
-      .get(`/api/users/${organizer.userId}`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get(`/api/users/${organizer.userId}`).set(withToken(token));
 
     expect(response.status).toBe(200);
     expect(response.body.profile).toMatchObject({ user_id: organizer.userId, friendship_status: 'self' });
@@ -92,9 +84,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
     const token = signIn(organizer);
     const reputation = mockUsers([organizer]);
 
-    const response = await request(createApp())
-      .get('/api/users/999')
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get('/api/users/999').set(withToken(token));
 
     expect(response.status).toBe(404);
     expect(response.body.msg).toBe('user_not_found');
@@ -111,9 +101,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
     const token = signIn(organizer);
     const reputation = mockUsers([organizer]);
 
-    const response = await request(createApp())
-      .get(`/api/users/${userId}`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get(`/api/users/${userId}`).set(withToken(token));
 
     expect(response.status).toBe(400);
     expect(response.body.msg).toBe('invalid_request');
@@ -133,9 +121,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
     jest.spyOn(friendsDb, 'getFriendshipStatus').mockResolvedValue('none');
     jest.spyOn(reputationDb, 'getReputation').mockRejectedValue(new Error('database is down'));
 
-    const response = await request(createApp())
-      .get(`/api/users/${player.userId}`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get(`/api/users/${player.userId}`).set(withToken(token));
 
     expect(response.status).toBe(500);
     expect(response.body.msg).toBe('server_error');

@@ -4,21 +4,26 @@ import { createApp } from '../../../src/app';
 import * as gamesDb from '../../../src/game/db/games';
 import * as ratingsDb from '../../../src/review/db/ratings';
 import type * as MockEnv from '../mockEnv';
-import { type ApiReply, cleanUpAfterTests, signIn, testGame, testPlayer } from '../helpers';
+import {
+  api,
+  type ApiReply,
+  cleanUpAfterTests,
+  GAME_ID,
+  signIn,
+  testGame,
+  testPlayer,
+  withToken,
+} from '../helpers';
 
-// the server reads its settings when it loads, mocked ones are enough (jest.mock runs before the imports)
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
 
-const GAME_ID = 42;
 const RATED_ID = 7;
 const VALID_RATING = { rated_user_id: RATED_ID, punctuality: 5, sportsmanship: 4, skill: 3, reliability: 2, overall: 1 };
 
 cleanUpAfterTests();
 
 async function postRating(token: string, rating: object): Promise<ApiReply> {
-  const response = await request(createApp())
-    .post(`/api/games/${GAME_ID}/ratings`)
-    .set('Authorization', `Bearer ${token}`)
+  const response = await api.post(`/api/games/${GAME_ID}/ratings`).set(withToken(token))
     .send(rating);
   return response as ApiReply;
 }
@@ -94,9 +99,7 @@ describe('Mocked: GET /api/users/me/stats', () => {
     const token = signIn(player);
     const getReputationScore = jest.spyOn(ratingsDb, 'getReputationScore').mockResolvedValue(4.2);
 
-    const response = await request(createApp())
-      .get('/api/users/me/stats')
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get('/api/users/me/stats').set(withToken(token));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success', reputation_score: 4.2 });
@@ -127,14 +130,12 @@ describe('Mocked: GET /api/games/{gameId}/ratings', () => {
   // Expected output: the players and who was rated, with no scores anywhere in the reply
   test('Lists the players to rate without any scores', async () => {
     const token = signIn(testPlayer());
-    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame({ gameId: GAME_ID, status: 'completed' }));
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame({ status: 'completed' }));
     jest.spyOn(ratingsDb, 'getPlayersToRate').mockResolvedValue([
       { userId: RATED_ID, firstName: 'Rae', lastName: 'Rated', rated: true },
     ]);
 
-    const response = await request(createApp())
-      .get(`/api/games/${GAME_ID}/ratings`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get(`/api/games/${GAME_ID}/ratings`).set(withToken(token));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -152,12 +153,10 @@ describe('Mocked: GET /api/games/{gameId}/ratings', () => {
   // Expected output: { msg: "forbidden" }
   test('A no-show cannot open the list', async () => {
     const token = signIn(testPlayer());
-    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame({ gameId: GAME_ID, status: 'completed' }));
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame({ status: 'completed' }));
     jest.spyOn(ratingsDb, 'getPlayersToRate').mockResolvedValue(null);
 
-    const response = await request(createApp())
-      .get(`/api/games/${GAME_ID}/ratings`)
-      .set('Authorization', `Bearer ${token}`);
+    const response = await api.get(`/api/games/${GAME_ID}/ratings`).set(withToken(token));
 
     expect(response.status).toBe(403);
     expect(response.body.msg).toBe('forbidden');

@@ -10,8 +10,7 @@
 
 ## 2. Back-end Test Specification: APIs
 
-We test every interface of the **Game** component that is built (see Requirements and Design, section 4.1). Two interfaces are only planned and not built yet: `DELETE /api/games/{gameId}/players/{userId}` and `POST /api/games/{gameId}/invites`. We will test them once they are built.
-
+We test every interface of the **Game** component that is built (see Requirements and Design, section 4.1).
 Each interface has two `describe` groups:
 - one **without mocks**, for example `describe('Unmocked: GET /api/games/discover', ...)`
 - one **with mocks**, for example `describe('Mocked: GET /api/games/discover', ...)`
@@ -33,15 +32,19 @@ Each test has comments that say its input, the status code we expect, what shoul
 
 | **Interface** | **Describe Group Location, No Mocks** | **Describe Group Location, With Mocks** | **Mocked Components** |
 | ------------- | ------------------------------------- | --------------------------------------- | --------------------- |
-| **POST /api/games** | `backend/tests/no-mock/game/createGame.test.ts` | `backend/tests/mock/game/createGame.test.ts` | Games DB, Firebase push |
-| **GET /api/games/mine** | `backend/tests/no-mock/game/getMyGames.test.ts` | `backend/tests/mock/game/getMyGames.test.ts` | Games DB |
-| **GET /api/games/discover** | `backend/tests/no-mock/game/discoverGames.test.ts` | `backend/tests/mock/game/discoverGames.test.ts` | Games DB |
-| **GET /api/games/{gameId}** | `backend/tests/no-mock/game/getGameDetails.test.ts` | `backend/tests/mock/game/getGameDetails.test.ts` | Games DB, Users DB |
-| **PUT /api/games/{gameId}** | `backend/tests/no-mock/game/updateGame.test.ts` | `backend/tests/mock/game/updateGame.test.ts` | Games DB, Firebase push |
-| **POST /api/games/{gameId}/cancel** | `backend/tests/no-mock/game/cancelGame.test.ts` | `backend/tests/mock/game/cancelGame.test.ts` | Games DB, Firebase push |
-| **POST /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/sendJoinRequest.test.ts` | `backend/tests/mock/game/sendJoinRequest.test.ts` | Join Requests DB, Firebase push |
-| **GET /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/listJoinRequests.test.ts` | `backend/tests/mock/game/listJoinRequests.test.ts` | Games DB, Join Requests DB |
-| **PATCH /api/games/{gameId}/join-requests/{requestId}** | `backend/tests/no-mock/game/answerJoinRequest.test.ts` | `backend/tests/mock/game/answerJoinRequest.test.ts` | Join Requests DB, Firebase push |
+| **POST /api/games** | `backend/tests/no-mock/game/createGame/createGame.test.ts` | `backend/tests/mock/game/createGame/` | Games DB, Firebase push |
+| **GET /api/games/mine** | `backend/tests/no-mock/game/getMyGames/` | `backend/tests/mock/game/getMyGames/` | Games DB |
+| **GET /api/games/discover** | `backend/tests/no-mock/game/discoverGames/` | `backend/tests/mock/game/discoverGames/` | Games DB |
+| **GET /api/games/{gameId}** | `backend/tests/no-mock/game/getGameDetails/` | `backend/tests/mock/game/getGameDetails/` | Games DB, Users DB |
+| **PUT /api/games/{gameId}** | `backend/tests/no-mock/game/updateGame/` | `backend/tests/mock/game/updateGame/` | Games DB, Firebase push |
+| **POST /api/games/{gameId}/cancel** | `backend/tests/no-mock/game/cancelGame/` | `backend/tests/mock/game/cancelGame/` | Games DB, Firebase push |
+| **POST /api/games/{gameId}/complete** | `backend/tests/no-mock/game/completeGame/` | `backend/tests/mock/game/completeGame/` | Games DB |
+| **POST /api/games/{gameId}/leave** | `backend/tests/no-mock/game/leaveGame/` | `backend/tests/mock/game/leaveGame/` | Games DB |
+| **DELETE /api/games/{gameId}/players/{userId}** | `backend/tests/no-mock/game/removePlayer/` | None yet | None |
+| **POST /api/games/{gameId}/invites** | `backend/tests/no-mock/game/inviteFriends/` | `backend/tests/mock/game/inviteFriends/` | Games DB, Friends DB, Firebase push |
+| **POST /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/sendJoinRequest/` | `backend/tests/mock/game/sendJoinRequest/` | Join Requests DB, Firebase push |
+| **GET /api/games/{gameId}/join-requests** | `backend/tests/no-mock/game/listJoinRequests/` | `backend/tests/mock/game/listJoinRequests/` | Games DB, Join Requests DB |
+| **PATCH /api/games/{gameId}/join-requests/{requestId}** | `backend/tests/no-mock/game/answerJoinRequest/` | `backend/tests/mock/game/answerJoinRequest/` | Join Requests DB, Firebase push |
 
 We will add links to the line where each `describe` group starts at CP2, once the test files exist.
 
@@ -104,7 +107,7 @@ Each interface's group with mocks also has a test where the database function th
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
 | No mocks | Bad id | `/api/games/abc` | 400 | Returns `{ msg: "invalid_request" }` |
 | With mocks | Database fails | `getGameById` throws | 500 | Returns `{ msg: "server_error" }` |
-| With mocks | Organizer not in players list | `getGamePlayers` doesn't return the organizer, `findUserById` does | 200 | `organizer` comes from the user lookup |
+| With mocks | Organizer not in players list | `getGamePlayers` doesn't return the organizer, the user lookup in `findOrganizer` does | 200 | `organizer` comes from the user lookup |
 | With mocks | Organizer not found | Neither lookup finds the organizer | 500 | Returns `{ msg: "server_error" }` |
 
 **PUT /api/games/{gameId}** (edit a game)
@@ -134,6 +137,40 @@ Each interface's group with mocks also has a test where the database function th
 | With mocks | Players are told | `sendPushToUsers` replaced | 200 | Players and people with pending requests get a `game_cancelled` notification |
 | With mocks | Database fails | `cancelGame` throws | 500 | Returns `{ msg: "server_error" }` |
 
+**POST /api/games/{gameId}/complete** (mark a game completed)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Organizer marks their started game completed | The organizer completes their started game | 200 | The game's `status` becomes "completed". Returns the game |
+| No mocks | A malformed no-show list is rejected | `no_show_user_ids: ["seven"]` | 400 | The game doesn't change. Returns `{ msg: "invalid_request" }` |
+| With mocks | Organizer marks players who did not show up | `no_show_user_ids: [7, 8, 7]` | 200 | `completeGame` gets each no-show once, `[7, 8]` |
+
+**POST /api/games/{gameId}/leave** (leave a game)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Last player leaves | The organizer, the only player left in their cancelled game, leaves it | 200 | The game, its players and its chat are deleted. Returns `{ msg: "success", game: null, game_deleted: true }` |
+| No mocks | Player leaves | A player leaves an upcoming game that has another player | 200 | The player is no longer in the game, and the other player and the game remain. Returns the game with `player_count` down by one |
+| With mocks | Database fails | `leaveGame` throws | 500 | Returns `{ msg: "server_error" }` |
+
+**DELETE /api/games/{gameId}/players/{userId}** (remove a player from a game)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Organizer removes the second player | The organizer removes the other player from their upcoming game | 200 | The player is no longer in the game, and only the organizer is left. Returns the game with `player_count` 1 |
+
+**POST /api/games/{gameId}/invites** (invite friends to a game)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | A player who is not the organizer cannot invite | A player invites their friend | 403 | Returns `{ msg: "forbidden" }` |
+| No mocks | Organizer cannot invite someone who is not their friend | The organizer invites a friend and a user who isn't their friend | 403 | Returns `{ msg: "not_friend" }` |
+| No mocks | Organizer cannot invite a friend already in the game | The organizer invites a friend and a friend who is already playing | 409 | Returns `{ msg: "already_player" }` |
+| No mocks | Organizer cannot invite to a game that isn't open | The game is cancelled, started, completed or full | 409 | Returns `{ msg: "game_cancelled" }`, `{ msg: "game_started" }` (started or completed) or `{ msg: "game_full" }` |
+| No mocks | Invalid `friend_ids` is rejected | `friend_ids` is missing, empty, text, not whole or zero | 400 | Returns `{ msg: "invalid_request" }` |
+| With mocks | Organizer invites two friends | The organizer invites two friends, `sendPushToUsers` replaced | 201 | Each friend gets a `game_invite` notification. Returns `{ msg: "success" }` |
+| With mocks | Database error | `getGameById` throws | 500 | Nobody is notified. Returns `{ msg: "server_error" }` |
+
 **POST /api/games/{gameId}/join-requests** (ask to join a game)
 
 | **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
@@ -159,6 +196,7 @@ Each interface's group with mocks also has a test where the database function th
 | No mocks | No requests | Nobody has asked to join | 200 | `requests` is an empty list |
 | No mocks | Not the organizer | Another user asks for the list | 403 | Returns `{ msg: "forbidden" }` |
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
+| No mocks | Reputation score | The requester has a no-show in one past game and 3 stars from the only other player in another | 200 | The request's `reputation_score` is 3.8 |
 | With mocks | Database fails | `getPendingJoinRequests` throws | 500 | Returns `{ msg: "server_error" }` |
 
 **PATCH /api/games/{gameId}/join-requests/{requestId}** (approve or decline a request)
