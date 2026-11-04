@@ -448,7 +448,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
 <br><br>
 
 4. <a id="seq-uc4"></a> [**Use Case 4: Friend Chat**](#uc4r)\
-![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat_ver2.5.png)
+![Sequence Diagram UC4](images/UC4%20-%20Friend%20Chat_ver3.png)
 <br><br>
 
 5. <a id="seq-uc5"></a> [**Use Case 5: Rate Players**](#uc5r)\
