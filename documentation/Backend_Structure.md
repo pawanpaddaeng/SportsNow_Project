@@ -71,8 +71,8 @@ backend/src/
 
 | File | What it does |
 | --- | --- |
-| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
-| `db/friends.ts` | Friend queries: search, friends list (with each friend's chat id), `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline (accepting also opens the two friends' chat) |
+| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId`, `GET /api/friends/:userId/chat` |
+| `db/friends.ts` | Friend queries: search, friends list, `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline (accepting also opens the two friends' chat) |
 | `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
 
 ## playerReview/

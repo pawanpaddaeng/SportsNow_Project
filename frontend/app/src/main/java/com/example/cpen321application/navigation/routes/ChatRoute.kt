@@ -23,8 +23,7 @@ import com.example.cpen321application.ui.screens.chat.ChatUiState
 // notifications that change whether the user can read or write in the game's chat
 private val CHAT_CHANGING_EVENTS = setOf("game_completed", "game_cancelled", "removed_from_game")
 
-private fun NavBackStackEntry.friendChatId(): Int = arguments?.getInt(Routes.CHAT_ID_ARG) ?: 0
-private fun NavBackStackEntry.friendName(): String = arguments?.getString(Routes.FRIEND_NAME_ARG).orEmpty()
+private fun NavBackStackEntry.friendUserId(): Int = arguments?.getInt(Routes.USER_ID_ARG) ?: 0
 
 // the players of a game chat with each other, opened from the Game Details button
 @Composable
@@ -51,11 +50,10 @@ fun GameChatRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
 @Composable
 fun FriendChatRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Modifier) {
     val context = LocalContext.current
-    val chatId = backStackEntry.friendChatId()
-    val friendName = backStackEntry.friendName()
+    val userId = backStackEntry.friendUserId()
     // this screen's scope, so leaving the screen stops its work
     val scope = rememberSafeCoroutineScope()
-    val chat = remember(chatId) { ChatState(context, friendChatSource(chatId, friendName), scope) }
+    val chat = remember(userId) { ChatState(context, friendChatSource(userId), scope) }
 
     ChatRoom(app, chat, backStackEntry, modifier)
 }

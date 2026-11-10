@@ -8,7 +8,6 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.cpen321application.core.notifications.FriendChatLink
 import com.example.cpen321application.core.notifications.FriendEvents
 import com.example.cpen321application.core.notifications.GameEvents
 import com.example.cpen321application.core.session.Session
@@ -33,21 +32,18 @@ import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.navigation.state.rememberAppState
 
 private val gameIdArgument = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
-private val friendChatArguments = listOf(
-    navArgument(Routes.CHAT_ID_ARG) { type = NavType.IntType },
-    navArgument(Routes.FRIEND_NAME_ARG) { type = NavType.StringType; defaultValue = "" }
-)
+private val userIdArgument = listOf(navArgument(Routes.USER_ID_ARG) { type = NavType.IntType })
 
 /*  connects each route to its screen, the shared state lives in AppState. gameToOpen is
-    the game of a tapped invite notification and friendChatToOpen the chat of a tapped
-    friend's message notification, their callbacks are called once they're handled
+    the game of a tapped invite notification and friendChatToOpen the friend of a tapped
+    message notification, their callbacks are called once they're handled
  */
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
     gameToOpen: Int? = null,
     onGameOpened: () -> Unit = {},
-    friendChatToOpen: FriendChatLink? = null,
+    friendChatToOpen: Int? = null,
     onFriendChatOpened: () -> Unit = {}
 ) {
     val app = rememberAppState()
@@ -65,7 +61,7 @@ fun AppNavigation(
     // a game invite was tapped: open the game so the friend can ask to join (if signed in)
     OpenFromNotification(gameToOpen?.let(Routes::gameDetails), onGameOpened) { app.navController.navigate(it) }
     // a friend's message was tapped: open the chat with them (if signed in)
-    OpenFromNotification(friendChatToOpen?.let { Routes.friendChat(it.chatId, it.friendName) }, onFriendChatOpened) {
+    OpenFromNotification(friendChatToOpen?.let(Routes::friendChat), onFriendChatOpened) {
         app.navController.navigate(it)
     }
 
@@ -81,7 +77,7 @@ fun AppNavigation(
         composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
         composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
         composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, it, modifier) }
-        composable(Routes.FRIEND_CHAT, arguments = friendChatArguments) { FriendChatRoute(app, it, modifier) }
+        composable(Routes.FRIEND_CHAT, arguments = userIdArgument) { FriendChatRoute(app, it, modifier) }
         composable(Routes.RATE_PLAYERS, arguments = gameIdArgument) { RatePlayersRoute(app, it, modifier) }
         composable(Routes.CREATE_GAME) { CreateGameRoute(app, it, modifier) }
         composable(Routes.EDIT_GAME, arguments = gameIdArgument) { EditGameRoute(app, it, modifier) }

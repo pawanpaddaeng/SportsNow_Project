@@ -35,9 +35,7 @@ fun FriendsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
             onAccept = { friends.answer(it, accept = true) },
             onDecline = { friends.answer(it, accept = false) },
             onOpenProfile = { userId -> app.openProfile(userId) },
-            onOpenChat = { friend ->
-                friend.chatId?.let { chatId -> app.navController.navigate(Routes.friendChat(chatId, friend.name)) }
-            },
+            onOpenChat = { userId -> app.navController.navigate(Routes.friendChat(userId)) },
             onTabSelected = { tab -> app.openTab(tab) }
         ),
         modifier = modifier

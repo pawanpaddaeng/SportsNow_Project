@@ -40,15 +40,9 @@ fun createNotificationChannel(context: Context) {
 fun invitedGameId(intent: Intent): Int? =
     if (intent.getStringExtra("type") == "game_invite") intent.getStringExtra("gameId")?.toIntOrNull() else null
 
-// a friend's chat to open: its id, and the friend's name to title it with
-data class FriendChatLink(val chatId: Int, val friendName: String)
-
-// the chat to open when the app was opened by tapping a friend's message notification, like invitedGameId
-fun messagedFriendChat(intent: Intent): FriendChatLink? {
-    if (intent.getStringExtra("type") != "friend_message") return null
-    val chatId = intent.getStringExtra("chatId")?.toIntOrNull() ?: return null
-    return FriendChatLink(chatId, intent.getStringExtra("friendName").orEmpty())
-}
+// the friend whose chat to open when the app was opened by tapping their message's notification, like invitedGameId
+fun messagedFriendId(intent: Intent): Int? =
+    if (intent.getStringExtra("type") == "friend_message") intent.getStringExtra("friendId")?.toIntOrNull() else null
 
 /*
     Receives push notifications from Firebase. Android only shows notifications

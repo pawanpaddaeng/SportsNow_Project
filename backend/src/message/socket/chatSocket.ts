@@ -64,12 +64,7 @@ function friendMessagePush(message: ChatMessage): PushMessage {
   return {
     title: message.senderFirstName,
     body: characters.length > PUSH_PREVIEW_LENGTH ? `${preview}...` : preview,
-    // the chat and its title, so tapping the notification opens it straight away
-    data: {
-      type: 'friend_message',
-      chatId: String(message.chatId),
-      friendName: `${message.senderFirstName} ${message.senderLastName}`.trim(),
-    },
+    data: { type: 'friend_message', friendId: String(message.senderId) },
     tag: `friend-${message.senderId}`,
   };
 }

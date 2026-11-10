@@ -58,6 +58,41 @@ export async function createFriendChat(connection: Queryable, userId: number, ot
   );
 }
 
+// a friend's chat and the name it's shown with
+export interface FriendChat {
+  chatId: number;
+  friendId: number;
+  friendFirstName: string;
+  friendLastName: string;
+}
+
+interface FriendChatRow {
+  chat_id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+}
+
+// the user's chat with their friend, or null if the two aren't friends
+export async function getFriendChat(userId: number, friendId: number): Promise<FriendChat | null> {
+  const rows = await selectRows<FriendChatRow>(
+    `SELECT c.chat_id, u.user_id, u.first_name, u.last_name
+     FROM friendships f
+     JOIN users u ON u.user_id = f.friend_id
+     JOIN chats c ON c.user_low_id = LEAST(f.user_id, f.friend_id) AND c.user_high_id = GREATEST(f.user_id, f.friend_id)
+     WHERE f.user_id = ? AND f.friend_id = ? LIMIT 1`,
+    [userId, friendId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    chatId: row.chat_id,
+    friendId: row.user_id,
+    friendFirstName: row.first_name,
+    friendLastName: row.last_name,
+  };
+}
+
 // what the user may do with a chat
 export interface ChatAccess {
   // only the game's current players, or the two friends while they're friends, can open a chat

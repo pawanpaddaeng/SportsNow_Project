@@ -90,27 +90,17 @@ export async function searchUsers(text: string, userId: number): Promise<UserSea
   return matches.slice(0, MAX_SEARCH_RESULTS).map((found) => found.user);
 }
 
-// a friend with the chat the two of them share, so the app can open it straight away
-export interface Friend extends FriendUser {
-  chatId: number;
-}
-
-interface FriendRow extends FriendUserRow {
-  chat_id: number;
-}
-
-// the user's friends in name order, each with their chat (made when they became friends)
-export async function getFriends(userId: number): Promise<Friend[]> {
-  const rows = await selectRows<FriendRow>(
-    `SELECT u.user_id, u.first_name, u.last_name, c.chat_id
+// the user's friends in name order
+export async function getFriends(userId: number): Promise<FriendUser[]> {
+  const rows = await selectRows<FriendUserRow>(
+    `SELECT u.user_id, u.first_name, u.last_name
      FROM friendships f
      JOIN users u ON u.user_id = f.friend_id
-     JOIN chats c ON c.user_low_id = LEAST(f.user_id, f.friend_id) AND c.user_high_id = GREATEST(f.user_id, f.friend_id)
      WHERE f.user_id = ?
      ORDER BY u.first_name, u.last_name, u.user_id`,
     [userId],
   );
-  return rows.map((row) => ({ ...toFriendUser(row), chatId: row.chat_id }));
+  return rows.map(toFriendUser);
 }
 
 // whether the two users are friends, used by Game before an organizer invites someone

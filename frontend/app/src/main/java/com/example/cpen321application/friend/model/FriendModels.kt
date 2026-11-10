@@ -10,9 +10,7 @@ enum class FriendshipStatus { None, Friends, RequestSent, RequestReceived }
 data class FriendPerson(
     val userId: Int,
     val name: String,
-    val status: FriendshipStatus = FriendshipStatus.None,
-    // friends only: the chat the two share, null for search results and requests
-    val chatId: Int? = null
+    val status: FriendshipStatus = FriendshipStatus.None
 ) {
     val initial get() = name.take(1).uppercase()
 }
@@ -30,8 +28,7 @@ fun friendshipStatusOf(value: String?): FriendshipStatus = when (value) {
 fun FriendUserDto.toFriendPerson() = FriendPerson(
     userId = userId,
     name = "$firstName $lastName".trim(),
-    status = friendshipStatusOf(friendshipStatus),
-    chatId = chatId
+    status = friendshipStatusOf(friendshipStatus)
 )
 
 fun FriendRequestDto.toFriendRequestItem() = FriendRequestItem(requestId = requestId, sender = sender.toFriendPerson())
