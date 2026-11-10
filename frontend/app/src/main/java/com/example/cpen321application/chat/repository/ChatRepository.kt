@@ -10,8 +10,6 @@ import com.google.gson.JsonParseException
 import java.io.IOException
 
 private const val COULD_NOT_LOAD_MESSAGES = "Couldn't load messages, try again"
-private const val COULD_NOT_OPEN_CHAT = "Couldn't open this chat, try again"
-private const val NOT_FRIENDS_MESSAGE = "You can't open this chat, you're no longer friends."
 
 sealed interface ChatMessagesResult {
     data class Loaded(val messages: List<ChatMessageDto>, val isClosed: Boolean) : ChatMessagesResult
@@ -49,26 +47,4 @@ sealed interface ChatInfoResult {
     // retrying won't help
     data class Unavailable(val message: String) : ChatInfoResult
     data class Failed(val message: String) : ChatInfoResult
-}
-
-// the chat with a friend, titled with their name
-suspend fun fetchFriendChat(context: Context, userId: Int): ChatInfoResult {
-    return try {
-        val response = Session.call(context) { authorization ->
-            ServerApi.friendService.getFriendChat(authorization = authorization, userId = userId)
-        } ?: return ChatInfoResult.Failed(SESSION_ENDED_MESSAGE)
-        if (response.code() == 403) return ChatInfoResult.Unavailable(NOT_FRIENDS_MESSAGE)
-
-        val reply = response.body()
-        val friend = reply?.friend
-        if (reply?.msg == "success" && reply.chatId != null && friend != null) {
-            ChatInfoResult.Found(chatId = reply.chatId, title = "${friend.firstName} ${friend.lastName}".trim())
-        } else {
-            ChatInfoResult.Failed(COULD_NOT_OPEN_CHAT)
-        }
-    } catch (e: IOException) {
-        ChatInfoResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        ChatInfoResult.Failed(COULD_NOT_OPEN_CHAT)
-    }
 }

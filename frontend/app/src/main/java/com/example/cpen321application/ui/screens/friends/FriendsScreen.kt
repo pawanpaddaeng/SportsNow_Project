@@ -60,7 +60,7 @@ data class FriendsActions(
     val onAccept: (FriendRequestItem) -> Unit = {},
     val onDecline: (FriendRequestItem) -> Unit = {},
     val onOpenProfile: (Int) -> Unit = {},
-    val onOpenChat: (Int) -> Unit = {},
+    val onOpenChat: (FriendPerson) -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
@@ -136,7 +136,7 @@ private fun LazyListScope.requestsAndFriends(state: FriendsUiState, actions: Fri
     items(state.friends, key = { "friend${it.userId}" }) { friend ->
         PersonCard(
             person = friend,
-            onClick = { actions.onOpenChat(friend.userId) },
+            onClick = { actions.onOpenChat(friend) },
             onAvatarClick = { actions.onOpenProfile(friend.userId) }
         )
     }

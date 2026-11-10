@@ -15,7 +15,9 @@ data class FriendUserDto(
     @field:Required @SerializedName("first_name") val firstName: String,
     @field:Required @SerializedName("last_name") val lastName: String,
     // search results only: "none", "friends", "request_sent" or "request_received"
-    @SerializedName("friendship_status") val friendshipStatus: String? = null
+    @SerializedName("friendship_status") val friendshipStatus: String? = null,
+    // friends list only: the chat the two share
+    @SerializedName("chat_id") val chatId: Int? = null
 )
 
 data class FriendRequestDto(
