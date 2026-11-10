@@ -2,7 +2,6 @@ package com.example.cpen321application.core.network
 
 import com.example.cpen321application.BuildConfig
 import com.example.cpen321application.chat.dto.ChatMessagesResponse
-import com.example.cpen321application.chat.dto.FriendChatResponse
 import com.example.cpen321application.friend.dto.FriendChangeResponse
 import com.example.cpen321application.friend.dto.FriendDecisionBody
 import com.example.cpen321application.friend.dto.FriendRequestsResponse
@@ -195,13 +194,6 @@ interface FriendApi {
 
     @GET("api/friends")
     suspend fun getFriends(@Header("Authorization") authorization: String) : Response<FriendsResponse>
-
-    // the chat with a friend and their name, its messages work like a game chat's
-    @GET("api/friends/{userId}/chat")
-    suspend fun getFriendChat(
-        @Header("Authorization") authorization: String,
-        @Path("userId") userId: Int
-    ) : Response<FriendChatResponse>
 
     // requests sent to the signed in user that are waiting for an answer, newest first
     @GET("api/friends/requests")

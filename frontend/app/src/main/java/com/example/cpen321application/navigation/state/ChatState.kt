@@ -10,7 +10,6 @@ import com.example.cpen321application.chat.model.toChatMessage
 import com.example.cpen321application.chat.repository.ChatInfoResult
 import com.example.cpen321application.chat.repository.ChatMessagesResult
 import com.example.cpen321application.chat.repository.fetchChatMessages
-import com.example.cpen321application.chat.repository.fetchFriendChat
 import com.example.cpen321application.chat.socket.ChatConnection
 import com.example.cpen321application.chat.socket.ChatConnectionListener
 import com.example.cpen321application.chat.socket.ChatDisconnect
@@ -51,11 +50,14 @@ fun gameChatSource(gameId: Int) = ChatSource(
     }
 )
 
-// the chat with a friend, it never closes
-fun friendChatSource(userId: Int) = ChatSource(
-    initialTitle = "Chat",
+/*  the chat with a friend, it never closes. The friends list (or the message's notification)
+    already gives its id and the friend's name, so nothing needs loading before its messages.
+    Whether they're still friends is checked when the messages load
+ */
+fun friendChatSource(chatId: Int, friendName: String) = ChatSource(
+    initialTitle = friendName.ifBlank { "Chat" },
     notAllowedMessage = "You can't open this chat, you're no longer friends.",
-    load = { context -> fetchFriendChat(context, userId) }
+    load = { ChatInfoResult.Found(chatId = chatId, title = friendName.ifBlank { "Chat" }) }
 )
 
 /*  a chat while its screen is open: loads the messages, keeps a WebSocket open for new

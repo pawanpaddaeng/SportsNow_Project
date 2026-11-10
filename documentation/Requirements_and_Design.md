@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 10, 2026 | 4.1 | `GET /api/friends` now returns each friend's `chat_id`, so the app opens a friend's chat straight from the friends list (or a message notification) without asking for it first. Removed `GET /api/friends/{userId}/chat`. Whether the two are still friends is checked when the chat's messages load. |
 | Nov 3, 2026 | 3 (Use Case 4), 4.1 | Friend chat is built on the same tables, WebSocket and screen as game chat. Added `GET /api/friends/{userId}/chat` and `createFriendChat`. Use Case 4 now starts from the Friends tab. |
 | Nov 3, 2026 | 4.1 | Player ratings are built. Section 4.1 lists Player Review's real interfaces. No-shows are sent when the organiser marks a game completed, so there is no separate no-shows endpoint, and the score is computed when it's read instead of by `updateReputation`. |
 | 2026-11-02 | 4.1 Main Components (User, Player Review, Social) | Built `GET /api/users/{userId}` for the player profile popup (Player Statistics use case). It returns a player's name, age range, games played, reputation score and badges, never their email or birth year. `getReputation` is built and counts games played; its score and badges stay empty until ratings are built. Added `getFriendshipStatus` so the popup knows when to offer Add Friend. |
@@ -328,9 +329,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Sends a message and delivers it live to everyone in the chat. The connection needs `?chat_id=` and the user's JWT, and only opens for a member of the chat. A friend who doesn't have the chat open gets a push notification. Sending fails with `chat_closed` once the game is completed or cancelled, so the chat can still be read but not written to. `client_id` lets the app match a reply to the message it sent.
         3. `int createGameChat(Queryable connection, int gameId)`
             - **Purpose**: Used by Game to open the chat room for a new game in the same transaction that creates the game, returning its chat id.
-        4. `GET /api/friends/{userId}/chat` → `200 { chat_id, friend }`
-            - **Purpose**: Finds the chat with a friend and the friend's name. Fails with `403 not_friends` if the two aren't friends.
-        5. `void createFriendChat(Queryable connection, int userId, int otherUserId)`
+        4. `void createFriendChat(Queryable connection, int userId, int otherUserId)`
             - **Purpose**: Used by Social to open two users' chat room in the same transaction that makes them friends.
 
 5. **Social**
@@ -346,7 +345,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         4. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
             - **Purpose**: Accepts or declines a friend request and notifies the sender. Accepting makes the two users friends.
         5. `GET /api/friends` → `200 { friends }`
-            - **Purpose**: Returns the user's friends.
+            - **Purpose**: Returns the user's friends, each with `chat_id`, the chat the two share, so the app opens it straight from the list.
         6. `DELETE /api/friends/{userId}` → `200 { msg: "success" }` *(planned)*
             - **Purpose**: Removes a friend.
         7. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }` *(planned)*
