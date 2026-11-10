@@ -3,7 +3,6 @@ import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
 import { sendPushToUser } from '../../core/notifications/push';
-import { readId } from '../../core/validation';
 import { type ErrorResponse, logNotificationError, readGameId, responseFor, sendError } from '../../game/routes/gameErrors';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import {
