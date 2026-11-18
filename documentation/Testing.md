@@ -10,6 +10,7 @@
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the User component are written: sign up, login, registering a device for notifications, and reading, editing and deleting the user's own profile each get a test file without mocks and one with mocks. The public profile, which only had tests with mocks, gets a test file without mocks, and its tests with mocks are now listed here. A real sign up or login needs an ID token that Google signed, so the tests without mocks stop at Google's check, and the tests with mocks replace that check to test a successful one. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
 | Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for the Friend System (`FriendSystemTest.kt`): Search Users, Send and Decline Friend Request, Accept Friend Request, and Send (formal Use Case 1), Receive and View Friend Messages. Section 4.2 explains how the manual tester acts as User B with `scripts/run-e2e-user-b`, and how to run the tests on User A's emulator only. Logs will be added once the tests pass. |
+| Nov 18, 2026 | 2.2 | Added the GitHub Actions workflow that runs the back-end interface tests on pushes to `main`, on pull requests, and by hand. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
 | Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
 
@@ -724,7 +725,13 @@ The back-end container reaches MySQL directly, so it doesn't need npm on your co
 
 ### 2.2. GitHub Actions Configuration Location
 
-_To be added at CP2._
+[`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml)
+
+It runs the back-end interface tests with `scripts/run-backend-interface-tests.sh`: the tests with mocks, then without mocks, then both together. It runs on every push to `main` and every pull request that changes the back end, the database scripts or the workflow, and can also be started by hand from the repository's **Actions** tab (**Backend tests** → **Run workflow**).
+
+Each run starts its own empty MySQL 8.4 database, creates the tables from `mysql/init/`, and uses test-only database and JWT settings, so it needs no secrets. The coverage reports of the three runs are saved with the run as the `backend-coverage` artifact.
+
+The front-end E2E tests don't run in GitHub Actions, since they need an emulator signed in with a Google account and a manual tester acting as User B (see section 4).
 
 ### 2.3. Jest Coverage Report Screenshots With Mocks
 
