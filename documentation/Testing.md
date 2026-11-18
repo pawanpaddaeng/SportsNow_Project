@@ -504,7 +504,7 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
 
 **Running the tests on your computer with npm**
 
-In our Docker setup MySQL is only reachable from inside Docker, so `docker-compose.test.yml` also opens it to your own computer, on `127.0.0.1:3307`. Before the tests run, `backend/tests/setupEnv.ts` reads the database login from the root `.env` and connects to that port.
+`docker-compose.yml` makes MySQL reachable from your own computer, on `127.0.0.1:3307` (only from that computer). Before the tests run, `backend/tests/setupEnv.ts` reads the database login from the root `.env` and connects to that port.
 
 1. **Install the back-end packages:**
    ```
@@ -514,7 +514,7 @@ In our Docker setup MySQL is only reachable from inside Docker, so `docker-compo
    ```
 2. **Start the test database** from the root folder:
    ```
-   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d mysql-db
+   docker compose up -d mysql-db
    ```
 3. **Run all the tests** from the root folder. The script runs the tests with mocks, then without mocks, then both together. Each run saves a coverage report in `backend/coverage/mock`, `backend/coverage/no-mock` and `backend/coverage/interface`.
    - macOS / Linux: `./scripts/run-backend-interface-tests.sh`
@@ -533,7 +533,7 @@ In our Docker setup MySQL is only reachable from inside Docker, so `docker-compo
 
 **Running the tests inside Docker**
 
-The back-end container reaches MySQL directly, so it doesn't need `docker-compose.test.yml` or npm on your computer.
+The back-end container reaches MySQL directly, so it doesn't need npm on your computer.
 
 1. **Start MySQL and the back end** from the root folder. The container copies the code when it is built, so run this again after changing a test.
    ```

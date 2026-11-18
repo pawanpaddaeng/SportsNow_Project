@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 
     On the host, the MySQL credentials are only in the root .env (docker-compose passes them to
     the backend container), so they're loaded from there, and the tests connect to the port
-    docker-compose.test.yml publishes on this machine.
+    docker-compose.yml publishes MySQL on, on this machine only.
 
     Inside the backend container there is no root .env (it's above /app), so nothing changes and
     the tests use the credentials and mysql-db host docker-compose gives the container.
