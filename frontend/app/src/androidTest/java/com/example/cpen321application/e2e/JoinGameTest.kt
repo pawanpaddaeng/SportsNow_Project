@@ -71,7 +71,7 @@ class JoinGameTest {
         openGameDetails(JOIN_GAME)
 
         // 1. Player selects "Request to join"
-        composeRule.onNode(requestToJoinButton).performClick()
+        composeRule.onNode(requestToJoinButton).performScrollTo().performClick()
 
         // 2. System displays the join request form with fields for skill level, how often they
         //    play (optional), and a message (optional)
@@ -95,9 +95,9 @@ class JoinGameTest {
         waitForPendingCard(JOIN_GAME)
         composeRule.onNode(gameCard(JOIN_GAME)).performClick()
         composeRule.waitForNode(hasText("Request sent") and hasClickAction())
-        composeRule.onNode(hasText("Request sent") and hasClickAction()).assertIsNotEnabled()
+        composeRule.onNode(hasText("Request sent") and hasClickAction()).performScrollTo().assertIsNotEnabled()
         composeRule.onNodeWithText("Waiting for the organizer to respond. You will be notified when they do.")
-            .assertIsDisplayed()
+            .performScrollTo().assertIsDisplayed()
     }
 
     // failure scenario 4a: the organiser cancelled the game before the request was sent
@@ -168,7 +168,7 @@ class JoinGameTest {
         composeRule.scrollTo(gameCard(title))
         composeRule.onNode(gameCard(title)).performClick()
         composeRule.waitForNode(requestToJoinButton)
-        composeRule.onNode(requestToJoinButton).assertIsEnabled()
+        composeRule.onNode(requestToJoinButton).performScrollTo().assertIsEnabled()
     }
 
     /*  after a request is sent the app goes back to Discover, which reloads and marks the game
@@ -185,7 +185,7 @@ class JoinGameTest {
     // opens the game's join request form and fills in the required skill level
     private fun openRequestForm(title: String) {
         openGameDetails(title)
-        composeRule.onNode(requestToJoinButton).performClick()
+        composeRule.onNode(requestToJoinButton).performScrollTo().performClick()
         composeRule.waitForNode(chip("Beginner"))
         composeRule.onNode(chip("Beginner")).performScrollTo().performClick()
     }
