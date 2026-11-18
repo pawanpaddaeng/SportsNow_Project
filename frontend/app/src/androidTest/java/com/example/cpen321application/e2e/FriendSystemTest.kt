@@ -1,10 +1,15 @@
 package com.example.cpen321application.e2e
 
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.util.Log
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -21,13 +26,18 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import com.example.cpen321application.MainActivity
 import com.example.cpen321application.ui.screens.friends.FRIEND_REQUEST_CARD_TAG
 import com.example.cpen321application.ui.screens.friends.PERSON_CARD_TAG
+import org.junit.After
+import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 
 // the name the manual tester gives User B when signing up, no other user may have it
 private const val USER_B_NAME = "Bea Tester"
@@ -47,6 +57,20 @@ private const val USER_B_SYNC_TIMEOUT_MILLIS = 30_000L
 // how often the test checks again while waiting
 private const val RECHECK_MILLIS = 1_000L
 
+// User B's first name, the title of a notification for their message
+private const val USER_B_FIRST_NAME = "Bea"
+
+// how long a sent message or a notification may take to arrive
+private const val MESSAGE_TIMEOUT_MILLIS = 30_000L
+
+// how long the chat may take to reconnect once the network is back on
+private const val RECONNECT_TIMEOUT_MILLIS = 60_000L
+
+// what a message that couldn't be sent shows under it
+private const val NOT_SENT_TEXT = "Not sent, check your connection. Tap to try again."
+
+private const val APP_PACKAGE = "com.example.cpen321application"
+
 /*  the tag the User B steps are logged with. scripts/run-e2e-user-b shows each one in a
     terminal and, when the tester presses Enter, writes USER_B_DONE to USER_B_DONE_FILE
  */
@@ -62,19 +86,29 @@ private const val USER_B_DONE = "done"
       - User B (manual tester): an account named "Bea Tester" exists, made with the app's
         sign up on another device. User A and User B are not friends and have no pending
         friend requests.
+
+    The tests run in the order of their names (test1, test2, test3). The first two leave the
+    users as they found them, the third leaves them friends, so it has to run last
  */
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class FriendSystemTest {
 
     @get:Rule
     val composeRule = createAndroidComposeRule<MainActivity>()
 
-    // runs shell commands on the emulator, outside the app
+    // runs shell commands on the emulator and opens the notification shade, outside the app
     private val device: UiDevice = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+
+    // a test that fails while offline must not leave the emulator without a network
+    @After
+    fun turnNetworkBackOn() {
+        setNetwork(on = true)
+    }
 
     // Use case 4: Search Users, its main success scenario and failure scenario 3a
     @Test
-    fun searchUsers() {
+    fun test1SearchUsers() {
         // 1. User selects "Friends" in the navigation bar
         composeRule.onNode(hasText("Friends") and hasClickAction()).performClick()
 
@@ -111,7 +145,7 @@ class FriendSystemTest {
     // the two users with no requests for the next run.
     // User B is the manual tester, who follows the steps scripts/run-e2e-user-b shows
     @Test
-    fun sendFriendRequest() {
+    fun test2SendFriendRequest() {
         // 1. User selects "Friends" in the navigation bar
         composeRule.onNode(hasText("Friends") and hasClickAction()).performClick()
 
@@ -174,6 +208,127 @@ class FriendSystemTest {
         composeRule.onNode(addButton(USER_B_NAME)).assertIsDisplayed()
     }
 
+    /*  Use case 6: Accept Friend Request, then the chat it opens: use case 9: Send Friend Message
+        (formal UC1, with failure scenarios 5a and 6a), use case 11: Receive Friend Message and
+        use case 10: View Friend Messages, in that order, since chatting needs the two users to
+        be friends. User B is the manual tester, who follows the steps scripts/run-e2e-user-b
+        shows. Only User A's own messages are checked by their text, User B can send anything.
+        The test ends with the two users friends: until Remove Friend is built, the tester
+        removes the friendship after the test
+     */
+    @Test
+    fun test3AcceptFriendRequestAndChat() {
+        // unique per run: if the two were friends before, their old chat and its messages are reused
+        val runId = System.currentTimeMillis() / 1000
+        val helloText = "E2E hello $runId"
+        val offlineText = "E2E offline $runId"
+        allowNotifications()
+
+        // Use case 6: Accept Friend Request
+        // 1. The other person sends the user a friend request
+        askUserB("Click the Friends tab, search for User A and click Add")
+
+        // 2. User opens their friend requests
+        composeRule.onNode(hasText("Notifications") and hasClickAction()).performClick()
+        composeRule.onNode(hasText("Friend requests") and hasClickAction()).performClick()
+
+        // 3. System lists the requests waiting for an answer, each with Accept and Decline
+        composeRule.onNodeWithText("Friend Requests").assertIsDisplayed()
+        waitForRequestCard(USER_B_NAME, MESSAGE_TIMEOUT_MILLIS)
+        composeRule.onNode(requestButton(USER_B_NAME, "Decline")).assertIsDisplayed()
+
+        // 4. User selects "Accept"
+        composeRule.onNode(requestButton(USER_B_NAME, "Accept")).performClick()
+
+        // 5. System removes the request, makes the two users friends, and notifies the other user
+        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(requestCard(USER_B_NAME)).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNode(hasText("Friends") and hasClickAction()).performClick()
+        clearSearchIfAny()
+        waitForPersonCard(USER_B_NAME)
+        askUserB("Check a 'Friend request accepted' notification arrived, and User A is in your friends")
+
+        // Use case 9: Send Friend Message (UC1)
+        // 1. User selects "Friends"   2. System displays the list of the user's friends
+        composeRule.onNodeWithText("Your Friends").assertIsDisplayed()
+        composeRule.onNode(personCard(USER_B_NAME)).assertIsDisplayed()
+
+        // 3. User selects a friend
+        composeRule.onNode(personCard(USER_B_NAME)).performClick()
+
+        // 4. System opens the chat with that friend
+        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(chatTitle()).fetchSemanticsNodes().isNotEmpty()
+        }
+        messageField().assert(hasText("Message"))
+        sendButton().assertIsDisplayed()
+
+        // 5a. User clicked "Send" without typing a message
+        sendButton().assertIsNotEnabled()
+        messageField().performTextInput("   ")
+        sendButton().assertIsNotEnabled()
+
+        // 5a1. System does not send anything and keeps the chat open
+        composeRule.onNode(chatTitle()).assertIsDisplayed()
+
+        // 5. User types a message and clicks "Send"
+        messageField().performTextClearance()
+        messageField().performTextInput(helloText)
+        sendButton().assertIsEnabled()
+        sendButton().performClick()
+
+        // 6. System sends the message to the friend
+        messageField().assert(hasText("Message"))
+        waitForSentMessage(helloText)
+        askUserB("Open the chat with User A and check User A's new message arrived")
+
+        // 6a. The message could not be sent (e.g. no internet connection)
+        setNetwork(on = false)
+        composeRule.waitUntil(RECONNECT_TIMEOUT_MILLIS) { chatIsOffline() }
+        messageField().performTextInput(offlineText)
+        sendButton().performClick()
+
+        // 6a1. System displays a message saying the message could not be sent and lets the user try again
+        waitForText(NOT_SENT_TEXT)
+        setNetwork(on = true)
+        waitForNetwork()
+        composeRule.waitUntil(RECONNECT_TIMEOUT_MILLIS) { !chatIsOffline() }
+        composeRule.onNodeWithText(NOT_SENT_TEXT).performClick()
+        waitForSentMessage(offlineText)
+        composeRule.onAllNodes(hasText(NOT_SENT_TEXT)).assertCountEquals(0)
+
+        // Use case 11: Receive Friend Message
+        // 1. The friend sends the user a message while the user has their chat open
+        askUserB("In the chat with User A, send any message")
+
+        // 2. System shows the new message right away, from the friend
+        composeRule.waitUntil(MESSAGE_TIMEOUT_MILLIS) { messagesFromUserBBelow(offlineText) >= 1 }
+
+        // 3. The friend sends a message while the user doesn't have the chat open
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        clearNotifications()
+        askUserB("Send User A any message")
+
+        // 4. System notifies the user with a push notification
+        device.openNotification()
+        val notified = device.wait(Until.hasObject(By.text(USER_B_FIRST_NAME)), MESSAGE_TIMEOUT_MILLIS)
+        device.pressBack()
+        if (!notified) throw AssertionError("No notification titled \"$USER_B_FIRST_NAME\" arrived")
+
+        // Use case 10: View Friend Messages
+        // 1. User opens the chat with a friend
+        composeRule.onNode(personCard(USER_B_NAME)).performClick()
+
+        // 2. System shows the earlier messages, oldest at the top and newest at the bottom,
+        //    each with who sent it
+        waitForText(offlineText, MESSAGE_TIMEOUT_MILLIS)
+        if (topOf(hasText(helloText)) >= topOf(hasText(offlineText))) {
+            throw AssertionError("\"$helloText\" isn't above \"$offlineText\"")
+        }
+        composeRule.waitUntil(MESSAGE_TIMEOUT_MILLIS) { messagesFromUserBBelow(offlineText) >= 2 }
+    }
+
     // the Friends screen's search field, the only text field on it
     private fun searchField() = composeRule.onNode(hasSetTextAction())
 
@@ -214,8 +369,8 @@ class FriendSystemTest {
     private fun requestButton(name: String, label: String): SemanticsMatcher =
         hasText(label) and hasClickAction() and hasAnyAncestor(requestCard(name))
 
-    private fun waitForRequestCard(name: String) {
-        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
+    private fun waitForRequestCard(name: String, timeoutMillis: Long = SEARCH_TIMEOUT_MILLIS) {
+        composeRule.waitUntil(timeoutMillis) {
             composeRule.onAllNodes(requestCard(name)).fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -243,9 +398,75 @@ class FriendSystemTest {
         device.executeShellCommand("rm -f $USER_B_DONE_FILE")
     }
 
-    // a person card showing the name
+    // a person card showing the name. A friend's card can be tapped, which merges its texts into it
     private fun personCard(name: String): SemanticsMatcher =
-        hasTestTag(PERSON_CARD_TAG) and hasAnyDescendant(hasText(name))
+        hasTestTag(PERSON_CARD_TAG) and (hasText(name) or hasAnyDescendant(hasText(name)))
+
+    // the chat's title, User B's name without the tap to open a profile that a message's sender name has
+    private fun chatTitle(): SemanticsMatcher = hasText(USER_B_NAME) and !hasClickAction()
+
+    // the sender name on User B's messages, which opens their profile when tapped
+    private fun userBSenderName(): SemanticsMatcher = hasText(USER_B_NAME) and hasClickAction()
+
+    // the chat's box to write in, the only text field on the chat screen
+    private fun messageField() = composeRule.onNode(hasSetTextAction())
+
+    private fun sendButton() = composeRule.onNodeWithContentDescription("Send message")
+
+    // waits until the message is on the screen and nothing is still being sent
+    private fun waitForSentMessage(text: String) {
+        composeRule.waitUntil(MESSAGE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty() &&
+                composeRule.onAllNodes(hasText("Sending...")).fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    // the chat shows it lost its connection: reconnecting, or the messages couldn't load
+    private fun chatIsOffline(): Boolean =
+        composeRule.onAllNodes(hasText("Connecting...")).fetchSemanticsNodes().isNotEmpty() ||
+            composeRule.onAllNodes(hasText("Couldn't reach the server, try again")).fetchSemanticsNodes().isNotEmpty()
+
+    // how many of User B's messages are below the message, i.e. newer than it
+    private fun messagesFromUserBBelow(text: String): Int {
+        val top = topOf(hasText(text))
+        return composeRule.onAllNodes(userBSenderName()).fetchSemanticsNodes().count { it.boundsInRoot.top > top }
+    }
+
+    // how far down the screen the first node matching the matcher starts
+    private fun topOf(matcher: SemanticsMatcher): Float =
+        composeRule.onAllNodes(matcher).fetchSemanticsNodes().first().boundsInRoot.top
+
+    // Android 13+ only shows the app's notifications once it's allowed to
+    private fun allowNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            device.executeShellCommand("pm grant $APP_PACKAGE android.permission.POST_NOTIFICATIONS")
+        }
+    }
+
+    // clears the notification shade, so a notification from an earlier run can't be mistaken for a new one
+    private fun clearNotifications() {
+        device.openNotification()
+        val clearAll = device.wait(Until.findObject(By.text("Clear all")), 3_000L)
+        if (clearAll != null) clearAll.click() else device.pressBack()
+        device.waitForIdle()
+    }
+
+    // turns the phone's Wi-Fi and mobile data on or off, outside the app
+    private fun setNetwork(on: Boolean) {
+        val state = if (on) "enable" else "disable"
+        device.executeShellCommand("svc wifi $state")
+        device.executeShellCommand("svc data $state")
+    }
+
+    // Wi-Fi takes a few seconds to reconnect once it's turned back on
+    private fun waitForNetwork() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        composeRule.waitUntil(RECONNECT_TIMEOUT_MILLIS) {
+            val capabilities = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        }
+    }
 
     private fun waitForPersonCard(name: String) {
         composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
@@ -253,8 +474,8 @@ class FriendSystemTest {
         }
     }
 
-    private fun waitForText(text: String) {
-        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
+    private fun waitForText(text: String, timeoutMillis: Long = SEARCH_TIMEOUT_MILLIS) {
+        composeRule.waitUntil(timeoutMillis) {
             composeRule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
         }
     }

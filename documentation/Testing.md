@@ -8,7 +8,7 @@
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Game and Friend components are written. Each interface now has one test file without mocks and one with mocks, so section 2.1.1 gives those files and the line where each `describe` group starts. The test tables now match the tests that were written, and the Friend component's tests are added. Section 2.1.3 explains how to start the test database and run the tests. |
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Review component are written: its three interfaces, the rating reminder the server checks for every minute, and the score rules. The existing mocked rating tests are split into one file per interface, and each interface gets a test file without mocks. New edge cases cover the 1 to 6 star limits, values that aren't whole numbers, the edges of the 1-day rating window, games that aren't completed, players who didn't show up or left, rating twice or at the same time, the order games count in, and a game exactly 1.5 stars from a player's middle score. The Reputation score case of the join request list now gives the exact score its test checks, 3.86. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
-| Nov 18, 2026 | 4.1, 4.2 | Added the front-end test for the Friend System's Search Users use case (`FriendSystemTest.kt`). Section 4.1 lists the test file for each feature, and section 4.2 gives the test's setup, including the manual User B account, and its expected behaviors. Its logs will be added once it passes. Also added the front-end test for Send Friend Request (`FriendSystemTest.sendFriendRequest`), with the manual steps for User B, and moved the steps for running the tests on User A's emulator only to the start of section 4.2, since every two-user test needs them. Added `scripts/run-e2e-user-b`, which shows the manual tester each User B step and lets the test carry on when they press Enter, with how to use it in section 4.2. The Send Friend Request test also covers Decline Friend Request, through Notifications → Friend requests, with its own expected behaviors. The offline steps were removed from the two Friend tests. |
+| Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for the Friend System (`FriendSystemTest.kt`): Search Users, Send and Decline Friend Request, Accept Friend Request, and Send (formal Use Case 1), Receive and View Friend Messages. Section 4.2 explains how the manual tester acts as User B with `scripts/run-e2e-user-b`, and how to run the tests on User A's emulator only. Logs will be added once the tests pass. |
 
 ---
 
@@ -640,6 +640,8 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
 
 #### Use cases
 
+The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests until Remove Friend is built.
+
 - **Use Case: Discover Game (Use Case 4)**
 
   - **Before the tests:**
@@ -674,7 +676,7 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
     To be added at CP2, once the test is written and run.
     ```
 
-- **Use Case: Search Users (Use Case 4 of the Friend System, test `FriendSystemTest.searchUsers`)**
+- **Use Case: Search Users (Use Case 4 of the Friend System, test `FriendSystemTest.test1SearchUsers`)**
 
   Search Users has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
 
@@ -701,7 +703,7 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
     To be added once the test passes on User A's emulator.
     ```
 
-- **Use Case: Send Friend Request (Use Case 5 of the Friend System, test `FriendSystemTest.sendFriendRequest`, which also covers Decline Friend Request)**
+- **Use Case: Send Friend Request (Use Case 5 of the Friend System, test `FriendSystemTest.test2SendFriendRequest`, which also covers Decline Friend Request)**
 
   Send Friend Request has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
 
@@ -732,7 +734,7 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
     To be added once the test passes on User A's emulator.
     ```
 
-- **Use Case: Decline Friend Request (Use Case 7 of the Friend System, test `FriendSystemTest.sendFriendRequest`)**
+- **Use Case: Decline Friend Request (Use Case 7 of the Friend System, test `FriendSystemTest.test2SendFriendRequest`)**
 
   Decline Friend Request is tested at the end of the Send Friend Request test, with the request User B sends in its step 3a. It has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does. The only failure the app handles, a request that was already answered by the time it is declined, can't be caused from the screen, since the app has no way to withdraw a request.
 
@@ -747,4 +749,64 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
     | 3. User selects "Decline". | Click the button labelled "Decline" on the request from "Bea Tester". |
     | 4. System removes the request, and the two users don't become friends. | Wait until the request from "Bea Tester" is no longer on the screen.<br>Click the "Friends" tab in the bottom bar, and click the button "Clear search" if a search is shown.<br>Check that "Your Friends" is on the screen, without a "Bea Tester" card.<br>Input "Bea Tester" in the text field "Search by name".<br>Check that the "Bea Tester" card has a button labelled "Add". |
 
-  - **Test Logs:** the logs of `FriendSystemTest.sendFriendRequest` above.
+  - **Test Logs:** the logs of `FriendSystemTest.test2SendFriendRequest` above.
+
+- **Use Cases: Accept Friend Request (6), Send Friend Message (9, formal Use Case 1), Receive Friend Message (11) and View Friend Messages (10), test `FriendSystemTest.test3AcceptFriendRequestAndChat`**
+
+  One test covers these four use cases in this order, since the two users can only chat once they are friends. Send Friend Message's scenario steps come from its formal specification (Requirements and Design section 3.5, Use Case 1). The other three have none, so their scenario steps describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **User B (manual tester):** the "Bea Tester" account described for Search Users, signed in on another device that uses the same back end. User A and User B are not friends and have no pending friend requests.
+    - **One device:** see [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only).
+    - **User B's steps:** run the User B helper in a second terminal, see [Doing User B's steps](#doing-user-bs-steps). User B can send any message: the test only checks User A's messages by their text, and finds User B's by the sender name "Bea Tester" and where they are in the chat.
+    - **User A's messages:** each run sends messages with the time in them (`E2E hello <time>`, `E2E offline <time>`). If the two users were friends before, the app reuses their old chat, so this keeps one run's messages apart from earlier ones.
+    - **Notifications:** the test allows the app's notifications with `pm grant ... android.permission.POST_NOTIFICATIONS`, and uses UI Automator to clear old notifications and look for new ones in the notification shade. Push notifications must be set up for User A's emulator (the app's `google-services.json`).
+    - **No connection (6a):** the 6a test turns the phone's Wi-Fi and mobile data off with UI Automator (`svc wifi disable`, `svc data disable`), and back on before trying again, waiting for the phone and the chat to reconnect. They are also turned back on after the test if it fails.
+    - **After the test:** User A and User B are friends. Until Remove Friend is built, the tester removes the friendship so the next run starts again with no friendship.
+
+  - **Expected Behaviors, Accept Friend Request (Use Case 6):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. The other person sends the user a friend request. | **(manual, User B)** Click the "Friends" tab, search for User A and click "Add". Press Enter in the User B helper. |
+    | 2. User opens their friend requests. | Click the "Notifications" tab in the bottom bar.<br>Click "Friend requests". |
+    | 3. System lists the requests waiting for an answer, each with "Accept" and "Decline". | Check that the text "Friend Requests" is on the screen.<br>Wait until a request from "Bea Tester" is on the screen.<br>Check that the request has a button labelled "Decline". |
+    | 4. User selects "Accept". | Click the button labelled "Accept" on the request from "Bea Tester". |
+    | 5. System removes the request, makes the two users friends, and notifies the other user. | Wait until the request from "Bea Tester" is no longer on the screen.<br>Click the "Friends" tab in the bottom bar, and click the button "Clear search" if a search is shown.<br>Wait until a "Bea Tester" card is on the screen.<br>**(manual, User B)** Check that a "Friend request accepted" notification arrived, and that User A is in User B's friends. Press Enter in the User B helper. |
+
+  - **Expected Behaviors, Send Friend Message (Use Case 9, formal Use Case 1):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User selects "Friends". | The Friends screen is open after accepting the request above. |
+    | 2. System displays the list of the user's friends. | Check that "Your Friends" is on the screen.<br>Check that a "Bea Tester" card is on the screen. |
+    | 3. User selects a friend. | Click the "Bea Tester" card. |
+    | 4. System opens the chat with that friend. | Wait until the title "Bea Tester" is on the screen.<br>Check that a text field with the placeholder "Message" is on the screen.<br>Check that the button "Send message" is on the screen. |
+    | 5a. User clicked "Send" without typing a message. | Check that the button "Send message" is disabled.<br>Input "   " (only spaces) in the text field "Message".<br>Check that the button "Send message" is still disabled. |
+    | 5a1. System does not send anything and keeps the chat open. | Check that the title "Bea Tester" is still on the screen. |
+    | 5. User types a message and clicks "Send". | Clear the text field "Message", then input "E2E hello &lt;time&gt;".<br>Check that the button "Send message" is enabled.<br>Click the button "Send message". |
+    | 6. System sends the message to the friend | Check that the text field "Message" is empty again.<br>Wait until "E2E hello &lt;time&gt;" is on the screen and no message shows "Sending...".<br>**(manual, User B)** Open the chat with User A and check that User A's new message arrived. Press Enter in the User B helper. |
+    | 6a. The message could not be sent (e.g. no internet connection). | Turn the phone's Wi-Fi and mobile data off.<br>Wait until "Connecting..." or "Couldn't reach the server, try again" is on the screen.<br>Input "E2E offline &lt;time&gt;" in the text field "Message" and click the button "Send message". |
+    | 6a1. System displays a message saying the message could not be sent and lets the user try again. | Wait until the text "Not sent, check your connection. Tap to try again." is on the screen.<br>Turn Wi-Fi and mobile data back on, and wait for the phone to be online.<br>Wait until neither "Connecting..." nor "Couldn't reach the server, try again" is on the screen.<br>Click "Not sent, check your connection. Tap to try again.".<br>Wait until "E2E offline &lt;time&gt;" is on the screen and no message shows "Sending...".<br>Check that "Not sent, check your connection. Tap to try again." is no longer on the screen. |
+
+  - **Expected Behaviors, Receive Friend Message (Use Case 11):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. The friend sends the user a message while the user has their chat open. | Keep the chat with "Bea Tester" open.<br>**(manual, User B)** In the chat with User A, send any message. Press Enter in the User B helper. |
+    | 2. System shows the new message right away, from the friend. | Without leaving the chat, wait until a message showing the sender name "Bea Tester" is on the screen below "E2E offline &lt;time&gt;". |
+    | 3. The friend sends a message while the user doesn't have the chat open. | Click the button "Back".<br>Open the notification shade and click "Clear all" (UI Automator), so an older notification can't count.<br>**(manual, User B)** Send User A any message. Press Enter in the User B helper. |
+    | 4. System notifies the user with a push notification. | Open the notification shade (UI Automator).<br>Wait until a notification titled "Bea" is shown.<br>Close the notification shade. |
+
+  - **Expected Behaviors, View Friend Messages (Use Case 10):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User opens the chat with a friend. | Click the "Bea Tester" card on the Friends screen. |
+    | 2. System shows the earlier messages, oldest at the top and newest at the bottom, each with who sent it. | Wait until "E2E offline &lt;time&gt;" is on the screen.<br>Check that "E2E hello &lt;time&gt;" is above "E2E offline &lt;time&gt;".<br>Wait until at least two messages showing the sender name "Bea Tester" are on the screen below "E2E offline &lt;time&gt;". |
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
