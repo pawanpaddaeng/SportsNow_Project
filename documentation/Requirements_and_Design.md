@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 18, 2026 | 3.5 (Use Case 5) | Failure scenario 3a of Join Game now matches the app: the skill level is marked as required and "Send request" stays disabled until it's selected, so no error message is needed. |
 | Nov 18, 2026 | 4.7 | Each non-functional requirement is now checked by a back-end test and a front-end test. Performance: the Jest test now calls Discover 10 times instead of once, and a new Android instrumented test times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a new Android instrumented test times each message on the phone, from tapping Send to the server's copy being shown. |
 | Nov 18, 2026 | 3.1, 3.2, 3.3, 3.4, 3.5, 4.6 | Updated the use case diagram. Chat is now its own feature, Feature 2, with Send Message, View Messages and Receive Message each covering both friend chat and game chat, instead of separate friend and game chat use cases under Friend System and Game Discovery. Added the Delete Account use case to Authentication. Features and use cases are renumbered to follow the diagram's order: Authentication, Chat, Friend System, Player Reputation and Statistics, Game Planning, Game Discovery, and in Player Reputation and Statistics, View Player Statistics now comes before Mark No-shows. Formal Use Case 1 is renamed Send Message to match the diagram. |
 | Nov 18, 2026 | 3.1, 3.4, 4.1, 4.2 | Added the Notifications screen (issue #60). Join requests and their answers, invites, accepted friend requests and game start reminders are now saved as well as sent as a push, so they're listed on the Notifications tab, and tapping one, there or as a push, opens the screen to act on it. Added `GET /api/notifications`, `PATCH /api/notifications/read` and `notifyUser` / `notifyUsers` to the shared Notifications module, and a notifications table. Friend requests moved from the Friends tab to a Friend Requests screen opened from the top of Notifications, and the sender is no longer told when their request is declined. The organiser and players now get a reminder about 1 hour before a game starts. |
@@ -243,7 +244,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 **Failure scenario(s)**:
 - 3a. Player did not select a skill level.
-    -  3a1. System displays an error message asking the Player to select their skill level.
+    -  3a1. System marks the skill level as required and keeps "Send request" disabled until the Player selects it.
 - 4a. The organiser cancelled the game before the request was sent.
     - 4a1. System displays "This game was cancelled" and does not send the request.
 - 4b. The game started before the request was sent.
