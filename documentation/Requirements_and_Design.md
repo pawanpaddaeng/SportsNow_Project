@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 18, 2026 | 3.5 (Use Case 5) | Failure scenario 3a of Join Game now matches the app: the skill level is marked as required and "Send request" stays disabled until it's selected, so no error message is needed. |
 | Nov 18, 2026 | 3.1, 3.4, 4.1, 4.2 | Added the Notifications screen (issue #60). Join requests and their answers, invites, accepted friend requests and game start reminders are now saved as well as sent as a push, so they're listed on the Notifications tab, and tapping one, there or as a push, opens the screen to act on it. Added `GET /api/notifications`, `PATCH /api/notifications/read` and `notifyUser` / `notifyUsers` to the shared Notifications module, and a notifications table. Friend requests moved from the Friends tab to a Friend Requests screen opened from the top of Notifications, and the sender is no longer told when their request is declined. The organiser and players now get a reminder about 1 hour before a game starts. |
 | Nov 17, 2026 | 3.4, 4.1 | Players can rate each other for 1 day after the organiser marks a game completed, so old games stop changing scores. The "Game completed" notification now asks players to rate their teammates, and players who still have someone to rate get a reminder 1 hour before rating closes. Games played now counts the completed games a player showed up to, from the same attendance the score uses, so the two always agree and a game deleted after everyone left still counts. |
 | Nov 17, 2026 | 3.1, 3.4, 4.1 | Ratings are out of 6 stars. The reputation score no longer gives players a default of 5: a player with no ratings and no missed games is "Not rated yet" (a null score), and is left out of anything that ranks or filters by score, including badges. The score is now a weighted average of the player's games that starts from 5: each game scores the average over the other players who showed up, counting anyone who didn't rate as 5, newer games count more, unusual games count less, and each no-show counts as a game scoring 1. Section 4.1 gives the formula. |
@@ -239,7 +240,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 
 **Failure scenario(s)**:
 - 3a. Player did not select a skill level.
-    -  3a1. System displays an error message asking the Player to select their skill level.
+    -  3a1. System marks the skill level as required and keeps "Send request" disabled until the Player selects it.
 - 4a. The organiser cancelled the game before the request was sent.
     - 4a1. System displays "This game was cancelled" and does not send the request.
 - 4b. The game started before the request was sent.
