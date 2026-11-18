@@ -7,12 +7,13 @@
 | Oct 20, 2026 | 2.1, 4 | First test plan for CP1. Section 2.1 plans the back-end tests for the Game component. Section 4 plans the end-to-end test for Use Case 2, Discover Game. We will write and run the tests, and add the results, coverage, GitHub Actions file and logs, at CP2. |
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Game and Friend components are written. Each interface now has one test file without mocks and one with mocks, so section 2.1.1 gives those files and the line where each `describe` group starts. The test tables now match the tests that were written, and the Friend component's tests are added. Section 2.1.3 explains how to start the test database and run the tests. |
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Review component are written: its three interfaces, the rating reminder the server checks for every minute, and the score rules. The existing mocked rating tests are split into one file per interface, and each interface gets a test file without mocks. New edge cases cover the 1 to 6 star limits, values that aren't whole numbers, the edges of the 1-day rating window, games that aren't completed, players who didn't show up or left, rating twice or at the same time, the order games count in, and a game exactly 1.5 stars from a player's middle score. The Reputation score case of the join request list now gives the exact score its test checks, 3.86. |
+| Nov 18, 2026 | 2, 2.1 | The back-end tests for the User component are written: sign up, login, registering a device for notifications, and reading, editing and deleting the user's own profile each get a test file without mocks and one with mocks. The public profile, which only had tests with mocks, gets a test file without mocks, and its tests with mocks are now listed here. A real sign up or login needs an ID token that Google signed, so the tests without mocks stop at Google's check, and the tests with mocks replace that check to test a successful one. |
 
 ---
 
 ## 2. Back-end Test Specification: APIs
 
-We test every interface of the **Game**, **Friend** and **Review** components that is built (see Requirements and Design, section 4.1). The Review component also has a timed part the app never calls, the rating reminder the server checks for every minute, which is tested the same way. The test folders are named after the back-end components in `backend/src`, so the Game tests are in `game`, the Friend tests in `friend` and the Review tests in `review`.
+We test every interface of the **User**, **Game**, **Friend** and **Review** components that is built (see Requirements and Design, section 4.1). The Review component also has a timed part the app never calls, the rating reminder the server checks for every minute, which is tested the same way. The test folders are named after the back-end components in `backend/src`, so the User tests are in `user`, the Game tests in `game`, the Friend tests in `friend` and the Review tests in `review`.
 
 Each interface has two test files, each with one `describe` group:
 - one **without mocks**, in `backend/tests/no-mock/`, for example `describe('Unmocked: GET /api/games/discover', ...)`
@@ -27,9 +28,11 @@ Each test has comments that say its input, the status code we expect, what shoul
 - After each test, we delete the users it added. Deleting a user also deletes their games, players, chats, join requests, friend requests and friendships, so one test can't change another.
 - We sign in by making a JWT for the test user with `createAuthToken`. This way the tests don't need Google sign in.
 - The Friend tests search all users, and other test files run at the same time on the same database. So the search tests use made-up names that no other test uses, and only check the users they added.
+- The User tests can't sign up or log in through Google, since that needs an ID token Google signed for this app. So their sign up and login tests stop at Google's check, which turns down a made-up token. The delete account test watches `sendPushToUsers` without replacing it, like the Review tests.
 - The Review tests mark a game completed with the same `completeGame` the organizer's request uses, then move the time it was completed back to test the 1-day rating window. To see who is sent a rating reminder, they watch `sendPushToUsers` with `jest.spyOn` without replacing it. The test users have no devices, so no notification leaves the server. Other test files' games can be due for a reminder at the same time, so these tests only check their own games.
 
 **Tests with mocks** don't use the database. They replace the database settings with `backend/tests/mock/mockEnv.ts`, and sign in by mocking the user lookup. They use `jest.spyOn` to:
+- replace Google's check of the ID token, so a sign up or login can succeed (`backend/tests/mock/user/googleHelpers.ts`)
 - make database functions throw an error, to check that the server answers `500 server_error`
 - replace the push notification functions (`sendPushToUser` and `sendPushToUsers`), to check who gets a notification and what type it is
 - make a push notification fail, to check the server still answers and logs the failure
@@ -39,6 +42,18 @@ Each test has comments that say its input, the status code we expect, what shoul
 ### 2.1. Locations of Back-end Tests and Instructions to Run Them
 
 #### 2.1.1. Tests
+
+**User component**
+
+| **Interface** | **Describe Group Location, No Mocks** | **Describe Group Location, With Mocks** | **Mocked Components** |
+| ------------- | ------------------------------------- | --------------------------------------- | --------------------- |
+| **POST /api/auth/signup** | [`backend/tests/no-mock/user/signup.test.ts#L16`](../backend/tests/no-mock/user/signup.test.ts#L16) | [`backend/tests/mock/user/signup.test.ts#L21`](../backend/tests/mock/user/signup.test.ts#L21) | Google Authentication, Users DB |
+| **POST /api/auth/login** | [`backend/tests/no-mock/user/login.test.ts#L9`](../backend/tests/no-mock/user/login.test.ts#L9) | [`backend/tests/mock/user/login.test.ts#L12`](../backend/tests/mock/user/login.test.ts#L12) | Google Authentication, Users DB |
+| **POST /api/register_notif** | [`backend/tests/no-mock/user/registerNotif.test.ts#L19`](../backend/tests/no-mock/user/registerNotif.test.ts#L19) | [`backend/tests/mock/user/registerNotif.test.ts#L10`](../backend/tests/mock/user/registerNotif.test.ts#L10) | Device Tokens DB |
+| **GET /api/users/me** | [`backend/tests/no-mock/user/getMyProfile.test.ts#L12`](../backend/tests/no-mock/user/getMyProfile.test.ts#L12) | [`backend/tests/mock/user/getMyProfile.test.ts#L10`](../backend/tests/mock/user/getMyProfile.test.ts#L10) | Users DB |
+| **PUT /api/users/me** | [`backend/tests/no-mock/user/updateMyProfile.test.ts#L21`](../backend/tests/no-mock/user/updateMyProfile.test.ts#L21) | [`backend/tests/mock/user/updateMyProfile.test.ts#L12`](../backend/tests/mock/user/updateMyProfile.test.ts#L12) | Users DB |
+| **DELETE /api/users/me** | [`backend/tests/no-mock/user/deleteAccount.test.ts#L23`](../backend/tests/no-mock/user/deleteAccount.test.ts#L23) | [`backend/tests/mock/user/deleteAccount.test.ts#L16`](../backend/tests/mock/user/deleteAccount.test.ts#L16) | Users DB, Games DB, Firebase push |
+| **GET /api/users/{userId}** | [`backend/tests/no-mock/user/publicProfile.test.ts#L18`](../backend/tests/no-mock/user/publicProfile.test.ts#L18) | [`backend/tests/mock/user/publicProfile.test.ts#L23`](../backend/tests/mock/user/publicProfile.test.ts#L23) | Users DB, Friends DB, Reputation DB |
 
 **Game component**
 
@@ -85,11 +100,92 @@ The unmocked Review tests share their setup helpers in [`backend/tests/no-mock/r
 
 **Signing in**
 
-Every route checks that the user is signed in first, in the same middleware. The Friend and Review components' groups without mocks test it for each of their interfaces:
+Every route checks that the user is signed in first, in the same middleware. The User, Friend and Review components' groups without mocks test it for each of their interfaces that needs a signed in user:
 
 | **Test** | **Input** | **Expected status** | **What should happen** |
 | -------- | --------- | ------------------- | ---------------------- |
 | Rejects a call that is not signed in | No `Authorization` header, then `Authorization: Bearer not-a-real-token` | 400, then 401 | Nothing changes. Returns `{ msg: "invalid_request" }`, then `{ msg: "invalid_token", error: "Invalid jwt_token" }` |
+
+##### User component
+
+The tests without mocks use real users the test adds, named Alice, Ben and Olivia, all born in 1995 with the last name Tester.
+
+**POST /api/auth/signup** (create an account)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a sign up with missing fields | No body, then `id_token` and `email` with no `f_name`, `l_name` or `birthYear` | 400 | Google is never asked and no user is saved. Returns `{ msg: "invalid_request" }` with `error` "id_token and email are required", then "First Name, Last Name and Birth Year fields are compulsory" |
+| No mocks | Rejects an ID token Google did not sign | Every field filled in, with a made-up `id_token` | 401 | No user is saved. Returns `{ msg: "invalid_token", error: "Invalid Google ID token" }` |
+| With mocks | Creates the account and signs the user in | Every field filled in. Google's check is replaced to accept the token, no user has the Google account, and `createUser` saves user 7 | 201 | `createUser` gets the Google account's id and email and the profile. Returns `{ msg: "signedIn", jwt_token }`, and the JWT signs in user 7 |
+| With mocks | Google account already has a user | `userExists` says yes, `createUser` watched | 409 | No second user is saved. Returns `{ msg: "already_exists" }` |
+| With mocks | Email does not match the Google account | An `email` that isn't the Google account's | 400 | No user is saved. Returns `{ msg: "invalid_request", error: "email does not match the Google account" }` |
+| With mocks | Database fails while saving the user | `createUser` throws | 500 | Returns `{ msg: "server_error", error: "Could not create account, try again later" }` |
+
+**POST /api/auth/login** (sign in)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a login with no ID token | No body, then an empty `id_token` | 400 | Google is never asked. Returns `{ msg: "invalid_request", error: "id_token is required" }` |
+| No mocks | Rejects an ID token Google did not sign | A made-up `id_token` | 401 | No JWT is made. Returns `{ msg: "invalid_token", error: "Invalid Google ID token" }` |
+| With mocks | Signs in a user who has an account | Google's check is replaced to accept the token, `findUserByGoogleId` finds player 2 | 200 | The user is looked up by the Google account that signed the token. Returns `{ msg: "signedIn", jwt_token }`, and the JWT signs in player 2 |
+| With mocks | Google account has no user yet | `findUserByGoogleId` finds nobody | 404 | No JWT is made, so the app sends them to sign up. Returns `{ msg: "no_user" }` |
+| With mocks | Database fails while looking up the user | `findUserByGoogleId` throws | 500 | Returns `{ msg: "server_error", error: "Could not sign in, try again later" }` |
+
+**POST /api/register_notif** (save the device's token for push notifications)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | No device token is saved |
+| No mocks | Saves the device token for the signed in user | Alice sends her device's `fcm_token` | 200 | The token is saved for Alice. Returns `{ msg: "success" }` |
+| No mocks | Rejects a missing device token | No `fcm_token`, then one of only spaces | 400 | No token is saved. Returns `{ msg: "invalid_request", error: "fcm_token is required (max 512 characters)" }` |
+| With mocks | Saves the trimmed token for the signed in user | `fcm_token: " device-token "`, `saveDeviceToken` replaced | 200 | `saveDeviceToken` gets "device-token" and the signed in user's id. Returns `{ msg: "success" }` |
+| With mocks | Database fails while saving the token | `saveDeviceToken` throws | 500 | Returns `{ msg: "server_error", error: "Could not register notifications, try again later" }` |
+
+**GET /api/users/me** (the user's own profile)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | No profile is read |
+| No mocks | Returns the signed in user's profile | Alice asks for her profile | 200 | Returns `{ msg: "success", user }` with her `user_id`, `email`, `f_name`, `l_name`, `birthYear` and `created_at` |
+| With mocks | Returns the signed in user's profile | The sign in check's `findUserById` returns player 2 | 200 | Returns player 2's details. Nothing else is read |
+| With mocks | Database fails while checking the sign in | `findUserById` throws | 500 | No profile is sent. Returns `{ msg: "server_error", error: "Could not check sign in, try again later" }` |
+
+**PUT /api/users/me** (edit the user's own profile)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | The profile doesn't change |
+| No mocks | Updates the signed in user's profile | Alice sends `{ f_name: "Alicia", l_name: "Newname", birthYear: 1990 }` | 200 | The new values are saved. Returns `{ msg: "success", user }` with them |
+| No mocks | Rejects a profile with a missing field | `f_name` and `birthYear`, no `l_name` | 400 | The profile doesn't change. Returns `{ msg: "invalid_request", error: "First Name, Last Name and Birth Year fields are compulsory" }` |
+| With mocks | Saves the new profile for the signed in user | A valid profile, `updateUserProfile` replaced | 200 | `updateUserProfile` gets the signed in user's id and the new values. Returns the user with the new values |
+| With mocks | Invalid profile never reaches the database | No `l_name`, `updateUserProfile` watched | 400 | Returns `{ msg: "invalid_request" }`. `updateUserProfile` is never called |
+| With mocks | Database fails while saving the profile | `updateUserProfile` throws | 500 | Returns `{ msg: "server_error", error: "Could not update profile, try again later" }` |
+
+**DELETE /api/users/me** (delete the user's account)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | No account is deleted |
+| No mocks | Deletes the account and the games the user organizes | Olivia organizes an upcoming game Ben plays in, and plays in Ben's upcoming game. She deletes her account, then uses her old token again | 200, then 401 | Olivia's account and her game are deleted. She is no longer in Ben's game, which stays, and Ben's account stays. Ben is told her game was cancelled (`game_cancelled`) and that she left his (`player_left`). Returns `{ msg: "success" }`, then `{ msg: "no_user" }` for her old token |
+| With mocks | Players of the user's games are told | `getActiveGamesOfUser` returns the organizer's game and a game of user 2 they joined, `getUsersToNotify` returns users 2 and 3, `deleteUser` and `sendPushToUsers` replaced | 200 | `deleteUser` gets the organizer's id. Users 2 and 3 get `game_cancelled` ("... was cancelled, the organizer deleted their account"), and user 2 gets `player_left` ("Olivia left ...") |
+| With mocks | Database fails while deleting the account | `deleteUser` throws, `sendPushToUsers` watched | 500 | Nobody is notified. Returns `{ msg: "server_error", error: "Could not delete account, try again later" }` |
+
+**GET /api/users/{userId}** (another player's public profile)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | No profile is read |
+| No mocks | Returns only the public details of another player | Alice opens Ben's profile. Ben never played and isn't her friend | 200 | Returns his name, `age_range`, `games_played: 0`, `reputation_score: null`, `badges: []` and `friendship_status: "none"`. His email and birth year are never sent |
+| No mocks | Shows a friend as a friend | Alice and Ben are friends, Alice opens Ben's profile | 200 | `friendship_status` is "friends" |
+| No mocks | Own profile is marked self | Alice opens her own profile | 200 | `friendship_status` is "self" |
+| No mocks | Player does not exist | A user id nobody has | 404 | Returns `{ msg: "user_not_found", error: "This player does not exist" }` |
+| No mocks | Rejects a bad user id | `/api/users/abc` | 400 | Returns `{ msg: "invalid_request", error: "userId must be a positive whole number" }` |
+| With mocks | Returns only the public details of another player | The organizer opens player 2's profile. `findUserById`, `getReputation` (4 games, score 4.2) and `getFriendshipStatus` ("request_sent") replaced | 200 | Returns exactly the public fields. The email and birth year are never sent |
+| With mocks | Own profile is marked self | The organizer opens their own profile, `getFriendshipStatus` watched | 200 | `friendship_status` is "self", and no friendship is looked up |
+| With mocks | Unknown player | A user id nobody has, `getReputation` watched | 404 | Returns `{ msg: "user_not_found" }`. No reputation is read |
+| With mocks | Invalid id is rejected | Ids `0`, `abc` and `1.5` | 400 | Returns `{ msg: "invalid_request" }`. Nothing is read |
+| With mocks | Database error | `getReputation` throws | 500 | No profile is sent. Returns `{ msg: "server_error" }` |
+| With mocks | Age range shown instead of the birth year | Birth years 2007, 2002, 2001, 1992, 1962 and 1961, in 2026 | n/a | "19–24", "19–24", "25–34", "25–34", "55–64" and "65+" |
 
 ##### Game component
 
@@ -451,6 +547,7 @@ In our Docker setup MySQL is only reachable from inside Docker, so `docker-compo
    - Tests with mocks: `npx jest tests/mock`
    - Tests without mocks: `npx jest tests/no-mock`
    - One component: `npx jest tests/no-mock/game` or `npx jest tests/mock/friend`
+   - The User component's tests: `npx jest tests/mock/user tests/no-mock/user`
    - The Review component's tests: `npx jest tests/mock/review tests/no-mock/review tests/unit/review`
    - One interface: `npx jest tests/no-mock/friend/searchUsers.test.ts`
 4. **Stop the database** from the root folder when you're done:
