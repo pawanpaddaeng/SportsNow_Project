@@ -48,11 +48,22 @@ export async function getGameChatId(gameId: number): Promise<number | null> {
   return rows[0]?.chat_id ?? null;
 }
 
-// opens the chat of two new friends, in the transaction making them friends. IGNORE: if
-// they were friends before they keep the same chat
+/*  opens the chat of two new friends, in the transaction making them friends. Removing a
+    friend deletes their chat, so friends again start an empty one. IGNORE: if they
+    somehow still have one, they keep it
+ */
 export async function createFriendChat(connection: Queryable, userId: number, otherUserId: number): Promise<void> {
   await executeWrite(
     'INSERT IGNORE INTO chats (user_low_id, user_high_id) VALUES (LEAST(?, ?), GREATEST(?, ?))',
+    [userId, otherUserId, userId, otherUserId],
+    connection,
+  );
+}
+
+// deletes the chat of two friends and its messages, in the transaction removing the friendship
+export async function deleteFriendChat(connection: Queryable, userId: number, otherUserId: number): Promise<void> {
+  await executeWrite(
+    'DELETE FROM chats WHERE user_low_id = LEAST(?, ?) AND user_high_id = GREATEST(?, ?)',
     [userId, otherUserId, userId, otherUserId],
     connection,
   );
