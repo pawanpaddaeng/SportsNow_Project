@@ -8,7 +8,7 @@
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Game and Friend components are written. Each interface now has one test file without mocks and one with mocks, so section 2.1.1 gives those files and the line where each `describe` group starts. The test tables now match the tests that were written, and the Friend component's tests are added. Section 2.1.3 explains how to start the test database and run the tests. |
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Review component are written: its three interfaces, the rating reminder the server checks for every minute, and the score rules. The existing mocked rating tests are split into one file per interface, and each interface gets a test file without mocks. New edge cases cover the 1 to 6 star limits, values that aren't whole numbers, the edges of the 1-day rating window, games that aren't completed, players who didn't show up or left, rating twice or at the same time, the order games count in, and a game exactly 1.5 stars from a player's middle score. The Reputation score case of the join request list now gives the exact score its test checks, 3.86. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
-| Nov 18, 2026 | 4.1, 4.2 | Added the front-end test for the Friend System's Search Users use case (`FriendSystemTest.kt`). Section 4.1 lists the test file for each feature, and section 4.2 gives the test's setup, including the manual User B account, and its expected behaviors. Its logs will be added once it passes. Also added the front-end test for Send Friend Request (`FriendSystemTest.sendFriendRequest`), with the manual steps for User B, and moved the steps for running the tests on User A's emulator only to the start of section 4.2, since every two-user test needs them. Added `scripts/run-e2e-user-b`, which shows the manual tester each User B step and lets the test carry on when they press Enter, with how to use it in section 4.2. |
+| Nov 18, 2026 | 4.1, 4.2 | Added the front-end test for the Friend System's Search Users use case (`FriendSystemTest.kt`). Section 4.1 lists the test file for each feature, and section 4.2 gives the test's setup, including the manual User B account, and its expected behaviors. Its logs will be added once it passes. Also added the front-end test for Send Friend Request (`FriendSystemTest.sendFriendRequest`), with the manual steps for User B, and moved the steps for running the tests on User A's emulator only to the start of section 4.2, since every two-user test needs them. Added `scripts/run-e2e-user-b`, which shows the manual tester each User B step and lets the test carry on when they press Enter, with how to use it in section 4.2. The Send Friend Request test also covers Decline Friend Request, through Notifications → Friend requests, with its own expected behaviors. The offline steps were removed from the two Friend tests. |
 
 ---
 
@@ -701,7 +701,7 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
     To be added once the test passes on User A's emulator.
     ```
 
-- **Use Case: Send Friend Request (Use Case 5 of the Friend System, test `FriendSystemTest.sendFriendRequest`)**
+- **Use Case: Send Friend Request (Use Case 5 of the Friend System, test `FriendSystemTest.sendFriendRequest`, which also covers Decline Friend Request)**
 
   Send Friend Request has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
 
@@ -721,11 +721,30 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
     | 4. User selects "Add". | Click the button labelled "Add" on the "Bea Tester" card. |
     | 5. System sends the request, shows it as sent, and notifies the other user. | Wait until the "Bea Tester" card shows "Request Sent".<br>Check that the "Bea Tester" card has no button labelled "Add".<br>Click the button "Clear search", then input "Bea Tester" in the text field "Search by name".<br>Check that the "Bea Tester" card still shows "Request Sent".<br>**(manual, User B)** Check that a "New friend request" notification arrived, saying User A sent a friend request.<br>**(manual, User B)** Open Notifications → Friend requests, check User A's request is listed, and click "Decline". Press Enter in the User B helper.<br>Search "Bea Tester" again until the card shows the "Add" button again. |
     | 3a. The other person already sent the user a request. | **(manual, User B)** Click the "Friends" tab, search for User A and click "Add". Press Enter in the User B helper.<br>Search "Bea Tester" again until the card shows "Sent you a request". |
-    | 3a1. System shows that the person already sent a request instead of the "Add" button, and lets the user answer it. | Check that the "Bea Tester" card has no button labelled "Add".<br>Click "Sent you a request" on the "Bea Tester" card.<br>Check that the text "Friend Requests" is on the screen.<br>Wait until a request from "Bea Tester" is on the screen.<br>Check that the request has a button labelled "Accept".<br>Click the button labelled "Decline" on the request, so the next run starts with no requests.<br>Wait until the request from "Bea Tester" is no longer on the screen. |
+    | 3a1. System shows that the person already sent a request instead of the "Add" button, and lets the user answer it. | Check that the "Bea Tester" card has no button labelled "Add".<br>Click "Sent you a request" on the "Bea Tester" card.<br>Check that the text "Friend Requests" is on the screen.<br>Wait until a request from "Bea Tester" is on the screen.<br>Click the button "Back". |
 
     The app never shows "Add" while a request is pending, so the server's "already requested" answer can't be reached from the screen. Step 5's second search, which still shows "Request Sent", covers that state.
+
+    The same test then declines User B's request from 3a, which covers the Decline Friend Request use case below and leaves the two users with no requests for the next run.
 
   - **Test Logs:**
     ```
     To be added once the test passes on User A's emulator.
     ```
+
+- **Use Case: Decline Friend Request (Use Case 7 of the Friend System, test `FriendSystemTest.sendFriendRequest`)**
+
+  Decline Friend Request is tested at the end of the Send Friend Request test, with the request User B sends in its step 3a. It has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does. The only failure the app handles, a request that was already answered by the time it is declined, can't be caused from the screen, since the app has no way to withdraw a request.
+
+  - **Before the tests:** as for Send Friend Request above. When these steps start, User B has a pending friend request to User A.
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User opens their friend requests. | Click the "Notifications" tab in the bottom bar.<br>Click "Friend requests". |
+    | 2. System lists the requests waiting for an answer, each with "Accept" and "Decline". | Check that the text "Friend Requests" is on the screen.<br>Wait until a request from "Bea Tester" is on the screen.<br>Check that the request has buttons labelled "Accept" and "Decline". |
+    | 3. User selects "Decline". | Click the button labelled "Decline" on the request from "Bea Tester". |
+    | 4. System removes the request, and the two users don't become friends. | Wait until the request from "Bea Tester" is no longer on the screen.<br>Click the "Friends" tab in the bottom bar, and click the button "Clear search" if a search is shown.<br>Check that "Your Friends" is on the screen, without a "Bea Tester" card.<br>Input "Bea Tester" in the text field "Search by name".<br>Check that the "Bea Tester" card has a button labelled "Add". |
+
+  - **Test Logs:** the logs of `FriendSystemTest.sendFriendRequest` above.

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -105,7 +106,9 @@ class FriendSystemTest {
         composeRule.onAllNodes(personCard(USER_B_NAME)).assertCountEquals(0)
     }
 
-    // Use case 5: Send Friend Request, its main success scenario and failure scenario 3a.
+    // Use case 5: Send Friend Request, its main success scenario and failure scenario 3a, then
+    // use case 7: Decline Friend Request with the request User B sent in 3a, which also leaves
+    // the two users with no requests for the next run.
     // User B is the manual tester, who follows the steps scripts/run-e2e-user-b shows
     @Test
     fun sendFriendRequest() {
@@ -142,16 +145,33 @@ class FriendSystemTest {
         composeRule.onAllNodes(addButton(USER_B_NAME)).assertCountEquals(0)
         composeRule.onNode(hasText("Sent you a request") and hasAnyAncestor(personCard(USER_B_NAME))).performClick()
         composeRule.onNodeWithText("Friend Requests").assertIsDisplayed()
-        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
-            composeRule.onAllNodes(requestCard(USER_B_NAME)).fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForRequestCard(USER_B_NAME)
+        composeRule.onNodeWithContentDescription("Back").performClick()
+
+        // Use case 7: Decline Friend Request, with the request User B sent in 3a
+        // 1. User opens their friend requests
+        composeRule.onNode(hasText("Notifications") and hasClickAction()).performClick()
+        composeRule.onNode(hasText("Friend requests") and hasClickAction()).performClick()
+
+        // 2. System lists the requests waiting for an answer, each with Accept and Decline
+        composeRule.onNodeWithText("Friend Requests").assertIsDisplayed()
+        waitForRequestCard(USER_B_NAME)
         composeRule.onNode(requestButton(USER_B_NAME, "Accept")).assertIsDisplayed()
+        composeRule.onNode(requestButton(USER_B_NAME, "Decline")).assertIsDisplayed()
+
+        // 3. User selects "Decline"
         composeRule.onNode(requestButton(USER_B_NAME, "Decline")).performClick()
 
-        // the request is gone, so the next run starts with no requests
+        // 4. System removes the request, and the two users don't become friends
         composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(requestCard(USER_B_NAME)).fetchSemanticsNodes().isEmpty()
         }
+        composeRule.onNode(hasText("Friends") and hasClickAction()).performClick()
+        clearSearchIfAny()
+        composeRule.onNodeWithText("Your Friends").assertIsDisplayed()
+        composeRule.onAllNodes(personCard(USER_B_NAME)).assertCountEquals(0)
+        search(USER_B_NAME)
+        composeRule.onNode(addButton(USER_B_NAME)).assertIsDisplayed()
     }
 
     // the Friends screen's search field, the only text field on it
@@ -193,6 +213,18 @@ class FriendSystemTest {
     // the Accept or Decline button on the person's request
     private fun requestButton(name: String, label: String): SemanticsMatcher =
         hasText(label) and hasClickAction() and hasAnyAncestor(requestCard(name))
+
+    private fun waitForRequestCard(name: String) {
+        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(requestCard(name)).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    // the Friends tab keeps the last search, clearing it shows the user's friends
+    private fun clearSearchIfAny() {
+        val clear = composeRule.onAllNodes(hasContentDescription("Clear search"))
+        if (clear.fetchSemanticsNodes().isNotEmpty()) clear[0].performClick()
+    }
 
     /*  asks the manual tester to do a User B step and waits until they press Enter. The step
         is logged for scripts/run-e2e-user-b, which shows it and marks it done on Enter. The
