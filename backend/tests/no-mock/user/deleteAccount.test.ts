@@ -1,7 +1,16 @@
 import { selectRows } from '../../../src/core/db/mysql';
 import * as push from '../../../src/core/notifications/push';
 import { findUserById } from '../../../src/user/db/users';
-import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, getPlayerIds, withToken } from '../helpers';
+import {
+  addGame,
+  addPlayer,
+  addUser,
+  api,
+  asUser,
+  cleanUpAfterTests,
+  expectSignInRequired,
+  getPlayerIds,
+} from '../helpers';
 
 let oliviaId: number;
 let benId: number;
@@ -9,6 +18,11 @@ let benId: number;
 beforeEach(async () => {
   oliviaId = await addUser('Olivia');
   benId = await addUser('Ben');
+});
+
+// the watched sendPushToUsers is put back after each test, so no test sees another's calls
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 cleanUpAfterTests();
@@ -26,13 +40,7 @@ describe('Unmocked: DELETE /api/users/me', () => {
   // Expected behavior: no account is deleted
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    const noToken = await api.delete('/api/users/me');
-    expect(noToken.status).toBe(400);
-    expect(noToken.body).toMatchObject({ msg: 'invalid_request' });
-
-    const badToken = await api.delete('/api/users/me').set(withToken('not-a-real-token'));
-    expect(badToken.status).toBe(401);
-    expect(badToken.body).toEqual({ msg: 'invalid_token', error: 'Invalid jwt_token' });
+    await expectSignInRequired((headers) => api.delete('/api/users/me').set(headers));
 
     expect(await findUserById(oliviaId)).not.toBeNull();
   });
@@ -54,7 +62,7 @@ describe('Unmocked: DELETE /api/users/me', () => {
 
     const response = await api.delete('/api/users/me').set(asUser(oliviaId));
     // the reply doesn't wait for the notifications, so wait for them before checking
-    await Promise.all(sendPushToUsers.mock.results.map((result) => result.value));
+    await Promise.all(sendPushToUsers.mock.results.map((result) => result.value as Promise<number>));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success' });

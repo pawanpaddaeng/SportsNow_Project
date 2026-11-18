@@ -1,5 +1,6 @@
 import * as push from '../../../src/core/notifications/push';
 import * as gamesDb from '../../../src/game/db/games';
+import { type ActiveGame } from '../../../src/game/db/games';
 import * as usersDb from '../../../src/user/db/users';
 import type * as MockEnv from '../mockEnv';
 import { api, cleanUpAfterTests, letNotificationsFinish, signIn, testOrganizer, withToken } from '../helpers';
@@ -11,6 +12,26 @@ cleanUpAfterTests();
 // the organizer's own upcoming game, and an upcoming game of user 2 they joined
 const OWN_GAME = { gameId: 42, organizerId: 1, title: 'Sunday Soccer', locationName: 'Jericho Park' };
 const JOINED_GAME = { gameId: 43, organizerId: 2, title: 'Friday Hoops', locationName: 'UBC Rec Centre' };
+
+/*  replaces everything deleting an account touches: getActiveGamesOfUser returns the given games,
+    getUsersToNotify returns users 2 and 3, and deleteUser and sendPushToUsers succeed. A test can
+    change one, e.g. make deleteUser throw
+ */
+function mockAccountDeletion(games: ActiveGame[]) {
+  jest.spyOn(gamesDb, 'getActiveGamesOfUser').mockResolvedValue(games);
+  return {
+    getUsersToNotify: jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]),
+    deleteUser: jest.spyOn(usersDb, 'deleteUser').mockResolvedValue(),
+    sendPushToUsers: jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(1),
+  };
+}
+
+// deletes the signed in user's account, and lets any notifications finish before the test checks them
+async function deleteAccount(token: string) {
+  const response = await api.delete('/api/users/me').set(withToken(token));
+  await letNotificationsFinish();
+  return response;
+}
 
 // Interface DELETE /api/users/me
 describe('Mocked: DELETE /api/users/me', () => {
@@ -25,13 +46,9 @@ describe('Mocked: DELETE /api/users/me', () => {
   test('Players of the user\'s games are told', async () => {
     const organizer = testOrganizer();
     const token = signIn(organizer);
-    jest.spyOn(gamesDb, 'getActiveGamesOfUser').mockResolvedValue([OWN_GAME, JOINED_GAME]);
-    const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
-    const deleteUser = jest.spyOn(usersDb, 'deleteUser').mockResolvedValue();
-    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(1);
+    const { getUsersToNotify, deleteUser, sendPushToUsers } = mockAccountDeletion([OWN_GAME, JOINED_GAME]);
 
-    const response = await api.delete('/api/users/me').set(withToken(token));
-    await letNotificationsFinish();
+    const response = await deleteAccount(token);
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success' });
@@ -58,13 +75,10 @@ describe('Mocked: DELETE /api/users/me', () => {
   // Expected output: { msg: "server_error", error: "Could not delete account, try again later" }
   test('Database fails while deleting the account', async () => {
     const token = signIn(testOrganizer());
-    jest.spyOn(gamesDb, 'getActiveGamesOfUser').mockResolvedValue([OWN_GAME]);
-    jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
-    jest.spyOn(usersDb, 'deleteUser').mockRejectedValue(new Error('database is down'));
-    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(1);
+    const { deleteUser, sendPushToUsers } = mockAccountDeletion([OWN_GAME]);
+    deleteUser.mockRejectedValue(new Error('database is down'));
 
-    const response = await api.delete('/api/users/me').set(withToken(token));
-    await letNotificationsFinish();
+    const response = await deleteAccount(token);
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ msg: 'server_error', error: 'Could not delete account, try again later' });

@@ -26,8 +26,8 @@ describe('Mocked: POST /api/auth/login', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'signedIn', jwt_token: expect.any(String) });
     expect(findUserByGoogleId).toHaveBeenCalledWith(GOOGLE_ACCOUNT.sub);
-    const jwt = verifyAuthToken(response.body.jwt_token);
-    expect(jwt.ok && jwt.payload.user_id).toBe(player.userId);
+    const { jwt_token: jwtToken } = response.body as { jwt_token: string };
+    expect(verifyAuthToken(jwtToken)).toMatchObject({ ok: true, payload: { user_id: player.userId } });
   });
 
   // Mocked behavior: Google's check accepts the ID token, and findUserByGoogleId finds nobody

@@ -8,7 +8,7 @@ export const GOOGLE_ACCOUNT = { sub: 'google-new-user', email: 'new.user@example
 /*  replaces Google's check of the ID token, so any token is accepted as signed by
     GOOGLE_ACCOUNT. The real check needs a token Google signed for this app
  */
-export function mockGoogleCheck(): jest.SpyInstance {
+export function mockGoogleCheck(): void {
   const ticket = new LoginTicket('test-envelope', {
     iss: 'https://accounts.google.com',
     aud: 'test-client-id',
@@ -17,5 +17,5 @@ export function mockGoogleCheck(): jest.SpyInstance {
     email_verified: true,
     ...GOOGLE_ACCOUNT,
   });
-  return jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve(ticket));
+  jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve(ticket));
 }

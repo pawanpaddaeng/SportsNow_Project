@@ -11,13 +11,14 @@ describe('Unmocked: POST /api/auth/login', () => {
   // Expected status code: 400
   // Expected behavior: Google is never asked and no JWT is made
   // Expected output: { msg: "invalid_request", error: "id_token is required" }
-  test('Rejects a login with no ID token', async () => {
-    for (const body of [undefined, { id_token: '' }]) {
-      const response = await api.post('/api/auth/login').send(body);
+  test.each([
+    ['no body', undefined],
+    ['an empty id_token', { id_token: '' }],
+  ])('Rejects a login with no ID token: %s', async (_case, body) => {
+    const response = await api.post('/api/auth/login').send(body);
 
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ msg: 'invalid_request', error: 'id_token is required' });
-    }
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ msg: 'invalid_request', error: 'id_token is required' });
   });
 
   // Input: an id_token Google didn't sign

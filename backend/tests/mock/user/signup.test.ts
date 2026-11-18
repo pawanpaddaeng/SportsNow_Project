@@ -41,8 +41,8 @@ describe('Mocked: POST /api/auth/signup', () => {
       lastName: 'Newuser',
       birthYear: 1999,
     });
-    const jwt = verifyAuthToken(response.body.jwt_token);
-    expect(jwt.ok && jwt.payload.user_id).toBe(7);
+    const { jwt_token: jwtToken } = response.body as { jwt_token: string };
+    expect(verifyAuthToken(jwtToken)).toMatchObject({ ok: true, payload: { user_id: 7 } });
   });
 
   // Mocked behavior: Google's check accepts the ID token, and userExists says the Google

@@ -1,5 +1,5 @@
 import { selectRows } from '../../../src/core/db/mysql';
-import { addUser, api, asUser, cleanUpAfterTests, withToken } from '../helpers';
+import { addUser, api, asUser, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 
 let aliceId: number;
 
@@ -24,13 +24,7 @@ describe('Unmocked: POST /api/register_notif', () => {
   test('Rejects a call that is not signed in', async () => {
     const body = { fcm_token: `no-mock-register-notif-${aliceId}` };
 
-    const noToken = await api.post('/api/register_notif').send(body);
-    expect(noToken.status).toBe(400);
-    expect(noToken.body).toMatchObject({ msg: 'invalid_request' });
-
-    const badToken = await api.post('/api/register_notif').set(withToken('not-a-real-token')).send(body);
-    expect(badToken.status).toBe(401);
-    expect(badToken.body).toEqual({ msg: 'invalid_token', error: 'Invalid jwt_token' });
+    await expectSignInRequired((headers) => api.post('/api/register_notif').set(headers).send(body));
 
     expect(await getSavedTokens(aliceId)).toEqual([]);
   });
@@ -53,13 +47,14 @@ describe('Unmocked: POST /api/register_notif', () => {
   // Expected status code: 400
   // Expected behavior: no device token is saved
   // Expected output: { msg: "invalid_request", error: "fcm_token is required (max 512 characters)" }
-  test('Rejects a missing device token', async () => {
-    for (const body of [{}, { fcm_token: '   ' }]) {
-      const response = await api.post('/api/register_notif').set(asUser(aliceId)).send(body);
+  test.each([
+    ['no fcm_token', {}],
+    ['an fcm_token of only spaces', { fcm_token: '   ' }],
+  ])('Rejects a missing device token: %s', async (_case, body) => {
+    const response = await api.post('/api/register_notif').set(asUser(aliceId)).send(body);
 
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ msg: 'invalid_request', error: 'fcm_token is required (max 512 characters)' });
-    }
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ msg: 'invalid_request', error: 'fcm_token is required (max 512 characters)' });
     expect(await getSavedTokens(aliceId)).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
-import { addUser, api, asUser, cleanUpAfterTests, withToken } from '../helpers';
+import { addUser, api, asUser, cleanUpAfterTests, expectSignInRequired } from '../helpers';
+import { expectedProfile } from './userHelpers';
 
 let aliceId: number;
 
@@ -15,13 +16,7 @@ describe('Unmocked: GET /api/users/me', () => {
   // Expected behavior: no profile is read
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    const noToken = await api.get('/api/users/me');
-    expect(noToken.status).toBe(400);
-    expect(noToken.body).toMatchObject({ msg: 'invalid_request' });
-
-    const badToken = await api.get('/api/users/me').set(withToken('not-a-real-token'));
-    expect(badToken.status).toBe(401);
-    expect(badToken.body).toEqual({ msg: 'invalid_token', error: 'Invalid jwt_token' });
+    await expectSignInRequired((headers) => api.get('/api/users/me').set(headers));
   });
 
   // Input: Alice asks for her own profile
@@ -33,16 +28,6 @@ describe('Unmocked: GET /api/users/me', () => {
     const response = await api.get('/api/users/me').set(asUser(aliceId));
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      msg: 'success',
-      user: {
-        user_id: aliceId,
-        email: 'no-mock-test@example.com',
-        f_name: 'Alice',
-        l_name: 'Tester',
-        birthYear: 1995,
-        created_at: expect.any(String),
-      },
-    });
+    expect(response.body).toEqual({ msg: 'success', user: expectedProfile(aliceId, 'Alice') });
   });
 });

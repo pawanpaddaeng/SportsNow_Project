@@ -8,8 +8,8 @@ cleanUpAfterTests();
 
 // how many users are really saved with this email
 async function countUsersWithEmail(email: string): Promise<number> {
-  const rows = await selectRows<{ total: number }>('SELECT COUNT(*) AS total FROM users WHERE email = ?', [email]);
-  return Number(rows[0]?.total ?? 0);
+  const rows = await selectRows<{ user_id: number }>('SELECT user_id FROM users WHERE email = ?', [email]);
+  return rows.length;
 }
 
 // Interface POST /api/auth/signup

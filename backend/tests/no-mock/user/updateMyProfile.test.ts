@@ -1,5 +1,6 @@
 import { findUserById } from '../../../src/user/db/users';
-import { addUser, api, asUser, cleanUpAfterTests, withToken } from '../helpers';
+import { addUser, api, asUser, cleanUpAfterTests, expectSignInRequired } from '../helpers';
+import { expectedProfile } from './userHelpers';
 
 let aliceId: number;
 
@@ -9,11 +10,12 @@ beforeEach(async () => {
 
 cleanUpAfterTests();
 
-// Alice's names and birth year as really saved
-async function getSavedProfile(userId: number) {
-  const user = await findUserById(userId);
-  return { firstName: user?.firstName, lastName: user?.lastName, birthYear: user?.birthYear };
+// checks the names and birth year really saved for the user
+async function expectSavedProfile(userId: number, profile: { firstName: string; lastName: string; birthYear: number }) {
+  expect(await findUserById(userId)).toMatchObject(profile);
 }
+
+const ORIGINAL = { firstName: 'Alice', lastName: 'Tester', birthYear: 1995 };
 
 const NEW_PROFILE = { f_name: 'Alicia', l_name: 'Newname', birthYear: 1990 };
 
@@ -24,15 +26,9 @@ describe('Unmocked: PUT /api/users/me', () => {
   // Expected behavior: the profile doesn't change
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    const noToken = await api.put('/api/users/me').send(NEW_PROFILE);
-    expect(noToken.status).toBe(400);
-    expect(noToken.body).toMatchObject({ msg: 'invalid_request' });
+    await expectSignInRequired((headers) => api.put('/api/users/me').set(headers).send(NEW_PROFILE));
 
-    const badToken = await api.put('/api/users/me').set(withToken('not-a-real-token')).send(NEW_PROFILE);
-    expect(badToken.status).toBe(401);
-    expect(badToken.body).toEqual({ msg: 'invalid_token', error: 'Invalid jwt_token' });
-
-    expect(await getSavedProfile(aliceId)).toEqual({ firstName: 'Alice', lastName: 'Tester', birthYear: 1995 });
+    await expectSavedProfile(aliceId, ORIGINAL);
   });
 
   // Input: Alice changes her first name, last name and birth year
@@ -45,16 +41,9 @@ describe('Unmocked: PUT /api/users/me', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       msg: 'success',
-      user: {
-        user_id: aliceId,
-        email: 'no-mock-test@example.com',
-        f_name: 'Alicia',
-        l_name: 'Newname',
-        birthYear: 1990,
-        created_at: expect.any(String),
-      },
+      user: expectedProfile(aliceId, 'Alicia', { l_name: 'Newname', birthYear: 1990 }),
     });
-    expect(await getSavedProfile(aliceId)).toEqual({ firstName: 'Alicia', lastName: 'Newname', birthYear: 1990 });
+    await expectSavedProfile(aliceId, { firstName: 'Alicia', lastName: 'Newname', birthYear: 1990 });
   });
 
   // Input: f_name and birthYear, with no l_name
@@ -69,6 +58,6 @@ describe('Unmocked: PUT /api/users/me', () => {
       msg: 'invalid_request',
       error: 'First Name, Last Name and Birth Year fields are compulsory',
     });
-    expect(await getSavedProfile(aliceId)).toEqual({ firstName: 'Alice', lastName: 'Tester', birthYear: 1995 });
+    await expectSavedProfile(aliceId, ORIGINAL);
   });
 });
