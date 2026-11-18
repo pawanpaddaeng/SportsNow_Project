@@ -12,6 +12,7 @@
 | Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for the Friend System (`FriendSystemTest.kt`): Search Users, Send and Decline Friend Request, Accept Friend Request, and Send (formal Use Case 1), Receive and View Friend Messages. Section 4.2 explains how the manual tester acts as User B with `scripts/run-e2e-user-b`, and how to run the tests on User A's emulator only. Logs will be added once the tests pass. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
 | Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
+| Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for Game Discovery and game chat (issue #80): Discover Game (formal Use Case 4) with its failures 2a, 3a and 5a, Join Game (formal Use Case 5) with 3a, 4a, 4b and 4c, View Upcoming Games, Leave Game, and Send, View and Receive Message in a game chat, where User B sends the live message. The planned Discover Game test from CP1 is replaced by the one that was written. Section 4.2 explains the test games that `scripts/run-frontend-e2e-tests` now saves before the tests with `backend/tests/e2e/seedGameDiscovery.ts`, and how the tests set the phone's location and act as the games' organizer. Logs will be added once the tests pass. |
 
 ---
 
@@ -786,7 +787,10 @@ _To be added at CP2._
 | **Feature** | **Test file** |
 | ----------- | ------------- |
 | Friend System | [`FriendSystemTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/FriendSystemTest.kt) |
-| Game Discovery | `DiscoverGameTest.kt` _(written at CP2)_ |
+| Game Discovery | [`DiscoverGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/DiscoverGameTest.kt), [`JoinGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/JoinGameTest.kt), [`MyGamesTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/MyGamesTest.kt) |
+| Chat (game chat) | [`GameChatTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/GameChatTest.kt) |
+
+The game discovery and game chat tests share helpers in the same folder: `TestLocation.kt` sets the phone's location, `TestOrganizer.kt` acts as the test games' organizer through the back end, `UserB.kt` waits for User B's steps, and `ComposeWaits.kt` waits for the screen. Their test data comes from [`backend/tests/e2e/seedGameDiscovery.ts`](../backend/tests/e2e/seedGameDiscovery.ts), see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
 
 ### 4.2. Tests
 
@@ -844,42 +848,213 @@ When a test needs User B, it pauses until the manual tester has done the step on
 
 A test fails if Enter isn't pressed within 10 minutes of a step being shown, or if User B's change doesn't show on User A's screen within 30 seconds of pressing Enter.
 
+#### Test data for the game discovery and game chat tests
+
+`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest` need games that User A didn't organize, since Discover never shows a user their own games. So `scripts/run-frontend-e2e-tests` saves them before the tests:
+
+1. Once you have signed in to the app and pressed Enter, the script asks for the email of the Google account you signed in with. To skip the question, set it first: `$env:E2E_USER_EMAIL = "you@example.com"` (PowerShell) or `export E2E_USER_EMAIL=you@example.com` (Bash).
+2. It runs `backend/tests/e2e/seedGameDiscovery.ts` inside the backend container (`docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts <email>`). The script first removes what an earlier run saved, so every run starts from the same games. It then saves a test organizer, "Olive Organizer", and these games:
+
+   | **Game** | **Sport** | **Where** | **Used by** |
+   | -------- | --------- | --------- | ----------- |
+   | "E2E Basketball Near" | basketball | 200 m from the Discover spot | `DiscoverGameTest` |
+   | "E2E Basketball Far" | basketball | 1 km from the Discover spot | `DiscoverGameTest` |
+   | "E2E Soccer" | soccer | 2 km from the Discover spot | `DiscoverGameTest` |
+   | "E2E Join", "E2E Join Cancelled", "E2E Join Started", "E2E Join Offline" | basketball | near the games spot | one `JoinGameTest` test each |
+   | "E2E Leave" | soccer | near the games spot, User A has joined it | `MyGamesTest` (Leave Game) |
+   | "E2E Chat" | volleyball | near the games spot, User A and User B have joined it, with the messages "E2E hello from the organizer" and "E2E bring a ball please" from the organizer | `MyGamesTest`, `GameChatTest` |
+   | "E2E Organized" | tennis | organized by User A | `MyGamesTest` (View Upcoming Games) |
+
+   There are no volleyball games near the Discover spot. The Discover spot (45° N, 135° W) and the games spot (46° N, 135° W) are in the Pacific Ocean, about 111 km apart, so no real game is within Discover's 50 km of either, and the games near one don't show at the other. User B is added to "E2E Chat" only if the account "Bea Tester" exists (see [Doing User B's steps](#doing-user-bs-steps)); otherwise the script says so and only Receive Message fails.
+3. The seed script prints a token that signs in as the test organizer. The runner passes it to the tests as the `organizerToken` instrumentation argument, and `TestOrganizer` uses it to cancel or start a game while User A has its join request form open (Join Game 4a and 4b), and to read the game chat.
+
+Every game starts on a different day, 1 to 10 days after the seed runs, so the lists are always in the same order. The tests also need:
+
+- **Phone location:** `TestLocation` replaces the phone's fused, network and GPS location providers with test providers that report the test spot, after allowing the app to use them (`appops set ... android:mock_location allow`). It gives the app location permission first (`grantRuntimePermission`), so Android's permission pop-up never shows, and removes the test providers after each test.
+- **Location off:** `cmd location set-location-enabled false` turns the phone's location off, and it's turned back on after the test.
+- **No connection:** `cmd connectivity airplane-mode enable` cuts the phone off from the server. Airplane mode is turned off after the test, waiting for the phone to reconnect.
+
 #### Use cases
 
 The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests until Remove Friend is built.
 
-- **Use Case: Discover Game (Use Case 4)**
+The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest`) can run in any order: each test has its own game, or only reads games no other test changes.
+
+- **Use Case: Discover Game (Use Case 24, formal Use Case 4, tests in `DiscoverGameTest`)**
+
+  The scenario steps come from the formal specification (Requirements and Design section 3.5, Use Case 4). Each of the three tests starts on the main screen.
 
   - **Before the tests:**
-    - **Signed in:** Each test starts signed in, on the Home screen.
-    - **Test games:** Discover never shows your own games. So before the tests, `scripts/run-frontend-e2e-tests` runs a script that adds games to the database. The games belong to a test organizer, and are near a fixed test location. The script first removes the test games from earlier runs, so every run starts the same. It adds:
-      - "E2E Basketball Near": basketball, 200 m away
-      - "E2E Basketball Far": basketball, 1 km away
-      - "E2E Soccer": soccer, 2 km away
-      - no volleyball games
-    - **Phone location:** The tests set the phone's location with a test location provider. They allow this with the command `appops set ... android:mock_location allow`.
-    - **Location permission:** The tests give the app location permission before each test (`GrantPermissionRule`), so the permission pop-up doesn't appear.
-    - **Location off (2a):** The 2a test turns the phone's location off with the command `cmd location set-location-enabled false`. It turns location back on at the end.
+    - **User A (automated):** signed in on the emulator that runs the tests, on the main screen.
+    - **Test data:** "E2E Basketball Near", "E2E Basketball Far" and "E2E Soccer" near the Discover spot, and no volleyball games, see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
+    - **Phone location:** set by `TestLocation`, which also gives the app location permission.
+
+  - **Expected Behaviors, main success scenario and 5a (`discoverGame_showsNearbyGamesAndFiltersBySport`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Player selects the compass in the navigation bar. | Set the phone's location to the Discover spot.<br>Click the "Discover" tab in the bottom bar.<br>Check that the title "Discover" is on the screen. |
+    | 2. System gets the Player's location from the phone. | Wait until "3 games nearby" is on the screen.<br>Check that "Showing games near" and "Your location" are on the screen.<br>Check that neither location error message is on the screen. |
+    | 3. System displays the nearby games sorted by distance with their information, and a selector bar at the top with various sports. | Check that "Sorted by distance" is on the screen.<br>Check that the cards "1. E2E Basketball Near" showing "200 m", "2. E2E Basketball Far" showing "1.0 km" and "3. E2E Soccer" showing "2.0 km" are on the screen.<br>Check that the "All" chip is selected, and the "Basketball", "Soccer" and "Volleyball" chips are on the screen and not selected. |
+    | 4. Player selects a sport in the selector bar. | Click the "Basketball" chip. |
+    | 5. System updates the list to show only the games of the selected sport. | Wait until "2 basketball games nearby" is on the screen.<br>Check that the "Basketball" chip is selected.<br>Check that the cards "1. E2E Basketball Near" and "2. E2E Basketball Far" are on the screen.<br>Check that "E2E Soccer" is not on the screen. |
+    | 5a. No nearby games are found for the selected sport. | Click the "Volleyball" chip. |
+    | 5a1. System displays a message saying no games were found of the selected sport. | Wait until "No volleyball games nearby. Try another sport." is on the screen.<br>Check that none of the three games is on the screen. |
+
+  - **Expected Behaviors, 2a (`discoverGame_locationOff_showsErrorAndTryAgain`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Player selects the compass in the navigation bar. | Turn the phone's location off.<br>Click the "Discover" tab in the bottom bar. |
+    | 2a. System cannot get the Player's location (e.g. location is turned off or location access is denied). | (Location is off.) |
+    | 2a1. System displays an error message and lets the Player try again or choose a place on the map. | Wait until "Location is turned off. Turn it on in your phone's settings, then try again." is on the screen.<br>Check that the button "Try again" is on the screen.<br>Check that "Choose a location" and "Change" are on the screen.<br>Check that none of the three games is on the screen.<br>Turn the phone's location back on and set it to the Discover spot.<br>Click the button "Try again".<br>Wait until "3 games nearby" is on the screen.<br>Check that neither location error message is on the screen.<br>Check that the card "1. E2E Basketball Near" showing "200 m" is on the screen. |
+
+  - **Expected Behaviors, 3a (`discoverGame_noGamesNearby_showsMessage`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Player selects the compass in the navigation bar. | Set the phone's location to a spot about 390 km from the test games (45° N, 130° W).<br>Click the "Discover" tab in the bottom bar. |
+    | 3a. No games are found nearby. | (No game is within 50 km.) |
+    | 3a1. System displays a message saying no nearby games were found. | Wait until "No games nearby right now. Check back later or organize your own game." is on the screen.<br>Check that neither location error message is on the screen.<br>Check that none of the three games is on the screen. |
+
+  - **Test Logs:**
+    ```
+    To be added once the tests pass on User A's emulator.
+    ```
+
+- **Use Case: Join Game (Use Case 25, formal Use Case 5, tests in `JoinGameTest`)**
+
+  The scenario steps come from the formal specification (Requirements and Design section 3.5, Use Case 5). Its precondition, viewing the details of a game the Player hasn't joined, is reached the same way in every test: set the phone's location to the games spot, click the "Discover" tab, wait until "Sorted by distance" is on the screen, click the test's game card (found by the end of its text, such as ". E2E Join Cancelled"), and check that the button "Request to Join" is enabled. Each test has its own game, so none depends on another.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the tests, on the main screen.
+    - **Test data:** "E2E Join", "E2E Join Cancelled", "E2E Join Started" and "E2E Join Offline", which User A has never asked to join, and the test organizer's token, see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests). The 4a and 4b tests change their games, so the tests need a fresh seed for each run, which `scripts/run-frontend-e2e-tests` always does.
+
+  - **Expected Behaviors, main success scenario and 3a (`joinGame_sendsRequestAndShowsItPending`, game "E2E Join"):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Player selects "Request to join". | Open "E2E Join" from Discover.<br>Click the button "Request to Join". |
+    | 2. System displays the join request form with fields for skill level, how often they play (optional), and a message (optional). | Wait until the title "Request to join" is on the screen.<br>Check that "What is your skill level in basketball? *", "How often do you play?" and "Message to organizer (optional)" are on the screen. |
+    | 3a. Player did not select a skill level. | (No skill level is selected yet.) |
+    | 3a1. System marks the skill level as required and keeps "Send request" disabled until the Player selects it. | Check that the button "Send Request" is disabled. |
+    | 3. Player fills in the form and clicks "Send request". | Click the "Intermediate" chip and the "Monthly" chip.<br>Input "E2E happy to play any position" in the message field.<br>Check that the button "Send Request" is enabled, and click it. |
+    | 4. System sends the request to the organiser and shows the request as pending. | Wait until Discover shows the "E2E Join" card with "Request pending".<br>Click the "E2E Join" card.<br>Check that the button "Request sent" is on the screen and disabled.<br>Check that "Waiting for the organizer to respond. You will be notified when they do." is on the screen. |
+
+  - **Expected Behaviors, 4a (`joinGame_gameCancelled_showsErrorAndSendsNothing`, game "E2E Join Cancelled"):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–3. Player opens the form, fills it in and clicks "Send request". | Open "E2E Join Cancelled" from Discover.<br>Click the button "Request to Join", then the "Beginner" chip. |
+    | 4a. The organiser cancelled the game before the request was sent. | As the test organizer, cancel "E2E Join Cancelled" (`POST /api/games/{gameId}/cancel`).<br>Click the button "Send Request". |
+    | 4a1. System displays "This game was cancelled" and does not send the request. | Wait until "This game was cancelled" is on the screen.<br>Check that the form is still open (the title "Request to join" is on the screen) and the button "Send Request" is enabled. |
+
+  - **Expected Behaviors, 4b (`joinGame_gameStarted_showsErrorAndSendsNothing`, game "E2E Join Started"):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–3. Player opens the form, fills it in and clicks "Send request". | Open "E2E Join Started" from Discover.<br>Click the button "Request to Join", then the "Beginner" chip. |
+    | 4b. The game started before the request was sent. | As the test organizer, edit "E2E Join Started" to start 30 seconds ago (`PUT /api/games/{gameId}`; the server accepts start times up to a minute in the past).<br>Click the button "Send Request". |
+    | 4b1. System displays "This game has already started" and does not send the request. | Wait until "This game has already started" is on the screen.<br>Check that the form is still open and the button "Send Request" is enabled. |
+
+  - **Expected Behaviors, 4c (`joinGame_noConnection_showsErrorAndTryAgain`, game "E2E Join Offline"):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–3. Player opens the form, fills it in and clicks "Send request". | Open "E2E Join Offline" from Discover.<br>Click the button "Request to Join", then the "Beginner" chip. |
+    | 4c. The phone cannot reach the server (e.g. no internet connection). | Turn airplane mode on.<br>Click the button "Send Request". |
+    | 4c1. System displays "Couldn't reach the server, try again" and lets the Player try again. | Wait until "Couldn't reach the server, try again" is on the screen.<br>Check that the form is still open and the button "Send Request" is enabled.<br>Turn airplane mode off and wait for the phone to reconnect.<br>Click the button "Send Request".<br>Wait until Discover shows the "E2E Join Offline" card with "Request pending". |
+
+  - **Test Logs:**
+    ```
+    To be added once the tests pass on User A's emulator.
+    ```
+
+- **Use Case: View Upcoming Games (Use Case 27, test `MyGamesTest.viewUpcomingGames_showsOrganizedAndJoinedGames`)**
+
+  View Upcoming Games has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Organized", organized by User A, and "E2E Chat", joined by User A, see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests). User A's own games may also be listed: the test only looks for these two.
 
   - **Expected Behaviors:**
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
-    | 1. Player selects the compass in the navigation bar. | Set the phone's location to the test location.<br>Click the "Discover" tab in the bottom bar.<br>Check that the text "Discover" is on the screen. |
-    | 2. System gets the Player's location from the phone. | Check that "Showing games near" and "Your location" are on the screen.<br>Check that there is no location error message on the screen. |
-    | 2a. System cannot get the Player's location (e.g. location is turned off or location access is denied). | Turn the phone's location off.<br>Click the "Discover" tab in the bottom bar. |
-    | 2a1. System displays an error message and lets the Player try again or choose a place on the map. | Check that the text "Location is turned off. Turn it on in your phone's settings, then try again." is on the screen.<br>Check that the "Try again" button is on the screen.<br>Check that "Choose a location" and "Change" are on the screen.<br>Turn the phone's location back on.<br>Click the "Try again" button.<br>Check that the text "3 games nearby" is on the screen. |
-    | 3. System displays the nearby games sorted by distance with their information, and a selector bar at the top with various sports. | Check that "3 games nearby" and "Sorted by distance" are on the screen.<br>Check that "1. E2E Basketball Near", "2. E2E Basketball Far" and "3. E2E Soccer" are on the screen, in that order.<br>Check that the first game shows "200 m".<br>Check that the "All", "Basketball", "Soccer" and "Volleyball" chips are on the screen, and "All" is selected. |
-    | 3a. No games are found nearby. | Set the phone's location to a place more than 50 km from the test games.<br>Click the "Discover" tab in the bottom bar. |
-    | 3a1. System displays a message saying no nearby games were found. | Check that the text "No games nearby right now. Check back later or organize your own game." is on the screen.<br>Check that there are no game cards on the screen. |
-    | 4. Player selects a sport in the selector bar. | Click the "Basketball" chip. |
-    | 5. System updates the list to show only the games of the selected sport. | Check that the text "2 basketball games nearby" is on the screen.<br>Check that "1. E2E Basketball Near" and "2. E2E Basketball Far" are on the screen.<br>Check that "E2E Soccer" is not on the screen. |
-    | 5a. No nearby games are found for the selected sport. | Click the "Volleyball" chip. |
-    | 5a1. System displays a message saying no games were found of the selected sport. | Check that the text "No volleyball games nearby. Try another sport." is on the screen.<br>Check that there are no game cards on the screen. |
+    | 1. User opens the Home screen. | Click the "Home" tab in the bottom bar. |
+    | 2. System lists the games the user joined and the games they organise, each in its own section. | Wait until the "E2E Chat" card is on the screen.<br>Check that "Joined Games" is on the screen.<br>Check that the "E2E Chat" card and the "E2E Organized" card showing "1/10" are on the screen.<br>Click the button "Collapse Joined Games".<br>Check that the "E2E Chat" card is not on the screen and the "E2E Organized" card is.<br>Click the button "Expand Joined Games".<br>Click the button "Collapse Organized Games".<br>Check that the "E2E Organized" card is not on the screen and the "E2E Chat" card is.<br>Click the button "Expand Organized Games". |
+    | 3. User selects a game. | Click the "E2E Organized" card. |
+    | 4. System opens the game's details. | Wait until "Organized by you" is on the screen.<br>Check that "E2E Organized" is on the screen. |
 
   - **Test Logs:**
     ```
-    To be added at CP2, once the test is written and run.
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Case: Leave Game (Use Case 26, test `MyGamesTest.leaveGame_removesTheGameFromJoinedGames`)**
+
+  Leave Game has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Leave", which User A has joined and which hasn't started, see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Player opens a game they joined. | Click the "Home" tab in the bottom bar.<br>Wait until the "E2E Leave" card is on the screen, and click it. |
+    | 2. Player selects "Leave Game". | Click the button "Leave Game". |
+    | 3. System asks the Player to confirm. | Check that "Leave this game?" and "You'll give up your spot in E2E Leave and the organizer will be notified. To play again you'll need to send a new join request." are on the screen. |
+    | 3a. Player chooses "Stay". | Click the button "Stay" in the dialog. |
+    | 3a1. System closes the dialog and the Player stays in the game. | Check that "Leave this game?" is not on the screen.<br>Check that the button "Leave Game" is on the screen. |
+    | 4. Player confirms. | Click the button "Leave Game", then the button "Leave Game" in the dialog. |
+    | 5. System removes the Player from the game, notifies the organiser, and goes back to Home, where the game is no longer listed. | Wait until "Joined Games" is on the screen.<br>Wait until the "E2E Leave" card is not on the screen.<br>Check that the "E2E Chat" card is on the screen. |
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Cases: Send Message (5, formal Use Case 1), View Messages (6) and Receive Message (7) in a game chat, tests in `GameChatTest`**
+
+  These use cases cover both friend chat and game chat. `FriendSystemTest` above tests them in a friend chat, including formal Use Case 1's failures 5a and 6a; these tests check the same use cases in a game's chat room. Use Case 1's scenario is written for a friend chat, so the steps below say what a game chat does in its place. Each test opens the chat the same way: click the "Home" tab, click the "E2E Chat" card, click the button "Open Chat", wait until "E2E bring a ball please" is on the screen and "Connecting..." isn't, and check that the text field "Message" is on the screen.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the tests, on the main screen.
+    - **Test data:** "E2E Chat", joined by User A and User B, with two earlier messages from "Olive Organizer", see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
+    - **Receive Message only, User B (manual tester):** the "Bea Tester" account described for Search Users, signed in on another device that uses the same back end, and the User B helper running in a second terminal, see [Doing User B's steps](#doing-user-bs-steps). The account must exist before the tests start, so the seed script can add it to "E2E Chat". See also [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only).
+    - **User A's message:** each run sends a message with the time in it (`E2E sent by the player <time>`), so one run's message can't be mistaken for an earlier one.
+
+  - **Expected Behaviors, View Messages (Use Case 6, `viewGameChatMessages_showsEarlierMessagesOldestFirst`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User opens the chat room of a game they joined. | Open the "E2E Chat" chat. |
+    | 2. System shows the earlier messages, oldest at the top and newest at the bottom, each with who sent it. | Check that "E2E hello from the organizer" and "E2E bring a ball please" are on the screen.<br>Check that the sender name "Olive Organizer" is shown at least twice.<br>Check that "E2E bring a ball please" is below "E2E hello from the organizer". |
+
+  - **Expected Behaviors, Send Message (Use Case 5, formal Use Case 1, `sendGameChatMessage_sendsTheMessageToTheChat`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–4. User opens the game's chat room (in place of selecting a friend). | Open the "E2E Chat" chat. |
+    | 5a. User clicked "Send" without typing a message. | Input "   " (only spaces) in the text field "Message".<br>Check that the button "Send message" is disabled.<br>Clear the text field "Message". |
+    | 5. User types a message and clicks "Send". | Input "E2E sent by the player &lt;time&gt;" in the text field "Message".<br>Check that the button "Send message" is enabled, and click it. |
+    | 6. System sends the message to the other members. | Wait until "E2E sent by the player &lt;time&gt;" is on the screen.<br>Check that the button "Send message" is disabled again, since the text field is empty.<br>As the test organizer, read the chat's messages (`GET /api/chats/{chatId}/messages`) until they include "E2E sent by the player &lt;time&gt;". |
+
+  - **Expected Behaviors, Receive Message (Use Case 7, `receiveGameChatMessage_showsNewMessageLive`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Another member sends a message while the user has the game's chat open. | Open the "E2E Chat" chat and keep it open.<br>**(manual, User B)** On Home, open "E2E Chat", click "Open Chat" and send the message "Hi from User B". Press Enter in the User B helper. |
+    | 2. System shows the new message right away, from that member. | Without leaving the chat, wait up to 30 seconds until "Hi from User B" is on the screen.<br>Check that the sender name "Bea Tester" is on the screen.<br>Check that "Hi from User B" is below "E2E bring a ball please". |
+
+    A game chat's push notification, when the chat isn't open, works the same way as a friend chat's, which `FriendSystemTest` checks.
+
+  - **Test Logs:**
+    ```
+    To be added once the tests pass on User A's emulator.
     ```
 
 - **Use Case: Search Users (Use Case 4 of the Friend System, test `FriendSystemTest.test1SearchUsers`)**
