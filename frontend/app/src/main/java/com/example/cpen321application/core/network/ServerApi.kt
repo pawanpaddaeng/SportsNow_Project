@@ -213,6 +213,13 @@ interface FriendApi {
         @Path("requestId") requestId: Int,
         @Body request: FriendDecisionBody
     ) : Response<FriendChangeResponse>
+
+    // stops being friends with userId, which also deletes the chat the two shared
+    @DELETE("api/friends/{userId}")
+    suspend fun removeFriend(
+        @Header("Authorization") authorization: String,
+        @Path("userId") userId: Int
+    ) : Response<FriendChangeResponse>
 }
 
 // the Player Review component's endpoints
