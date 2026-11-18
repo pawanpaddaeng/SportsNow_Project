@@ -113,7 +113,7 @@ Only notifications a user should still see after dismissing the push are saved: 
 
 A chat is either a game's (`game_id` set) or two friends' (`user_low_id` and `user_high_id` set, lowest id first). It has no stored open or closed state or members. A game's chat is closed when the game's status is `completed` or `cancelled`, and its readers are the game's current players. A friend chat never closes, and its readers are the two users while `friendships` says they're friends. So all of this is always up to date. Deleting a game deletes its chat and messages, and deleting a user deletes their friend chats and messages, for both people (`ON DELETE CASCADE`).
 
-Two friends' chat is created when the request is accepted, in the same transaction. If removing friends is added, the chat row should stay: access is lost right away because it's read from `friendships`, and becoming friends again finds the same chat and its history.
+Two friends' chat is created when the request is accepted, in the same transaction. Removing a friend (`removeFriend`) deletes both friendship rows and the chat with `deleteFriendChat` in one transaction, and its messages go with it (`ON DELETE CASCADE`). Becoming friends again opens a new, empty chat. A connection still open on the old chat gets `chat_not_found` and is closed the next time a message is sent to it.
 
 The endpoints are listed in the Requirements and Design doc (section 4.1 Main Components). Every endpoint except sign up, login and `/health` needs `Authorization: Bearer <jwt>`.
 
@@ -160,4 +160,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-Review's stats endpoint and badges aren't built yet, and Friend doesn't have removing friends or friend profiles yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+Review's stats endpoint and badges aren't built yet, and Friend doesn't have friend profiles yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.

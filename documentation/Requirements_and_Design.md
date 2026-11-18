@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 18, 2026 | 3.4, 4.1 | Remove Friend is built (issue #75). Added `DELETE /api/friends/{userId}` to Friend and `deleteFriendChat` to Chat. Removing a friend ends the friendship for both users and deletes the chat they shared with all its messages, so if they become friends again `createFriendChat` opens a new, empty chat instead of reusing the old one. The other user isn't notified. In the app, each friend on the Friends tab has a Remove friend option that asks the user to confirm first. |
 | Nov 18, 2026 | 3.5 (Use Case 5) | Failure scenario 3a of Join Game now matches the app: the skill level is marked as required and "Send request" stays disabled until it's selected, so no error message is needed. |
 | Nov 18, 2026 | 4.7 | Each non-functional requirement is now checked by a back-end test and a front-end test. Performance: the Jest test now calls Discover 10 times instead of once, and a new Android instrumented test times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a new Android instrumented test times each message on the phone, from tapping Send to the server's copy being shown. |
 | Nov 18, 2026 | 3.1, 3.2, 3.3, 3.4, 3.5, 4.6 | Updated the use case diagram. Chat is now its own feature, Feature 2, with Send Message, View Messages and Receive Message each covering both friend chat and game chat, instead of separate friend and game chat use cases under Friend System and Game Discovery. Added the Delete Account use case to Authentication. Features and use cases are renumbered to follow the diagram's order: Authentication, Chat, Friend System, Player Reputation and Statistics, Game Planning, Game Discovery, and in Player Reputation and Statistics, View Player Statistics now comes before Mark No-shows. Formal Use Case 1 is renamed Send Message to match the diagram. |
@@ -71,7 +72,7 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 9. Send Friend Request: A user sends a friend request to a user they found, and the other user is notified.
 10. Accept Friend Request: A user opens the Friend Requests screen from the Notifications screen and accepts a friend request sent to them. The two users become friends and the sender is notified.
 11. Decline Friend Request: A user opens the Friend Requests screen from the Notifications screen and declines a friend request sent to them. The sender is not notified.
-12. Remove Friend: A user removes someone from their list of friends. 
+12. Remove Friend: A user removes someone from their list of friends after confirming. The friendship ends for both of them and their chat, with its messages, is deleted.
 13. View Friend Profile: A user views a friend’s profile, including their badges and upcoming games.
 
 #### - Use cases for Feature 4 Player Reputation and Statistics: 
@@ -370,12 +371,14 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         3. `int createGameChat(Queryable connection, int gameId)`
             - **Purpose**: Used by Game to open the chat room for a new game in the same transaction that creates the game, returning its chat id.
         4. `void createFriendChat(Queryable connection, int userId, int otherUserId)`
-            - **Purpose**: Used by Friend to open two users' chat room in the same transaction that makes them friends.
+            - **Purpose**: Used by Friend to open two users' chat room in the same transaction that makes them friends. Friends who were removed and become friends again get a new, empty chat.
+        5. `void deleteFriendChat(Queryable connection, int userId, int otherUserId)`
+            - **Purpose**: Used by Friend to delete two users' chat room and all its messages in the same transaction that removes the friendship. Anyone who still has it open is told `chat_not_found` and disconnected the next time a message is sent to it.
 
 5. **Friend**
     - **Purpose**: Handles friend search, friend requests, removing friends, and viewing friends' profiles.
     - **Rationale**: Friendships are used by friend chat, game invites and friend profiles, so one component owns them. We chose to keep it apart from User so the User component only handles accounts and profiles.
-    - **Interfaces**: Search, friend requests, the friends list, `areFriends` and `getFriendshipStatus` are built. Removing friends and friend profiles are *(planned)*.
+    - **Interfaces**: Search, friend requests, the friends list, removing friends, `areFriends` and `getFriendshipStatus` are built. Friend profiles are *(planned)*.
         1. `GET /api/users/search?q=` → `200 { users }`
             - **Purpose**: Searches for users by name as the user types, returning at most 20 with the best match first. Names that start with or contain `q` come first, then similar names, so partial names and typos still find people. Each user has a `friendship_status` of `none`, `friends`, `request_sent` or `request_received`, so the app can show Add or where the request stands.
         2. `POST /api/friends/requests` body `{ user_id }` → `201 { request }`
@@ -386,8 +389,8 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
             - **Purpose**: Accepts or declines a friend request. Accepting makes the two users friends and notifies the sender with `notifyUser`. Declining notifies nobody, so no one is told they were turned down.
         5. `GET /api/friends` → `200 { friends }`
             - **Purpose**: Returns the user's friends, each with `chat_id`, the chat the two share, so the app opens it straight from the list.
-        6. `DELETE /api/friends/{userId}` → `200 { msg: "success" }` *(planned)*
-            - **Purpose**: Removes a friend.
+        6. `DELETE /api/friends/{userId}` → `200 { msg: "success" }`
+            - **Purpose**: Removes a friend. The friendship ends for both users and their chat is deleted with all its messages using `deleteFriendChat`, so nothing is kept if they become friends again. The other user isn't notified. Blocked for yourself (`409 own_friend`) and for a user who isn't a friend or doesn't exist (`404 not_friends`).
         7. `GET /api/friends/{userId}` → `200 { user, badges, upcoming_games }` *(planned)*
             - **Purpose**: Returns a friend's profile with their badges and upcoming games.
         8. `boolean areFriends(int userId, int otherUserId)`

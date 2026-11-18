@@ -227,4 +227,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-Review's badges have no frontend code yet apart from the profile popup, and Friend doesn't have removing friends or friend profiles yet. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+Review's badges have no frontend code yet apart from the profile popup, and Friend doesn't have friend profiles yet. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.

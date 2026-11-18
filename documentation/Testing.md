@@ -14,6 +14,7 @@
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
 | Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
 | Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for Game Discovery and game chat (issue #80): Discover Game (formal Use Case 4) with its failures 2a, 3a and 5a, Join Game (formal Use Case 5) with 3a, 4a, 4b and 4c, View Upcoming Games, Leave Game, and Send, View and Receive Message in a game chat, where User B sends the live message. The planned Discover Game test from CP1 is replaced by the one that was written. Section 4.2 explains the test games that `scripts/run-frontend-e2e-tests` now saves before the tests with `backend/tests/e2e/seedGameDiscovery.ts`, and how the tests set the phone's location and act as the games' organizer. Logs will be added once the tests pass. |
+| Nov 18, 2026 | 2.1, 4.2 | Added the back-end tests for `DELETE /api/friends/{userId}` (issue #75), a test file without mocks and one with mocks. They cover signing in, bad ids, removing yourself, removing someone who isn't a friend, a successful removal deleting the chat and its messages, removing twice, a removed friend who has the chat open being disconnected, and becoming friends again with a new, empty chat. In section 4.2, the Friend System tests no longer need the tester to remove the friendship by hand: they use Remove friend in the app, and a new chat starts empty, so old messages can't mix with a new run's. |
 
 ---
 
@@ -95,6 +96,7 @@ How a start reminder says how soon the game starts has no database code, so it a
 | **GET /api/friends/requests** | [`backend/tests/no-mock/friend/listFriendRequests.test.ts#L13`](../backend/tests/no-mock/friend/listFriendRequests.test.ts#L13) | [`backend/tests/mock/friend/listFriendRequests.test.ts#L10`](../backend/tests/mock/friend/listFriendRequests.test.ts#L10) | Friends DB |
 | **POST /api/friends/requests** | [`backend/tests/no-mock/friend/sendFriendRequest.test.ts#L15`](../backend/tests/no-mock/friend/sendFriendRequest.test.ts#L15) | [`backend/tests/mock/friend/sendFriendRequest.test.ts#L22`](../backend/tests/mock/friend/sendFriendRequest.test.ts#L22) | Friends DB, Firebase push, Logger |
 | **PATCH /api/friends/requests/{requestId}** | [`backend/tests/no-mock/friend/answerFriendRequest.test.ts#L25`](../backend/tests/no-mock/friend/answerFriendRequest.test.ts#L25) | [`backend/tests/mock/friend/answerFriendRequest.test.ts#L24`](../backend/tests/mock/friend/answerFriendRequest.test.ts#L24) | Friends DB, MySQL transaction, Notifications DB, Firebase push, Logger |
+| **DELETE /api/friends/{userId}** | [`backend/tests/no-mock/friend/removeFriend.test.ts#L42`](../backend/tests/no-mock/friend/removeFriend.test.ts#L42) | [`backend/tests/mock/friend/removeFriend.test.ts#L11`](../backend/tests/mock/friend/removeFriend.test.ts#L11) | Friends DB, MySQL transaction |
 
 The unmocked Friend tests share their setup helpers in [`backend/tests/no-mock/friend/friendHelpers.ts`](../backend/tests/no-mock/friend/friendHelpers.ts).
 
@@ -460,6 +462,23 @@ The tests without mocks start each game 30 seconds past the minute they name (e.
 | With mocks | Sender is not told when the receiver declines | "decline", `saveNotifications` and `sendPushToUser` replaced | 200 | Nothing is saved or sent |
 | With mocks | Notification fails | An answer that saves, `sendPushToUser` throws | 200 | The answer is still saved and the failed notification is logged |
 | With mocks | Request is gone once locked | A fake transaction: the request is found, then gone after the users are locked | 404 | Nothing is written and nobody is notified. Returns `{ msg: "request_not_found" }` |
+
+**DELETE /api/friends/{userId}** (remove a friend)
+
+Every test starts with two friends who share a chat holding 3 messages.
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | They stay friends and keep their chat and its messages |
+| No mocks | Bad userId | A `userId` of "abc", 0, -3 or 1.5 | 400 | They stay friends. Returns `{ msg: "invalid_request" }` |
+| No mocks | Cannot remove yourself | The user's own `userId` | 409 | Nothing changes. Returns `{ msg: "own_friend" }` |
+| No mocks | Not friends with this user | A user who isn't a friend, and a `userId` no user has | 404 | Nothing changes, the two friends keep their chat. Returns `{ msg: "not_friends" }` |
+| No mocks | Removes the friend and deletes the chat | The friend's `userId` | 200 | The friendship is removed both ways, the chat and its 3 messages are deleted, neither sees the other in `GET /api/friends`, and both get `404 chat_not_found` loading the old chat |
+| No mocks | Removing twice | The same friend removed again | 200, then 404 | The second call returns `{ msg: "not_friends" }` |
+| No mocks | Removed friend with the chat open is disconnected | The friend has the chat open over the WebSocket, is removed, then sends a message | 200 | Nothing is saved. The friend gets `{ type: "error", msg: "chat_not_found" }` and the connection is closed with 4403 |
+| No mocks | Friends again get a new, empty chat | After the removal, the removed friend sends a new request and it's accepted | 200, 201, 200 | They're friends again with a new chat whose `chat_id` is different, listed in `GET /api/friends`, with no messages |
+| With mocks | Database fails | `removeFriend` throws | 500 | Returns `{ msg: "server_error", error: "Could not remove this friend, try again later" }` |
+| With mocks | Database fails while removing | A fake transaction: both users are locked, then deleting the friendship fails | 500 | The chat is never deleted. Returns `{ msg: "server_error" }` |
 
 
 ##### Review component
@@ -883,7 +902,7 @@ Every game starts on a different day, 1 to 10 days after the seed runs, so the l
 
 #### Use cases
 
-The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests until Remove Friend is built.
+The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests with Remove friend on the Friends tab.
 
 The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest`) can run in any order: each test has its own game, or only reads games no other test changes.
 
@@ -1148,10 +1167,10 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
     - **User B (manual tester):** the "Bea Tester" account described for Search Users, signed in on another device that uses the same back end. User A and User B are not friends and have no pending friend requests.
     - **One device:** see [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only).
     - **User B's steps:** run the User B helper in a second terminal, see [Doing User B's steps](#doing-user-bs-steps). User B can send any message: the test only checks User A's messages by their text, and finds User B's by the sender name "Bea Tester" and where they are in the chat.
-    - **User A's messages:** each run sends messages with the time in them (`E2E hello <time>`, `E2E offline <time>`). If the two users were friends before, the app reuses their old chat, so this keeps one run's messages apart from earlier ones.
+    - **User A's messages:** each run sends messages with the time in them (`E2E hello <time>`, `E2E offline <time>`). Removing a friend deletes their chat, so each run starts with an empty chat, and the time keeps the messages apart even if an old chat was left behind.
     - **Notifications:** the test allows the app's notifications with `pm grant ... android.permission.POST_NOTIFICATIONS`, and uses UI Automator to clear old notifications and look for new ones in the notification shade. Push notifications must be set up for User A's emulator (the app's `google-services.json`).
     - **No connection (6a):** the 6a test turns the phone's Wi-Fi and mobile data off with UI Automator (`svc wifi disable`, `svc data disable`), and back on before trying again, waiting for the phone and the chat to reconnect. They are also turned back on after the test if it fails.
-    - **After the test:** User A and User B are friends. Until Remove Friend is built, the tester removes the friendship so the next run starts again with no friendship.
+    - **After the test:** User A and User B are friends. The tester removes the friendship with Remove friend on the Friends tab, which also deletes their chat, so the next run starts again with no friendship.
 
   - **Expected Behaviors, Accept Friend Request (Use Case 6):**
 
