@@ -101,7 +101,7 @@ The unmocked Notification tests share their setup helpers in [`backend/tests/no-
 
 | **Interface** | **Describe Group Location, No Mocks** | **Describe Group Location, With Mocks** | **Mocked Components** |
 | ------------- | ------------------------------------- | --------------------------------------- | --------------------- |
-| **GET /api/chats/{chatId}/messages** | [`backend/tests/no-mock/chat/getChatMessages.test.ts#L30`](../backend/tests/no-mock/chat/getChatMessages.test.ts#L30) | [`backend/tests/mock/chat/getChatMessages.test.ts#L13`](../backend/tests/mock/chat/getChatMessages.test.ts#L13) | Chats DB |
+| **GET /api/chats/{chatId}/messages** | [`backend/tests/no-mock/chat/getChatMessages.test.ts#L41`](../backend/tests/no-mock/chat/getChatMessages.test.ts#L41) | [`backend/tests/mock/chat/getChatMessages.test.ts#L13`](../backend/tests/mock/chat/getChatMessages.test.ts#L13) | Chats DB |
 | **WebSocket `send_message`** (`wss://DOMAIN/ws?chat_id=`) | [`backend/tests/no-mock/chat/sendMessage.test.ts#L55`](../backend/tests/no-mock/chat/sendMessage.test.ts#L55) | [`backend/tests/mock/chat/sendMessage.test.ts#L73`](../backend/tests/mock/chat/sendMessage.test.ts#L73) | Chats DB, Users DB, Firebase push, Logger, timers |
 
 The unmocked Message tests share their setup helpers in [`backend/tests/no-mock/chat/chatHelpers.ts`](../backend/tests/no-mock/chat/chatHelpers.ts). Both WebSocket test files connect with the test client in [`backend/tests/chatSocketClient.ts`](../backend/tests/chatSocketClient.ts). How a `send_message` request is checked has no database code, so it also has unit tests, in [`backend/tests/unit/chat/sendMessage.test.ts#L9`](../backend/tests/unit/chat/sendMessage.test.ts#L9).

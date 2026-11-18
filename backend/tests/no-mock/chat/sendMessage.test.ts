@@ -29,7 +29,7 @@ let chatId: number;
 
 beforeAll(async () => {
   chatSocket = startChatSocket(PORT);
-  await waitForChatServer(PORT);
+  expect(await waitForChatServer(PORT)).toBe(true);
 });
 
 afterAll(() => {
@@ -320,14 +320,16 @@ describe('Unmocked: WebSocket send_message', () => {
       data: { type: 'friend_message', chatId: String(friendChatId), friendName: 'Pat Tester' },
       tag: `friend-${playerId}`,
     };
-    await waitUntil(() => { expect(sendPushToUsers).toHaveBeenCalledWith([friendId], notification); });
+    await waitUntil(() => sendPushToUsers.mock.calls.length === 1);
+    expect(sendPushToUsers).toHaveBeenCalledWith([friendId], notification);
 
     // 3. once the friend has the chat open, nobody is left to notify
     const friend = await connectToChat(PORT, friendChatId, createAuthToken(friendId));
     player.sendMessage(friendChatId, 'Lunch?', 'f-2');
     expect(await friend.nextReply()).toMatchObject({ type: 'new_message', client_id: 'f-2' });
-    await waitUntil(() => { expect(sendPushToUsers).toHaveBeenLastCalledWith([], notification); });
+    await waitUntil(() => sendPushToUsers.mock.calls.length === 2);
     expect(sendPushToUsers).toHaveBeenCalledTimes(2);
+    expect(sendPushToUsers).toHaveBeenLastCalledWith([], notification);
   });
 
   // Input: the player sends a message in the game chat while the organizer isn't connected

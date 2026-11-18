@@ -29,7 +29,7 @@ let chatSocket: ChatSocket;
 
 beforeAll(async () => {
   chatSocket = startChatSocket(PORT);
-  await waitForChatServer(PORT);
+  expect(await waitForChatServer(PORT)).toBe(true);
 });
 
 afterAll(() => {
@@ -166,7 +166,8 @@ describe('Mocked: WebSocket send_message', () => {
     player.sendMessage(CHAT_ID, emoji101, 'p-2');
     await player.nextReply();
 
-    await waitUntil(() => { expect(sendPushToUsers).toHaveBeenCalledTimes(2); });
+    await waitUntil(() => sendPushToUsers.mock.calls.length === 2);
+    expect(sendPushToUsers).toHaveBeenCalledTimes(2);
     expect(sendPushToUsers).toHaveBeenNthCalledWith(1, [1], expect.objectContaining({ title: 'Paul', body: exactly100 }));
     expect(sendPushToUsers).toHaveBeenNthCalledWith(2, [1], expect.objectContaining({
       title: 'Paul',
@@ -191,9 +192,8 @@ describe('Mocked: WebSocket send_message', () => {
     player.sendMessage(CHAT_ID, 'Hi', 'c-3');
 
     expect(await player.nextReply()).toMatchObject({ type: 'new_message', client_id: 'c-3' });
-    await waitUntil(() => {
-      expect(logError).toHaveBeenCalledWith(`Notifying about a message in chat ${CHAT_ID} failed:`, expect.any(Error));
-    });
+    await waitUntil(() => logError.mock.calls.length > 0);
+    expect(logError).toHaveBeenCalledWith(`Notifying about a message in chat ${CHAT_ID} failed:`, expect.any(Error));
   });
 
   // Mocked behavior: chat 7 lets both in. Fake timers run the server's check every
@@ -214,7 +214,7 @@ describe('Mocked: WebSocket send_message', () => {
     });
     const heartbeatSocket = startChatSocket(HEARTBEAT_PORT);
     try {
-      await waitForChatServer(HEARTBEAT_PORT);
+      expect(await waitForChatServer(HEARTBEAT_PORT)).toBe(true);
       const answers = await connectToChat(HEARTBEAT_PORT, CHAT_ID, organizerToken);
       const silent = await connectToChat(HEARTBEAT_PORT, CHAT_ID, playerToken, false);
 

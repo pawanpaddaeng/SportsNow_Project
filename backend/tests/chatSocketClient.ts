@@ -130,31 +130,36 @@ export function closeAllClients(): void {
   openClients.clear();
 }
 
-// waits until the chat server answers on the port, it starts listening a moment after starting
-export async function waitForChatServer(port: number): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      // a plain HTTP request, the chat server answers 426 Upgrade Required
-      const response = await fetch(`http://127.0.0.1:${port}/`);
-      if (response.status === 426) return;
-    } catch {
-      // not listening yet
-    }
-    await new Promise((resolve) => { setTimeout(resolve, 20); });
-  }
-  throw new Error(`Chat server on port ${port} did not start`);
+// how often the waits below check again
+const CHECK_EVERY_MS = 20;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
-// waits until check stops throwing, for work the server does after replying
-export async function waitUntil(check: () => void): Promise<void> {
-  const deadline = Date.now() + REPLY_TIMEOUT_MS;
-  for (;;) {
-    try {
-      check();
-      return;
-    } catch (error) {
-      if (Date.now() > deadline) throw error;
-      await new Promise((resolve) => { setTimeout(resolve, 20); });
-    }
+// whether the chat server answers on the port: a plain HTTP request gets 426 Upgrade Required
+function chatServerAnswers(port: number): Promise<boolean> {
+  return fetch(`http://127.0.0.1:${port}/`).then((response) => response.status === 426, () => false);
+}
+
+/*  waits until the chat server answers on the port, it starts listening a moment after
+    starting. Returns whether it did in time, e.g. expect(await waitForChatServer(port)).toBe(true)
+ */
+export async function waitForChatServer(port: number): Promise<boolean> {
+  for (let waited = 0; waited < REPLY_TIMEOUT_MS; waited += CHECK_EVERY_MS) {
+    if (await chatServerAnswers(port)) return true;
+    await sleep(CHECK_EVERY_MS);
   }
+  return chatServerAnswers(port);
+}
+
+/*  for work the server does after replying: waits until isDone is true, or the reply time
+    passed. Returns isDone's last answer, the test then checks the result
+ */
+export async function waitUntil(isDone: () => boolean): Promise<boolean> {
+  for (let waited = 0; waited < REPLY_TIMEOUT_MS; waited += CHECK_EVERY_MS) {
+    if (isDone()) return true;
+    await sleep(CHECK_EVERY_MS);
+  }
+  return isDone();
 }

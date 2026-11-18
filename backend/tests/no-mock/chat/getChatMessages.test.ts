@@ -21,9 +21,20 @@ beforeEach(async () => {
 
 cleanUpAfterTests();
 
+// the parts of a page of messages the tests read
+interface MessagesPage {
+  messages: { message_id: number; text: string }[];
+  is_closed: boolean;
+}
+
+// a reply's body as a page of messages
+function page(body: unknown): MessagesPage {
+  return body as MessagesPage;
+}
+
 // the messages a reply lists, as their texts, in the order returned
-function texts(body: { messages: { text: string }[] }): string[] {
-  return body.messages.map((message) => message.text);
+function texts(body: unknown): string[] {
+  return page(body).messages.map((message) => message.text);
 }
 
 // Interface GET /api/chats/{chatId}/messages
@@ -104,16 +115,17 @@ describe('Unmocked: GET /api/chats/:chatId/messages', () => {
     // 2. the newest page
     const firstPage = await api.get(`/api/chats/${chatId}/messages`).set(asUser(playerId));
     expect(firstPage.status).toBe(200);
-    expect(firstPage.body.messages).toHaveLength(MESSAGES_PAGE_SIZE);
-    expect(texts(firstPage.body)[0]).toBe('Message 55');
-    expect(texts(firstPage.body)[MESSAGES_PAGE_SIZE - 1]).toBe('Message 6');
+    const firstTexts = texts(firstPage.body);
+    expect(firstTexts).toHaveLength(MESSAGES_PAGE_SIZE);
+    expect(firstTexts[0]).toBe('Message 55');
+    expect(firstTexts[MESSAGES_PAGE_SIZE - 1]).toBe('Message 6');
 
     // 3. the page before the oldest message shown
-    const oldestShown = firstPage.body.messages[MESSAGES_PAGE_SIZE - 1].message_id;
+    const oldestShown = page(firstPage.body).messages[MESSAGES_PAGE_SIZE - 1]?.message_id;
     const secondPage = await api.get(`/api/chats/${chatId}/messages?before=${oldestShown}`).set(asUser(playerId));
     expect(secondPage.status).toBe(200);
     expect(texts(secondPage.body)).toEqual(['Message 5', 'Message 4', 'Message 3', 'Message 2', 'Message 1']);
-    expect(secondPage.body.is_closed).toBe(false);
+    expect(page(secondPage.body).is_closed).toBe(false);
 
     // 4. nothing is older than the first message
     const lastPage = await api.get(`/api/chats/${chatId}/messages?before=${ids[0]}`).set(asUser(playerId));
@@ -135,7 +147,7 @@ describe('Unmocked: GET /api/chats/:chatId/messages', () => {
       const response = await api.get(`/api/chats/${friendChatId}/messages`).set(asUser(userId));
       expect(response.status).toBe(200);
       expect(texts(response.body)).toEqual(['Lunch?', 'Hello']);
-      expect(response.body.is_closed).toBe(false);
+      expect(page(response.body).is_closed).toBe(false);
     }
   });
 
@@ -157,7 +169,7 @@ describe('Unmocked: GET /api/chats/:chatId/messages', () => {
       const response = await api.get(`/api/chats/${closedChatId}/messages`).set(asUser(playerId));
       expect(response.status).toBe(200);
       expect(texts(response.body)).toEqual(['Good game']);
-      expect(response.body.is_closed).toBe(true);
+      expect(page(response.body).is_closed).toBe(true);
     }
   });
 
