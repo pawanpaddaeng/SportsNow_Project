@@ -21,6 +21,8 @@ import com.example.cpen321application.game.dto.JoinRequestDecisionResponse
 import com.example.cpen321application.game.dto.JoinRequestResponse
 import com.example.cpen321application.game.dto.MyGamesResponse
 import com.example.cpen321application.game.dto.PendingJoinRequestsResponse
+import com.example.cpen321application.notification.dto.NotificationsReadResponse
+import com.example.cpen321application.notification.dto.NotificationsResponse
 import com.example.cpen321application.review.dto.PlayersToRateResponse
 import com.example.cpen321application.review.dto.RatingBody
 import com.example.cpen321application.review.dto.RatingResponse
@@ -234,8 +236,24 @@ interface ReviewApi {
     ) : Response<UserStatsResponse>
 }
 
+// the Notifications screen's endpoints
+interface NotificationApi {
+    // the user's newest notifications, newest first, with the unread and friend request counts
+    @GET("api/notifications")
+    suspend fun getNotifications(
+        @Header("Authorization") authorization: String
+    ) : Response<NotificationsResponse>
+
+    // marks all the user's notifications as seen
+    @PATCH("api/notifications/read")
+    suspend fun markNotificationsRead(
+        @Header("Authorization") authorization: String
+    ) : Response<NotificationsReadResponse>
+}
+
 // one Retrofit service per part of the API, all on the same server
 object ServerApi {
+    val notificationService: NotificationApi by lazy { retrofit.create(NotificationApi::class.java) }
     val userService: UserApi by lazy { retrofit.create(UserApi::class.java) }
     val gameService: GameApi by lazy { retrofit.create(GameApi::class.java) }
     val friendService: FriendApi by lazy { retrofit.create(FriendApi::class.java) }

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
+import { notifyUser } from '../../core/notifications/notify';
 import { sendPushToUser } from '../../core/notifications/push';
 import { type ErrorResponse, logNotificationError, readGameId, responseFor, sendError } from '../../game/routes/gameErrors';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
@@ -107,8 +108,8 @@ export function friendsRouter(): Router {
       });
     }));
 
-  /*  the receiver answers a pending request ({ decision: "accept" | "decline" }) and the
-      sender is notified. Errors: 400 invalid_request, 404 request_not_found, 409 already_responded
+  /*  the receiver answers a pending request ({ decision: "accept" | "decline" }). The
+      sender is notified when it's accepted, not when it's declined. Errors: 400 invalid_request, 404 request_not_found, 409 already_responded
    */
   router.patch('/api/friends/requests/:requestId', requireAuth, asyncRoute('Could not save your answer, try again later',
     async (req: Request<{ requestId: string }, unknown, { decision?: unknown } | undefined>, res: Response) => {
@@ -125,18 +126,16 @@ export function friendsRouter(): Router {
       if (!result.ok) return sendError(res, responseFor(DECISION_ERRORS, result.problem));
       logInfo(`Friend request ${requestId} ${accept ? 'accepted' : 'declined'}`);
 
-      // best effort, the app gets its reply without waiting for the notification
-      sendPushToUser(result.senderId, accept
-        ? {
+      // only an accepted request is notified, a declined one isn't so nobody is told they were turned down.
+      // Best effort, the app gets its reply without waiting for the notification
+      if (accept) {
+        notifyUser(result.senderId, {
+          type: 'friend_request_accepted',
           title: 'Friend request accepted',
           body: `${user.firstName} accepted your friend request`,
-          data: { type: 'friend_request_accepted' },
-        }
-        : {
-          title: 'Friend request declined',
-          body: `${user.firstName} declined your friend request`,
-          data: { type: 'friend_request_declined' },
+          gameId: null,
         }).catch(logNotificationError);
+      }
 
       return res.status(200).json({ msg: 'success' });
     }));

@@ -369,15 +369,19 @@ export async function updateGame(
       return { ok: false, problem: 'ends_before_start' };
     }
 
+    // a new start time clears start_reminder_sent, so players are reminded before the new time.
+    // MySQL sets the values in order, so it's compared before starts_at changes
+    const startsAt = toUtcDatetime(changes.startsAt);
     const result = await executeWrite(
       `UPDATE games
-       SET title = ?, sport = ?, description = ?, starts_at = ?, ends_at = ?,
+       SET start_reminder_sent = IF(starts_at = ?, start_reminder_sent, FALSE),
+           title = ?, sport = ?, description = ?, starts_at = ?, ends_at = ?,
            location_name = ?, address = ?, latitude = ?, longitude = ?,
            max_players = ?, skill_level = ?
        WHERE game_id = ?`,
       [
-        changes.title, changes.sport, changes.description,
-        toUtcDatetime(changes.startsAt), endsAt ? toUtcDatetime(endsAt) : null,
+        startsAt, changes.title, changes.sport, changes.description,
+        startsAt, endsAt ? toUtcDatetime(endsAt) : null,
         changes.locationName, changes.address, changes.latitude, changes.longitude,
         changes.maxPlayers, changes.skillLevel, gameId,
       ],

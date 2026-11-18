@@ -26,10 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.cpen321application.core.notifications.createNotificationChannel
-import com.example.cpen321application.core.notifications.invitedGameId
-import com.example.cpen321application.core.notifications.FriendChatLink
-import com.example.cpen321application.core.notifications.messagedFriendChat
 import com.example.cpen321application.navigation.AppNavigation
+import com.example.cpen321application.navigation.notificationRoute
 import com.example.cpen321application.ui.screens.launch.LAUNCH_FADE_OUT_MS
 import com.example.cpen321application.ui.screens.launch.LaunchAnimation
 import com.example.cpen321application.ui.theme.CPEN321ApplicationTheme
@@ -42,10 +40,8 @@ class MainActivity : ComponentActivity() {
     // result ignored: if denied, notifications just aren't shown
     private val notificationPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    // the game of a tapped invite notification, AppNavigation opens it and clears it
-    private var gameToOpen by mutableStateOf<Int?>(null)
-    // the chat of a tapped friend's message notification, AppNavigation opens it and clears it
-    private var friendChatToOpen by mutableStateOf<FriendChatLink?>(null)
+    // the screen a tapped notification asks for, AppNavigation opens it and clears it
+    private var routeToOpen by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,10 +65,8 @@ class MainActivity : ComponentActivity() {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                         AppNavigation(
                             modifier = Modifier.padding(innerPadding),
-                            gameToOpen = gameToOpen,
-                            onGameOpened = { gameToOpen = null },
-                            friendChatToOpen = friendChatToOpen,
-                            onFriendChatOpened = { friendChatToOpen = null }
+                            routeToOpen = routeToOpen,
+                            onRouteOpened = { routeToOpen = null }
                         )
                     }
                     // plays over the app while it loads underneath, then fades away
@@ -99,8 +93,7 @@ class MainActivity : ComponentActivity() {
 
     // what a tapped notification should open, if the app was opened by one
     private fun readNotification(intent: Intent) {
-        gameToOpen = invitedGameId(intent)
-        friendChatToOpen = messagedFriendChat(intent)
+        routeToOpen = notificationRoute { key -> intent.getStringExtra(key) }
     }
 
     // Android 13+ asks the user before an app can show notifications

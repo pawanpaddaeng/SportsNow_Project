@@ -21,19 +21,16 @@ fun FriendsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
         state = FriendsUiState(
             query = friends.query,
             friends = friends.friends,
-            requests = friends.requests,
             searchResults = friends.searchResults,
             isLoading = if (searching) friends.isSearching else friends.isLoading,
             errorMessage = if (searching) friends.searchError else friends.error,
-            busyRequestIds = friends.busyRequestIds,
             busyUserIds = friends.busyUserIds
         ),
         actions = FriendsActions(
             onQueryChange = { friends.updateQuery(it) },
             onRetry = { if (searching) friends.retrySearch() else friends.refresh() },
             onAddFriend = { friends.addFriend(it) },
-            onAccept = { friends.answer(it, accept = true) },
-            onDecline = { friends.answer(it, accept = false) },
+            onOpenFriendRequests = { app.navController.navigate(Routes.FRIEND_REQUESTS) },
             onOpenProfile = { userId -> app.openProfile(userId) },
             onOpenChat = { friend ->
                 friend.chatId?.let { chatId -> app.navController.navigate(Routes.friendChat(chatId, friend.name)) }

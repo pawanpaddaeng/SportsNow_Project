@@ -12,6 +12,7 @@ import {
   getJoinRequestIds,
   MISSING_GAME_ID,
 } from '../helpers';
+import { waitForNotices } from '../notification/notificationHelpers';
 
 const TOO_LONG_MESSAGE_LENGTH = 201;
 
@@ -31,7 +32,8 @@ cleanUpAfterTests();
 describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
   // Input: skill_level, play_frequency and message for another user's game
   // Expected status code: 201
-  // Expected behavior: a pending request is saved with the answers
+  // Expected behavior: a pending request is saved with the answers, and the organizer gets a
+  //   join_request notification for the game saved for their Notifications screen
   // Expected output: { msg: "success", request } with the request's id, game_id and status "pending"
   test('Valid request', async () => {
     // 1. another user's upcoming game
@@ -58,6 +60,12 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
       play_frequency: 'weekly',
       message: 'Happy to play any position',
       status: 'pending',
+    }]);
+    expect(await waitForNotices(organizerId)).toEqual([{
+      type: 'join_request',
+      title: 'New join request',
+      body: 'Rae wants to join Evening Basketball',
+      game_id: gameId,
     }]);
   });
 

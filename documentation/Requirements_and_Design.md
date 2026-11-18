@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 18, 2026 | 3.1, 3.4, 4.1, 4.2 | Added the Notifications screen (issue #60). Join requests and their answers, invites, accepted friend requests and game start reminders are now saved as well as sent as a push, so they're listed on the Notifications tab, and tapping one, there or as a push, opens the screen to act on it. Added `GET /api/notifications`, `PATCH /api/notifications/read` and `notifyUser` / `notifyUsers` to the shared Notifications module, and a notifications table. Friend requests moved from the Friends tab to a Friend Requests screen opened from the top of Notifications, and the sender is no longer told when their request is declined. The organiser and players now get a reminder about 1 hour before a game starts. |
 | Nov 17, 2026 | 3.4, 4.1 | Players can rate each other for 1 day after the organiser marks a game completed, so old games stop changing scores. The "Game completed" notification now asks players to rate their teammates, and players who still have someone to rate get a reminder 1 hour before rating closes. Games played now counts the completed games a player showed up to, from the same attendance the score uses, so the two always agree and a game deleted after everyone left still counts. |
 | Nov 17, 2026 | 3.1, 3.4, 4.1 | Ratings are out of 6 stars. The reputation score no longer gives players a default of 5: a player with no ratings and no missed games is "Not rated yet" (a null score), and is left out of anything that ranks or filters by score, including badges. The score is now a weighted average of the player's games that starts from 5: each game scores the average over the other players who showed up, counting anyone who didn't rate as 5, newer games count more, unusual games count less, and each no-show counts as a game scoring 1. Section 4.1 gives the formula. |
 | Nov 17, 2026 | 3.7, 4.7 | Following CP2 feedback, the Energy Efficiency requirement (at most 1% battery in 10 minutes) is replaced by Chat Responsiveness (a message reaches the other members within 1 second), because battery drain can't be checked by an automated test. Section 4.7 describes how chat meets it and how each requirement will be tested. |
@@ -31,11 +32,11 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 ### **3.1. List of Features**
 1. Authentication: To access app features, a user must Sign In using Google Authentication Service first. New users must set up a profile by providing their first name, last name, and birth year. Users can also sign out.
 
-2. Friend System: A user can search for other users and send, accept, or decline friend requests. A user can remove a friend. Friends can chat in real-time direct chat. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games.
+2. Friend System: A user can search for other users and send, accept, or decline friend requests. Requests waiting for an answer are listed on a Friend Requests screen, opened from the top of the Notifications screen, and the sender is notified only when their request is accepted. A user can remove a friend. Friends can chat in real-time direct chat. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games.
 
 3. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill, and reliability, along with an overall rating, and the organiser marks players who did not show up. Our algorithm computes a reputation score out of 6, adjusting for the number of ratings, giving recent games more weight, counting unusual games less, and penalising no-shows. A player with no ratings shows “Not rated yet” instead of a score. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
 
-4. Game Planning: A user can create a game by specifying the sport, title, date, start time, max players, skill level, and an optional description. The user picks the game location on a map using the Google Maps API. Every player who wants to join must send a join request that the organiser approves. The organiser can then review join requests, each shown with the player’s rating, history, and badges, and can accept or reject each one. The join request list updates live as new requests arrive. The Game Organiser can also invite friends and edit or cancel the game. Each game has a temporary real-time chat room, which is closed after the game ends.
+4. Game Planning: A user can create a game by specifying the sport, title, date, start time, max players, skill level, and an optional description. The user picks the game location on a map using the Google Maps API. Every player who wants to join must send a join request that the organiser approves. The organiser can then review join requests, each shown with the player’s rating, history, and badges, and can accept or reject each one. The join request list updates live as new requests arrive. The Game Organiser can also invite friends and edit or cancel the game. Each game has a temporary real-time chat room, which is closed after the game ends. The organiser and players get a reminder about 1 hour before the game starts. Join requests and their answers, invites and start reminders are sent as push notifications and also listed on a Notifications screen, where tapping one opens the screen to act on it, and a badge on the Notifications tab counts the unread ones and the friend requests waiting for an answer.
 
 5. Game Discovery: A user can browse a list of games near their location, or near a place they choose on a map using the Google Maps API. Games are sorted by distance and can be filtered by sport. A user can view game details and the organiser’s reputation, and can send a join request with their skill level, how often they play, and an optional message. The user is notified when a request is accepted or rejected, and the game status updates automatically. A user can also view upcoming games and leave a game before it starts.
 
@@ -57,8 +58,8 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 #### - Use cases for Feature 2 Friend System: 
 4. Search Users: A user searches for other users by name.
 5. Send Friend Request: A user sends a friend request to a user they found, and the other user is notified.
-6. Accept Friend Request: A user accepts a friend request sent to them, and the two users become friends.
-7. Decline Friend Request: A user declines a friend request sent to them.
+6. Accept Friend Request: A user opens the Friend Requests screen from the Notifications screen and accepts a friend request sent to them. The two users become friends and the sender is notified.
+7. Decline Friend Request: A user opens the Friend Requests screen from the Notifications screen and declines a friend request sent to them. The sender is not notified.
 8. Remove Friend: A user removes someone from their list of friends. 
 9. Send Friend Message: A user selects a friend from their friend list, opens their chat, and sends them a message.
 10. View Friend Messages: A user opens the chat with a friend and reads their earlier messages.
@@ -74,9 +75,9 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 16. Create Game: A game organiser creates a new game by entering its details and selecting a location on the map.
 17. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
 18. Cancel Game: A game organiser cancels a game they created, and its players are notified.
-19. Invite Friends: A game organiser invites one or more of their friends to a game they created. 
-20. Accept Join Request: A game organiser reviews a join request for their game, using the player’s rating, history, and badges, and accepts it, adding the player to the game.
-21. Reject Join Request: A game organiser reviews a join request for their game, using the player’s rating, history, and badges, and rejects it.
+19. Invite Friends: A game organiser invites one or more of their friends to a game they created. Each friend gets a notification, also listed on their Notifications screen, that opens the game.
+20. Accept Join Request: A game organiser opens a join request for their game, from the game or from its notification, reviews it using the player’s rating, history, and badges, and accepts it, adding the player to the game. The player is notified.
+21. Reject Join Request: A game organiser opens a join request for their game, from the game or from its notification, reviews it using the player’s rating, history, and badges, and rejects it. The player is notified.
 22. Remove Player: A game organiser removes a player from a game they created. 
 
 #### - Use cases for Feature 5 Game Discovery: 
@@ -305,15 +306,15 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         4. `GET /api/games/{gameId}` → `200 { game, organizer, players, viewer_role, chat_id }`
             - **Purpose**: Returns a game's details, its players, and what the signed in user can do with it.
         5. `PUT /api/games/{gameId}` body same as create → `200 { game }`
-            - **Purpose**: Lets the organiser edit the details of their game.
+            - **Purpose**: Lets the organiser edit the details of their game. Moving the start time clears its start reminder, so the players are reminded again before the new time.
         6. `POST /api/games/{gameId}/cancel` → `200 { game }`
             - **Purpose**: Lets the organiser cancel their game and notifies its players.
         7. `POST /api/games/{gameId}/join-requests` body `{ skill_level, play_frequency, message }` → `201 { request }`
-            - **Purpose**: Sends a join request for a game and notifies the organiser.
+            - **Purpose**: Sends a join request for a game and notifies the organiser with `notifyUser`. Tapping the notification opens the game's join requests.
         8. `GET /api/games/{gameId}/join-requests` → `200 { game, requests }`
             - **Purpose**: Returns the pending join requests for the organiser to review.
         9. `PATCH /api/games/{gameId}/join-requests/{requestId}` body `{ decision: "approve" | "decline" }` → `200 { game }`
-            - **Purpose**: Lets the organiser approve or decline a join request and notifies the requester.
+            - **Purpose**: Lets the organiser approve or decline a join request and notifies the requester with `notifyUser` either way.
         10. `POST /api/games/{gameId}/complete` body `{ no_show_user_ids }` (optional) → `200 { game }`
             - **Purpose**: Lets the organiser mark a game that has started as completed, recording the players who didn't show up and when it was completed, and notifies its players to rate each other within 1 day. Fails with `game_not_started` before the start time. Each game the app receives carries `rating_closes_at`, 1 day after it was completed, so it only offers Rate Players while rating is open.
         11. `POST /api/games/{gameId}/leave` → `200 { game, game_deleted }`
@@ -321,9 +322,10 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         12. `DELETE /api/games/{gameId}/players/{userId}` → `200 { game }`
             - **Purpose**: Lets the organiser remove a player from their game before it starts, and notifies the player, who can send a new join request later.
         13. `POST /api/games/{gameId}/invites` body `{ friend_ids }` → `201 { msg: "success" }`
-            - **Purpose**: Lets the organiser invite friends to their game by notifying them. Tapping the notification opens the game, where the friend can send a join request. Only the organiser can invite, only their friends who aren't in the game yet, and not once the game is cancelled, started or full.
+            - **Purpose**: Lets the organiser invite friends to their game by notifying them with `notifyUsers`, so the invite is also on their Notifications screen. Tapping the notification opens the game, where the friend can send a join request. Only the organiser can invite, only their friends who aren't in the game yet, and not once the game is cancelled, started or full.
         14. `List<GamePlayer> getGamePlayers(int gameId)`
             - **Purpose**: Used by Review and Chat to check who played in a game.
+    - **Start reminder**: every minute the server looks for scheduled games starting within 1 hour that haven't had their reminder (`start_reminder_sent`), marks each as reminded in the same transaction so it's only reminded once, and sends the organiser and players a "Game starting soon" notification with `notifyUsers`, e.g. "Sunday Soccer starts in 1 hour". A game created or moved to start within the hour is reminded on the next check with the minutes left. Cancelled and completed games aren't reminded. Tapping it opens the game.
 
 3. **Review**
     - **Purpose**: Handles player ratings after a game, no-shows, reputation scores, and badges.
@@ -376,7 +378,7 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         3. `GET /api/friends/requests` → `200 { requests }`
             - **Purpose**: Returns the requests sent to the user that are waiting for an answer, newest first.
         4. `PATCH /api/friends/requests/{requestId}` body `{ decision: "accept" | "decline" }` → `200 { msg: "success" }`
-            - **Purpose**: Accepts or declines a friend request and notifies the sender. Accepting makes the two users friends.
+            - **Purpose**: Accepts or declines a friend request. Accepting makes the two users friends and notifies the sender with `notifyUser`. Declining notifies nobody, so no one is told they were turned down.
         5. `GET /api/friends` → `200 { friends }`
             - **Purpose**: Returns the user's friends, each with `chat_id`, the chat the two share, so the app opens it straight from the list.
         6. `DELETE /api/friends/{userId}` → `200 { msg: "success" }` *(planned)*
@@ -388,18 +390,26 @@ All front-end to back-end interfaces are HTTP/REST calls that send and return JS
         9. `String getFriendshipStatus(int userId, int otherUserId)`
             - **Purpose**: Used by User's public profile to say whether the two users are friends or one has a pending request to the other, so the popup shows Add Friend or where the request stands.
 
-**Shared module: Notifications** (`backend/src/core/notifications`)
+**Shared module: Notifications** (`backend/src/core/notifications` and `backend/src/notification`)
 
-Push notifications are sent by several components, so sending them lives in a shared module instead of in one component. It also stores each user's device tokens, which `POST /api/register_notif` saves.
+Notifications are sent by several components, so sending them lives in a shared module instead of in one component. It also stores each user's device tokens, which `POST /api/register_notif` saves, and the notifications listed on the app's Notifications screen. A push is best effort, so the ones a user should still see after dismissing it are saved too: a friend request accepted, a new join request, a join request approved or declined, a game invite, and a game starting soon. New friend requests aren't saved, they're answered on the Friend Requests screen, and neither are chat messages, which have their own screen.
+- `int notifyUser(int userId, NewNotification notification)` and `int notifyUsers(List<Integer> userIds, NewNotification notification)`
+    - **Purpose**: Used by Game and Friend to save a notification (`type`, `title`, `body`, and the game it's about if any) for each user's Notifications screen and send it as a push, returning how many devices it reached. The push carries the type and game id, so tapping it opens the same screen as tapping the saved one. If saving fails the push is still sent.
 - `int sendPushToUser(int userId, PushMessage message)`
-    - **Purpose**: Used by Game and Friend to send a push notification to every device one user is signed into, such as for a join request or friend request, returning how many devices it reached.
+    - **Purpose**: Used by Game and Friend to send a push notification that isn't saved, such as a new friend request, to every device one user is signed into, returning how many devices it reached.
 - `int sendPushToUsers(List<Integer> userIds, PushMessage message)`
-    - **Purpose**: Used by Game, Chat, User and Review to notify several users at once, such as a game's players when it is cancelled, a chat's members about a new message, players when an account is deleted, or players who still have teammates to rate, returning how many devices it reached.
+    - **Purpose**: Used by Game, Chat, User and Review to notify several users at once without saving it, such as a game's players when it is cancelled, a chat's members about a new message, players when an account is deleted, or players who still have teammates to rate, returning how many devices it reached.
+- `GET /api/notifications` → `200 { notifications, unread_count, friend_request_count }`
+    - **Purpose**: Returns the signed in user's 50 newest notifications, newest first, each with `notification_id`, `type`, `title`, `body`, `game_id`, `created_at` and `is_read`. `unread_count` and `friend_request_count` (requests waiting for an answer) make up the badge on the Notifications tab, and `friend_request_count` is shown on the Friend requests button.
+- `PATCH /api/notifications/read` → `200 { msg: "success" }`
+    - **Purpose**: Marks all the user's notifications as seen, once the Notifications screen showed them.
+
+On the app, tapping a notification, on the Notifications screen or as a push, opens where the user can act on it: a new friend request opens Friend Requests, an accepted one the Friends tab, a join request the organiser's join requests for that game, and anything else about a game opens the game.
 
 
 ### **4.2. Databases**
 1. **Relational Database (MySQL)**
-    - **Purpose**: Stores users, games, players, join requests, device tokens, chats and their messages, friend requests, friendships, and ratings.
+    - **Purpose**: Stores users, games, players, join requests, device tokens, chats and their messages, friend requests, friendships, ratings, and the notifications listed on the Notifications screen.
     - **Rationale**: This data has clear links between tables and needs transactions, such as locking a game while a join request is approved. We chose MySQL over a document database for these joins and transactions. Chat messages are stored here too, instead of in a second database, because the 1 GB server doesn't have the memory to run both, and checking who can read a chat already needs the game and player tables.
 
 

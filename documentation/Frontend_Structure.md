@@ -15,6 +15,7 @@ cpen321application/
 ├── friend/                    Friend component: user search, friend requests, friends list
 ├── chat/                      Chat component: game and friend chats
 ├── review/                    Review component: rating players after a game
+├── notification/              the Notifications screen's data: saved notifications and their counts
 ├── navigation/                connects routes to screens and holds shared state
 └── ui/                        screens and reusable UI pieces (drawing only)
 ```
@@ -23,14 +24,15 @@ cpen321application/
 
 | File | What it does |
 | --- | --- |
-| `network/ServerApi.kt` | Every backend endpoint as a Retrofit function, split into `UserApi`, `GameApi` and `FriendApi` services |
+| `network/ServerApi.kt` | Every backend endpoint as a Retrofit function, split into `UserApi`, `GameApi`, `FriendApi`, `ReviewApi` and `NotificationApi` services |
 | `network/ServerGson.kt` | Gson setup. `@Required` fields make a reply fail to parse if the server leaves them out |
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |
-| `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. `invitedGameId` reads which game a tapped invite is for, and `messagedFriendChat` which chat a tapped friend's message is from |
+| `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. Tapping one opens the app with its data in the intent's extras, and `notificationRoute` (`navigation/NotificationLinks.kt`) picks the screen |
 | `notifications/GameEvents.kt` | Passes notifications to open screens so they reload (e.g. a new join request) |
-| `notifications/FriendEvents.kt` | Passes friend request notifications on so the Friends tab reloads |
+| `notifications/FriendEvents.kt` | Passes friend request notifications on so the Friends tab and Friend Requests reload |
+| `notifications/NotificationBadge.kt` | The number on the Notifications tab's bell (unread notifications plus friend requests waiting), read by the bottom bar on every screen |
 | `SafeCoroutines.kt` | Coroutine scopes that show a message instead of crashing on an unexpected error |
 | `Messages.kt` | Error messages shared by the repositories |
 
@@ -76,6 +78,14 @@ cpen321application/
 | `dto/FriendDtos.kt` | Request and reply classes for the friends endpoints, matching the server's JSON |
 | `model/FriendModels.kt` | What the Friends tab shows: `FriendPerson`, `FriendRequestItem`, and the converters from DTOs |
 
+## notification/
+
+| File | What it does |
+| --- | --- |
+| `repository/NotificationRepository.kt` | Loads the user's notifications with the unread and friend request counts, and marks them all seen |
+| `dto/NotificationDtos.kt` | Reply classes for the notifications endpoints, matching the server's JSON |
+| `model/AppNotification.kt` | A row of the Notifications screen, its type (which picks the icon and what a tap opens), the converters, and how old it reads ("5m", "2h") |
+
 ## chat/
 
 | File | What it does |
@@ -89,8 +99,9 @@ cpen321application/
 
 | File | What it does |
 | --- | --- |
-| `AppNavigation.kt` | Maps each route to its route function, listens for sign-in-required, approval and friend request events |
+| `AppNavigation.kt` | Maps each route to its route function, opens the screen a tapped notification asks for, and listens for sign-in-required, approval and friend request events |
 | `Routes.kt` | Route names and `savedStateHandle` keys for passing values between screens |
+| `NotificationLinks.kt` | `notificationRoute`: the screen a tapped push notification opens, from its type and ids |
 | `routes/` | One function per screen (see below) |
 | `state/` | State that survives leaving a screen (see below) |
 
@@ -103,6 +114,8 @@ cpen321application/
 | `HomeRoute.kt` | Home |
 | `DiscoverRoute.kt` | Discover, including the location permission |
 | `FriendsRoute.kt` | Friends |
+| `FriendRequestsRoute.kt` | Friend Requests, answered through `FriendsState` so an accepted friend shows on the Friends tab straight away |
+| `NotificationsRoute.kt` | Notifications: marks what it shows as seen, and opens where a tapped notification can be acted on |
 | `GameDetailsRoute.kt` | Game Details, the join request popup and the Invite Friends picker |
 | `JoinRequestsRoute.kt` | Join Requests (organiser) |
 | `ChatRoute.kt` | Game Chat and Friend Chat, sharing the Chat screen and opening and closing its connection as the screen is shown and hidden |
@@ -114,11 +127,12 @@ cpen321application/
 
 | File | Holds |
 | --- | --- |
-| `AppState.kt` | The nav controller, the four states below, sign in/out, tab switching, and which player's profile popup is open (`openProfile`) |
+| `AppState.kt` | The nav controller, the five states below, sign in/out, tab switching, and which player's profile popup is open (`openProfile`) |
 | `HomeState.kt` | The user's organised and joined games |
 | `DiscoverState.kt` | Discover results, the search location, and the picked place |
 | `ProfileState.kt` | The signed-in user's profile |
-| `FriendsState.kt` | The search text and results, incoming friend requests and the friends list. Searches shortly after typing pauses |
+| `FriendsState.kt` | The search text and results, incoming friend requests (shown on Friend Requests) and the friends list. Searches shortly after typing pauses |
+| `NotificationsState.kt` | The user's notifications and friend request count, and keeps `NotificationBadge` up to date. Loaded when the app opens, on sign in, when a push arrives and when Notifications is shown |
 
 `state/ChatState.kt` is the exception: it holds one open chat (messages, connection, sending and reconnecting), so it only lives as long as the Chat screen. Its `ChatSource` holds what differs between a game's chat and a friend's: the title until it's loaded, the message when the user can't be in the chat, and how to find the chat.
 
@@ -128,12 +142,13 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar, form fields, chips, map preview, cards, and the player profile popup |
+| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), form fields, chips, map preview, cards, and the player profile popup |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
 | `screens/games/` | Game Details, Input Game Info (create/edit), Pick Location, Join Requests, Rate Players, and their parts |
-| `screens/friends/` | Friends: search, friend requests and the friends list |
+| `screens/friends/` | Friends (search and the friends list) and Friend Requests |
+| `screens/notifications/` | Notifications, with the Friend requests button at the top |
 | `screens/profile/` | Profile, Edit Profile |
 | `screens/chat/` | Chat |
 | `theme/` | Colours, fonts and the app theme |
@@ -179,14 +194,15 @@ If loading fails after the game was already shown, the old details stay on scree
 **Push notifications**
 1. The backend sends a Firebase message with a `type` (e.g. `join_request`) and a `gameId`.
 2. `PushNotificationService` shows the notification and calls `GameEvents.publish`.
-3. Any open route for that game reloads. `AppNavigation` also refreshes Home when a join request is approved.
-4. Friend request notifications have a `type` starting with `friend_request` and no `gameId`. They go through `FriendEvents` instead, and `AppNavigation` refreshes the Friends tab.
-5. Tapping a `game_invite` notification opens the app with its data in the intent's extras. `MainActivity` reads the game with `invitedGameId` and `AppNavigation` opens its Game Details, where the friend can send a join request.
-6. A `friend_message` notification has a `chatId` and `friendName` instead of a `gameId`, and `GameEvents` and `FriendEvents` both ignore it. Tapping it works the same way: `MainActivity` reads the chat with `messagedFriendChat` and `AppNavigation` opens it, titled with the friend's name. The server doesn't send one to a user who has that chat open, and a friend's newest message replaces the last one's notification.
+3. Any open route for that game reloads. `AppNavigation` also refreshes Home when a join request is approved, and reloads `NotificationsState` so the bell's badge counts the new one.
+4. Friend request notifications have a `type` starting with `friend_request` and no `gameId`. They go through `FriendEvents` instead, and `AppNavigation` refreshes the friends state (Friends and Friend Requests) and the badge.
+5. Tapping a notification opens the app with its data in the intent's extras. `MainActivity` turns it into a route with `notificationRoute` and `AppNavigation` opens it if the user is signed in: Friend Requests for a `friend_request`, the Friends tab for `friend_request_accepted`, Join Requests for a `join_request`, the chat for a `friend_message`, and Game Details for the other game notifications (an invite, an answered join request, a start or rating reminder, a game edited, cancelled or completed).
+6. A `friend_message` notification has a `chatId` and `friendName` instead of a `gameId`, and `GameEvents` and `FriendEvents` both ignore it. The server doesn't send one to a user who has that chat open, and a friend's newest message replaces the last one's notification.
+7. Most notifications are also saved on the server (see the design doc), so the Notifications tab lists them after the push is dismissed. Tapping one there opens the same screen as tapping the push.
 
 **Session ends**
 - Any call whose JWT can't be renewed makes `Session` emit `signInRequired`.
-- `AppNavigation` calls `AppState.returnToSignIn`, which clears the saved JWT and all the Home, Discover, Profile and Friends state, then shows Sign In with "Your session ended".
+- `AppNavigation` calls `AppState.returnToSignIn`, which clears the saved JWT and all the Home, Discover, Profile, Friends and Notifications state (and the badge), then shows Sign In with "Your session ended".
 
 ## Things to know
 

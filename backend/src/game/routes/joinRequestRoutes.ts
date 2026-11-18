@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
-import { sendPushToUser } from '../../core/notifications/push';
+import { notifyUser } from '../../core/notifications/notify';
 import { getReputationScore } from '../../review/db/reputation';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import { getGameById } from '../db/games';
@@ -71,10 +71,11 @@ export function joinRequestsRouter(): Router {
       logInfo(`Join request ${result.requestId} sent for game id: ${gameId}`);
 
       // best effort, the app gets its reply without waiting for the notification
-      sendPushToUser(result.organizerId, {
+      notifyUser(result.organizerId, {
+        type: 'join_request',
         title: 'New join request',
         body: `${user.firstName} wants to join ${result.title}`,
-        data: { type: 'join_request', gameId: String(gameId) },
+        gameId,
       }).then((devices) => { logInfo(`Join request notification sent to ${devices} device(s)`); })
         .catch(logNotificationError);
 
@@ -136,16 +137,18 @@ export function joinRequestsRouter(): Router {
       logInfo(`Join request ${requestId} ${approve ? 'approved' : 'declined'} for game id: ${gameId}`);
 
       // best effort, the app gets its reply without waiting for the notification
-      sendPushToUser(result.requesterId, approve
+      notifyUser(result.requesterId, approve
         ? {
+          type: 'join_request_approved',
           title: 'Request approved',
           body: `You're in! You joined ${result.title}`,
-          data: { type: 'join_request_approved', gameId: String(gameId) },
+          gameId,
         }
         : {
+          type: 'join_request_declined',
           title: 'Request declined',
           body: `The organizer declined your request to join ${result.title}`,
-          data: { type: 'join_request_declined', gameId: String(gameId) },
+          gameId,
         }).then((devices) => { logInfo(`Join request answer sent to ${devices} device(s)`); })
         .catch(logNotificationError);
 

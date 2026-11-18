@@ -1,10 +1,12 @@
 import * as push from '../../../src/core/notifications/push';
 import * as joinRequestsDb from '../../../src/game/db/joinRequests';
+import * as notificationsDb from '../../../src/notification/db/notifications';
 import type * as MockEnv from '../mockEnv';
 import {
   api,
   cleanUpAfterTests,
   GAME_ID,
+  letNotificationsFinish,
   signIn,
   testGame,
   testOrganizer,
@@ -21,10 +23,12 @@ cleanUpAfterTests();
 // Interface POST /api/games/{gameId}/join-requests
 describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
   // Mocked behavior: createJoinRequest saves nothing and reports a new request.
-  //   sendPushToUser is replaced to check who is told. Sign in is mocked only so the route can run
+  //   saveNotifications and sendPushToUser are replaced to check who is told. Sign in is
+  //   mocked only so the route can run
   // Input: a valid request for game 42
   // Expected status code: 201
-  // Expected behavior: the organizer gets a join_request notification with the game's id
+  // Expected behavior: the organizer gets a join_request notification with the game's id,
+  //   saved for their Notifications screen and sent as a push
   // Expected output: { msg: "success", request } with the request's id, game_id and status "pending"
   test('Organizer is told', async () => {
     // 1. sign in as the player asking to join (not what this test checks)
@@ -40,17 +44,25 @@ describe('Mocked: POST /api/games/{gameId}/join-requests', () => {
       organizerId: organizer.userId,
       title: game.title,
     });
+    const saveNotifications = jest.spyOn(notificationsDb, 'saveNotifications').mockResolvedValue();
     const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
 
-    // 3. ask to join through the interface
+    // 3. ask to join through the interface, and let the notification finish
     const response = await api.post(`/api/games/${GAME_ID}/join-requests`).set(withToken(token))
       .send({ skill_level: 'beginner' });
+    await letNotificationsFinish();
 
     // 4. check the reply and the notification
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       msg: 'success',
       request: { request_id: REQUEST_ID, game_id: GAME_ID, status: 'pending' },
+    });
+    expect(saveNotifications).toHaveBeenCalledWith([organizer.userId], {
+      type: 'join_request',
+      title: 'New join request',
+      body: `${player.firstName} wants to join ${game.title}`,
+      gameId: GAME_ID,
     });
     expect(sendPushToUser).toHaveBeenCalledTimes(1);
     expect(sendPushToUser).toHaveBeenCalledWith(organizer.userId, {

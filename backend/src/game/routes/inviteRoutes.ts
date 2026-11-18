@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
-import { sendPushToUsers } from '../../core/notifications/push';
+import { notifyUsers } from '../../core/notifications/notify';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import { checkInvites, type InviteProblem } from '../db/invites';
 import { parseInvite, type InviteBody } from '../validation/invite';
@@ -30,7 +30,7 @@ export function invitesRouter(): Router {
 
   /*  invite friends: the organizer invites { friend_ids } to their game before it starts.
       Each friend gets a notification that opens the game, where they can send a join
-      request. Nothing is stored. Responds 201 { msg: "success" }.
+      request. Only the notification is stored, the invite itself isn't. Responds 201 { msg: "success" }.
       Errors: 400 invalid_request, 403 forbidden (not the organizer) / not_friend,
       404 not_found, 409 game_cancelled / game_started / game_full / already_player
    */
@@ -48,10 +48,11 @@ export function invitesRouter(): Router {
       logInfo(`${friendIds.length} friend(s) invited to game id: ${gameId}`);
 
       // best effort, the app gets its reply without waiting for the notifications
-      sendPushToUsers(friendIds, {
+      notifyUsers(friendIds, {
+        type: 'game_invite',
         title: 'Game invite',
         body: `${user.firstName} invited you to ${result.title}`,
-        data: { type: 'game_invite', gameId: String(gameId) },
+        gameId,
       }).then((devices) => { logInfo(`Game invite sent to ${devices} device(s)`); })
         .catch(logNotificationError);
 

@@ -5,6 +5,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,6 +19,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
+import com.example.cpen321application.core.notifications.NotificationBadge
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimaryContainer
@@ -51,7 +54,10 @@ fun AppBottomBar(
             NavigationBarItem(
                 selected = tab == selectedTab,
                 onClick = { onTabSelected(tab) },
-                icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
+                icon = {
+                    val badge = if (tab == BottomTab.Notifications) NotificationBadge.count else 0
+                    TabIcon(tab, badge)
+                },
                 label = { Text(tab.label) },
                 alwaysShowLabel = false,
                 colors = NavigationBarItemDefaults.colors(
@@ -63,6 +69,24 @@ fun AppBottomBar(
                 )
             )
         }
+    }
+}
+
+// the most a count badge shows, more reads "99+"
+private const val MAX_BADGE = 99
+
+// a count as a badge shows it: the number up to MAX_BADGE, then "99+", so it never keeps growing
+internal fun badgeText(count: Int): String = if (count > MAX_BADGE) "$MAX_BADGE+" else count.toString()
+
+// the tab's icon, with a red count on it when badge is above 0 (the Notifications bell)
+@Composable
+private fun TabIcon(tab: BottomTab, badge: Int) {
+    if (badge <= 0) {
+        Icon(imageVector = tab.icon, contentDescription = tab.label)
+        return
+    }
+    BadgedBox(badge = { Badge { Text(badgeText(badge)) } }) {
+        Icon(imageVector = tab.icon, contentDescription = "${tab.label}, $badge new")
     }
 }
 
@@ -82,8 +106,8 @@ private val CompassIcon: ImageVector = ImageVector.Builder(
     fill = SolidColor(Color.Black)
 ).build()
 
-// two people icon for the Friends tab (Material "People" icon, not in the core icon set)
-private val PeopleIcon: ImageVector = ImageVector.Builder(
+// two people icon for the Friends tab and friend notifications (Material "People" icon, not in the core icon set)
+internal val PeopleIcon: ImageVector = ImageVector.Builder(
     name = "People",
     defaultWidth = 24.dp,
     defaultHeight = 24.dp,

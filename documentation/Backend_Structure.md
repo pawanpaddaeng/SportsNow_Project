@@ -15,11 +15,13 @@ backend/src/
 ├── game/             Game component: games, discover, join requests
 ├── friend/           Friend component: user search, friend requests, friends list
 ├── chat/             Chat component: game chats, message history, WebSocket
-└── review/           Review component: ratings and reputation scores
+├── review/           Review component: ratings and reputation scores
+└── notification/     the saved notifications listed on the app's Notifications screen
 ```
 
 **Dependency rules**
-- `core/` imports nothing from `user/`, `game/`, `friend/` or `chat/`.
+- `core/` imports nothing from `user/`, `game/`, `friend/` or `chat/`. Its `notifications/notify.ts` imports `notification/db/notifications.ts` to save the notifications it sends.
+- `notification/` may import from `user/` (for `requireAuth` and `getAuthUser`) and `getIncomingFriendRequests` from `friend/db/friends.ts` for the Friend requests count. Only `app.ts` and `core/notifications/notify.ts` import from it.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
 - `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
 - `user/routes/publicProfileRoutes.ts` imports `getReputation` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
@@ -35,6 +37,7 @@ backend/src/
 | `http/responses.ts` | `invalidRequest(res, error)`, the shared `400 invalid_request` reply |
 | `notifications/push.ts` | Sends Firebase push notifications to every device a user is signed into, and deletes tokens Firebase reports as dead |
 | `notifications/deviceTokens.ts` | Saves, reads and deletes the phones' Firebase tokens |
+| `notifications/notify.ts` | `notifyUser` / `notifyUsers`: saves a notification for the Notifications screen and sends it as a push, whose data carries its type and game id. A failed save is only logged, the push still goes out |
 | `validation.ts` | `ParseResult`, the result type every body parser returns, and `readId` for ids in a request |
 | `logger.ts` | `logInfo` and `logError`. Messages are kept on one line so a value can't fake a log line |
 
@@ -61,7 +64,9 @@ backend/src/
 | `routes/gameErrors.ts` | Game id parsing, `readBackGame`, and the error tables that map problems like `game_full` to a status and message |
 | `db/games.ts` | Game queries: create, read, my games, discover (distance search), update, cancel, players, and `lockGameForChange` |
 | `db/joinRequests.ts` | Join request queries: create, list pending, approve/decline, pending count and the user's request status |
-| `db/invites.ts` | `checkInvites`: the game is the organiser's and not cancelled, started or full, and everyone invited is their friend and not in it yet. Invites aren't stored |
+| `db/invites.ts` | `checkInvites`: the game is the organiser's and not cancelled, started or full, and everyone invited is their friend and not in it yet. Invites aren't stored, only their notifications are |
+| `db/startReminders.ts` | `claimDueStartReminders`: scheduled games starting within the hour that haven't been reminded, marked reminded in the same transaction. `getGamePlayerIds` for who to remind |
+| `startReminders.ts` | Every minute, sends the organiser and players of each due game a `game_starting` notification. Started from `index.ts` like the rating reminders |
 | `validation/newGame.ts` | Checks a create/edit game body: sport, title, times, location, max players and skill level |
 | `validation/joinRequest.ts` | Checks a join request body: skill level, how often they play and the message |
 | `validation/invite.ts` | Checks an invite body: `friend_ids` is a list of 1 to 100 user ids |
@@ -86,6 +91,15 @@ backend/src/
 | `reputation.ts` | The score rules, with no database so they can be tested on their own |
 
 A completed game's players and no-shows are copied to `game_attendance`, because leaving a completed game deletes its `game_players` row and the last player leaving deletes the game. A player's score mustn't change when that happens. Players are sent their own overall score, but never what they were rated in a game.
+
+## notification/
+
+| File | What it does |
+| --- | --- |
+| `routes/notificationRoutes.ts` | `GET /api/notifications` (the newest 50, the unread count and the friend request count) and `PATCH /api/notifications/read` |
+| `db/notifications.ts` | Notification queries: save one for each of several users, list a user's newest, count unread, mark all read |
+
+Only notifications a user should still see after dismissing the push are saved: an accepted friend request, a new join request and its answer, an invite, and a game starting soon. A new friend request is answered on its own screen and isn't saved, and the routes that send it still call `sendPushToUser`. Deleting a user or a game deletes their notifications (`ON DELETE CASCADE`).
 
 ## chat/
 
@@ -117,9 +131,9 @@ Example: a player taps **Send Request** in the app's join request popup.
    - It checks the user doesn't already have a pending request. A previously declined request is reset to pending instead of creating a new row.
    - It returns `{ ok: true, requestId, organizerId, title }`, or `{ ok: false, problem }` such as `game_full`.
 6. **Problems become replies.** If `ok` is false, the route looks the problem up in `JOIN_REQUEST_ERRORS` with `responseFor` and replies, e.g. `409 { msg: "game_full", error: "This game is full" }`.
-7. **Notify.** On success, the route calls `sendPushToUser` (`core/notifications/push.ts`) for the organiser, with `data: { type: "join_request", gameId: "42" }`. It doesn't wait for the notification. A failure is only logged.
+7. **Notify.** On success, the route calls `notifyUser` (`core/notifications/notify.ts`) for the organiser with type `join_request` and game 42. It saves the notification for the organiser's Notifications screen and sends the push with `data: { type: "join_request", gameId: "42" }`. The route doesn't wait for it. A failure is only logged.
 8. **Reply.** The route replies `201 { msg: "success", request: { request_id, game_id, status: "pending" } }`.
-9. **On the organiser's phone,** the notification arrives with `type: "join_request"`, and an open Join Requests screen for game 42 reloads.
+9. **On the organiser's phone,** the notification arrives with `type: "join_request"`, and an open Join Requests screen for game 42 reloads. Tapping the notification, or its row on the Notifications screen, opens Join Requests for game 42.
 
 If anything throws along the way (e.g. the database is down), `asyncRoute` catches it, `handleRouteErrors` logs it with `logError`, and the app gets `500 { msg: "server_error", error: "Could not send your request, try again later" }`.
 

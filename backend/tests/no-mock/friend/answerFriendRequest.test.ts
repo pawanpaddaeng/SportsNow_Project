@@ -1,4 +1,5 @@
 import { addUser, api, asUser, cleanUpAfterTests, withToken } from '../helpers';
+import { noticesAfterAWhile, waitForNotices } from '../notification/notificationHelpers';
 import {
   addFriendRequest,
   countFriendshipRows,
@@ -93,7 +94,8 @@ describe('Unmocked: PATCH /api/friends/requests/{requestId}', () => {
   // Expected status code: 200
   // Expected behavior: the request is accepted and answered, the two become friends both
   //   ways with one shared chat, and each sees the other in GET /api/friends with that chat.
-  //   Sid has no device, so no notification is sent
+  //   Sid gets a friend_request_accepted notification saved for his Notifications screen (he
+  //   has no device, so no push leaves the server)
   // Expected output: { msg: "success" }
   test('Receiver accepts', async () => {
     const response = await api.patch(`/api/friends/requests/${requestId}`).set(asUser(receiverId))
@@ -116,12 +118,18 @@ describe('Unmocked: PATCH /api/friends/requests/{requestId}', () => {
       msg: 'success',
       friends: [{ user_id: senderId, first_name: 'Sid', last_name: 'Tester', chat_id: chatIds[0] }],
     });
+    expect(await waitForNotices(senderId)).toEqual([{
+      type: 'friend_request_accepted',
+      title: 'Friend request accepted',
+      body: 'Rae accepted your friend request',
+      game_id: null,
+    }]);
   });
 
   // Input: Rae answers { decision: "decline" } to Sid's pending request
   // Expected status code: 200
-  // Expected behavior: the request is declined and answered, they don't become friends and
-  //   no chat is opened
+  // Expected behavior: the request is declined and answered, they don't become friends,
+  //   no chat is opened, and Sid isn't told he was declined
   // Expected output: { msg: "success" }
   test('Receiver declines', async () => {
     const response = await api.patch(`/api/friends/requests/${requestId}`).set(asUser(receiverId))
@@ -132,6 +140,7 @@ describe('Unmocked: PATCH /api/friends/requests/{requestId}', () => {
     expect(await getFriendRequest(requestId)).toMatchObject({ status: 'declined', answered: 1 });
     expect(await countFriendshipRows(senderId, receiverId)).toBe(0);
     expect(await getFriendChatIds(senderId, receiverId)).toEqual([]);
+    expect(await noticesAfterAWhile(senderId)).toEqual([]);
   });
 
   // Input: Rae answers a request she already accepted, once with "decline" and once with "accept"

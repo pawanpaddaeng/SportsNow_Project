@@ -1,6 +1,7 @@
 import { createAuthToken } from '../../src/user/auth/jwt';
 import { type Game } from '../../src/game/db/games';
 import { pool } from '../../src/core/db/mysql';
+import * as notificationsDb from '../../src/notification/db/notifications';
 import * as usersDb from '../../src/user/db/users';
 import { type User } from '../../src/user/db/users';
 import { api, ONE_DAY_MS, validGameBody, withToken } from '../sharedHelpers';
@@ -83,8 +84,15 @@ export function letNotificationsFinish(): Promise<void> {
   return new Promise((resolve) => { setImmediate(resolve); });
 }
 
-// undoes each test's mocks after it, and closes the database pool after the file's tests
+/*  replaces saving notifications before each test, since the mocked tests have no database,
+    undoes each test's mocks after it, and closes the database pool after the file's tests.
+    A test that checks what was saved spies on saveNotifications again, which returns this spy
+ */
 export function cleanUpAfterTests(): void {
+  beforeEach(() => {
+    jest.spyOn(notificationsDb, 'saveNotifications').mockResolvedValue();
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });

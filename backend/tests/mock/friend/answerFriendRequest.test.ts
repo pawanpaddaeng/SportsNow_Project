@@ -2,6 +2,7 @@ import * as mysql from '../../../src/core/db/mysql';
 import * as logger from '../../../src/core/logger';
 import * as push from '../../../src/core/notifications/push';
 import * as friendsDb from '../../../src/friend/db/friends';
+import * as notificationsDb from '../../../src/notification/db/notifications';
 import type * as MockEnv from '../mockEnv';
 import {
   api,
@@ -49,16 +50,14 @@ describe('Mocked: PATCH /api/friends/requests/{requestId}', () => {
   });
 
   // Mocked behavior: decideFriendRequest saves nothing and reports that Paul sent request 7.
-  //   sendPushToUser is replaced to check who is told. Sign in is mocked only so the route can run
-  // Input: Olivia answers { decision: "accept" } or { decision: "decline" } to request 7
+  //   saveNotifications and sendPushToUser are replaced to check who is told. Sign in is
+  //   mocked only so the route can run
+  // Input: Olivia answers { decision: "accept" } to request 7
   // Expected status code: 200
-  // Expected behavior: the answer is passed on, and Paul gets a friend_request_accepted or
-  //   friend_request_declined notification naming Olivia
+  // Expected behavior: the answer is passed on, and Paul gets a friend_request_accepted
+  //   notification naming Olivia, saved for his Notifications screen and sent as a push
   // Expected output: { msg: "success" }
-  test.each([
-    ['accept', true, 'Friend request accepted', 'accepted', 'friend_request_accepted'],
-    ['decline', false, 'Friend request declined', 'declined', 'friend_request_declined'],
-  ])('Sender is told when the receiver answers "%s"', async (decision, accept, title, verb, type) => {
+  test('Sender is told when the receiver accepts', async () => {
     // 1. sign in as the receiver (not what this test checks)
     const receiver = testOrganizer();
     const token = signIn(receiver);
@@ -67,22 +66,62 @@ describe('Mocked: PATCH /api/friends/requests/{requestId}', () => {
     // 2. an answer that saves successfully
     const decideFriendRequest = jest.spyOn(friendsDb, 'decideFriendRequest')
       .mockResolvedValue({ ok: true, senderId: sender.userId });
+    const saveNotifications = jest.spyOn(notificationsDb, 'saveNotifications').mockResolvedValue();
     const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
 
-    // 3. answer through the interface
+    // 3. answer through the interface, and let the notification finish
     const response = await api.patch(`/api/friends/requests/${REQUEST_ID}`).set(withToken(token))
-      .send({ decision });
+      .send({ decision: 'accept' });
+    await letNotificationsFinish();
 
     // 4. check the reply and the notification
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success' });
-    expect(decideFriendRequest).toHaveBeenCalledWith(REQUEST_ID, receiver.userId, accept);
+    expect(decideFriendRequest).toHaveBeenCalledWith(REQUEST_ID, receiver.userId, true);
+    const body = `${receiver.firstName} accepted your friend request`;
+    expect(saveNotifications).toHaveBeenCalledWith([sender.userId], {
+      type: 'friend_request_accepted',
+      title: 'Friend request accepted',
+      body,
+      gameId: null,
+    });
     expect(sendPushToUser).toHaveBeenCalledTimes(1);
     expect(sendPushToUser).toHaveBeenCalledWith(sender.userId, {
-      title,
-      body: `${receiver.firstName} ${verb} your friend request`,
-      data: { type },
+      title: 'Friend request accepted',
+      body,
+      data: { type: 'friend_request_accepted' },
     });
+  });
+
+  // Mocked behavior: decideFriendRequest saves nothing and reports that Paul sent request 7.
+  //   saveNotifications and sendPushToUser are replaced to check nobody is told. Sign in is
+  //   mocked only so the route can run
+  // Input: Olivia answers { decision: "decline" } to request 7
+  // Expected status code: 200
+  // Expected behavior: the answer is passed on, and Paul is not told he was declined
+  // Expected output: { msg: "success" }
+  test('Sender is not told when the receiver declines', async () => {
+    // 1. sign in as the receiver (not what this test checks)
+    const receiver = testOrganizer();
+    const token = signIn(receiver);
+
+    // 2. an answer that saves successfully
+    const decideFriendRequest = jest.spyOn(friendsDb, 'decideFriendRequest')
+      .mockResolvedValue({ ok: true, senderId: testPlayer().userId });
+    const saveNotifications = jest.spyOn(notificationsDb, 'saveNotifications').mockResolvedValue();
+    const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
+
+    // 3. answer through the interface, and give a notification time to be sent
+    const response = await api.patch(`/api/friends/requests/${REQUEST_ID}`).set(withToken(token))
+      .send({ decision: 'decline' });
+    await letNotificationsFinish();
+
+    // 4. check the reply and that nothing was sent
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ msg: 'success' });
+    expect(decideFriendRequest).toHaveBeenCalledWith(REQUEST_ID, receiver.userId, false);
+    expect(saveNotifications).not.toHaveBeenCalled();
+    expect(sendPushToUser).not.toHaveBeenCalled();
   });
 
   // Mocked behavior: decideFriendRequest saves nothing and reports that Paul sent request 7.

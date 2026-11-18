@@ -12,8 +12,9 @@ export type InviteCheckResult =
   | { ok: true; title: string }
   | { ok: false; problem: InviteProblem };
 
-/*  checks the organizer can invite friendIds to their game. Nothing is stored: an invite
-    is only a notification, the friend then sends a join request like anyone else
+/*  checks the organizer can invite friendIds to their game. No invite is stored: an invite
+    is only a notification (saved for the Notifications screen), the friend then sends a
+    join request like anyone else
  */
 export async function checkInvites(gameId: number, organizerId: number, friendIds: number[]): Promise<InviteCheckResult> {
   const game = await getGameById(gameId);

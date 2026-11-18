@@ -33,26 +33,6 @@ fun createNotificationChannel(context: Context) {
     context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
 }
 
-// notifications that open their game when tapped: an invite, and the reminder to rate its players
-private val GAME_OPENING_TYPES = setOf("game_invite", "rating_reminder")
-
-/*  the game to open when the app was opened by tapping a game invite or rating reminder
-    notification, null otherwise. The notification's data is in the intent's extras, put there
-    by Android for notifications shown in the background and by showNotification while the app is open
- */
-fun invitedGameId(intent: Intent): Int? =
-    if (intent.getStringExtra("type") in GAME_OPENING_TYPES) intent.getStringExtra("gameId")?.toIntOrNull() else null
-
-// a friend's chat to open: its id, and the friend's name to title it with
-data class FriendChatLink(val chatId: Int, val friendName: String)
-
-// the chat to open when the app was opened by tapping a friend's message notification, like invitedGameId
-fun messagedFriendChat(intent: Intent): FriendChatLink? {
-    if (intent.getStringExtra("type") != "friend_message") return null
-    val chatId = intent.getStringExtra("chatId")?.toIntOrNull() ?: return null
-    return FriendChatLink(chatId, intent.getStringExtra("friendName").orEmpty())
-}
-
 /*
     Receives push notifications from Firebase. Android only shows notifications
     by itself while the app is in the background, so this shows them while the
@@ -83,7 +63,8 @@ class PushNotificationService : FirebaseMessagingService() {
         showNotification(title, body, message.data, message.notification?.tag)
     }
 
-    /*  tapping it opens the app with messageData as the intent's extras, see invitedGameId.
+    /*  tapping it opens the app with messageData as the intent's extras, see notificationRoute.
+        Android puts them there by itself for notifications it shows in the background.
         With a tag it replaces the notification showing with that tag, e.g. a friend's last message
      */
     private fun showNotification(title: String, body: String, messageData: Map<String, String>, tag: String?) {

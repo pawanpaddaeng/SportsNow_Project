@@ -13,6 +13,7 @@ import {
   setGameStatus,
   withToken,
 } from '../helpers';
+import { waitForNotices } from '../notification/notificationHelpers';
 
 let organizerId: number;
 let playerId: number;
@@ -57,7 +58,8 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
 
   // Input: the organizer sends { decision: "approve" } for a pending request
   // Expected status code: 200
-  // Expected behavior: the request is approved and the person joins the game
+  // Expected behavior: the request is approved and the person joins the game, and they get a
+  //   join_request_approved notification for the game saved for their Notifications screen
   // Expected output: { msg: "success", request, game } with status "approved" and player_count up by one
   test('Approve', async () => {
     // 1. a game with a pending request
@@ -78,11 +80,18 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     // 4. check what was really saved
     expect(await getJoinRequestStatus(requestId)).toBe('approved');
     expect(await getPlayerIds(gameId)).toContain(requesterId);
+    expect(await waitForNotices(requesterId)).toEqual([{
+      type: 'join_request_approved',
+      title: 'Request approved',
+      body: "You're in! You joined Evening Basketball",
+      game_id: gameId,
+    }]);
   });
 
   // Input: the organizer sends { decision: "decline" } for a pending request
   // Expected status code: 200
-  // Expected behavior: the request is declined, the players don't change
+  // Expected behavior: the request is declined, the players don't change, and the person gets
+  //   a join_request_declined notification for the game saved for their Notifications screen
   // Expected output: { msg: "success", request, game } with status "declined" and player_count still 1
   test('Decline', async () => {
     // 1. a game with a pending request
@@ -103,6 +112,12 @@ describe('Unmocked: PATCH /api/games/{gameId}/join-requests/{requestId}', () => 
     // 4. check what was really saved
     expect(await getJoinRequestStatus(requestId)).toBe('declined');
     expect(await getPlayerIds(gameId)).toEqual([organizerId]);
+    expect(await waitForNotices(requesterId)).toEqual([{
+      type: 'join_request_declined',
+      title: 'Request declined',
+      body: 'The organizer declined your request to join Evening Basketball',
+      game_id: gameId,
+    }]);
   });
 
   // Input: the organizer answers the same request twice

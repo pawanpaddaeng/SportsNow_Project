@@ -10,6 +10,7 @@ import {
   cleanUpAfterTests,
   setGameStatus,
 } from '../helpers';
+import { noticesAfterAWhile, waitForNotices } from '../notification/notificationHelpers';
 
 let organizerId: number;
 let friendId: number;
@@ -29,6 +30,31 @@ cleanUpAfterTests();
 
 // Interface POST /api/games/{gameId}/invites
 describe('Unmocked: POST /api/games/{gameId}/invites', () => {
+  // Input: the organizer invites Fay and Gus, two friends not in their upcoming game
+  // Expected status code: 201
+  // Expected behavior: Fay and Gus each get a game_invite notification for the game saved for
+  //   their Notifications screen. The invite itself isn't stored, so nobody joins
+  // Expected output: { msg: "success" }
+  test('Organizer invites two friends', async () => {
+    const otherFriendId = await addUser('Gus');
+    await addFriends(organizerId, otherFriendId);
+    const gameId = await addGame(organizerId);
+
+    const response = await api.post(`/api/games/${gameId}/invites`).set(asUser(organizerId))
+      .send({ friend_ids: [friendId, otherFriendId] });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ msg: 'success' });
+    const invite = {
+      type: 'game_invite',
+      title: 'Game invite',
+      body: 'Olivia invited you to Evening Basketball',
+      game_id: gameId,
+    };
+    expect(await waitForNotices(friendId)).toEqual([invite]);
+    expect(await waitForNotices(otherFriendId)).toEqual([invite]);
+  });
+
   // Input: the organizer invites their friend to a game that is cancelled, has started,
   //   is completed, or is full
   // Expected status code: 409
@@ -111,9 +137,11 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
     const response = await api.post(`/api/games/${gameId}/invites`).set(asUser(organizerId))
       .send({ friend_ids: [friendId, strangerId] });
 
-    // 3. check it was rejected
+    // 3. check it was rejected and nobody got an invite
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ msg: 'not_friend', error: 'You can only invite your friends' });
+    expect(await noticesAfterAWhile(friendId)).toEqual([]);
+    expect(await noticesAfterAWhile(strangerId)).toEqual([]);
   });
 
   // Input: a player who isn't the organizer invites their friend

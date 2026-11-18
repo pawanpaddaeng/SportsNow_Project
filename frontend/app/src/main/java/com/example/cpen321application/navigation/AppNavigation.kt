@@ -8,7 +8,6 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.cpen321application.core.notifications.FriendChatLink
 import com.example.cpen321application.core.notifications.FriendEvents
 import com.example.cpen321application.core.notifications.GameEvents
 import com.example.cpen321application.core.session.Session
@@ -18,11 +17,13 @@ import com.example.cpen321application.navigation.routes.DiscoverRoute
 import com.example.cpen321application.navigation.routes.EditGameRoute
 import com.example.cpen321application.navigation.routes.EditProfileRoute
 import com.example.cpen321application.navigation.routes.FriendChatRoute
+import com.example.cpen321application.navigation.routes.FriendRequestsRoute
 import com.example.cpen321application.navigation.routes.FriendsRoute
 import com.example.cpen321application.navigation.routes.GameChatRoute
 import com.example.cpen321application.navigation.routes.GameDetailsRoute
 import com.example.cpen321application.navigation.routes.HomeRoute
 import com.example.cpen321application.navigation.routes.JoinRequestsRoute
+import com.example.cpen321application.navigation.routes.NotificationsRoute
 import com.example.cpen321application.navigation.routes.PickLocationRoute
 import com.example.cpen321application.navigation.routes.PlayerProfilePopup
 import com.example.cpen321application.navigation.routes.ProfileRoute
@@ -38,17 +39,15 @@ private val friendChatArguments = listOf(
     navArgument(Routes.FRIEND_NAME_ARG) { type = NavType.StringType; defaultValue = "" }
 )
 
-/*  connects each route to its screen, the shared state lives in AppState. gameToOpen is
-    the game of a tapped invite notification and friendChatToOpen the chat of a tapped
-    friend's message notification, their callbacks are called once they're handled
+/*  connects each route to its screen, the shared state lives in AppState. routeToOpen is
+    the screen a tapped notification asks for (see notificationRoute), onRouteOpened is
+    called once it's handled
  */
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
-    gameToOpen: Int? = null,
-    onGameOpened: () -> Unit = {},
-    friendChatToOpen: FriendChatLink? = null,
-    onFriendChatOpened: () -> Unit = {}
+    routeToOpen: String? = null,
+    onRouteOpened: () -> Unit = {}
 ) {
     val app = rememberAppState()
     val startDestination = remember { app.startDestination() }
@@ -59,15 +58,13 @@ fun AppNavigation(
     LaunchedEffect(Unit) {
         if (startDestination == Routes.HOME) {
             app.registerNotifications()
+            // the bell's count
+            app.notificationsState.refresh()
         }
     }
 
-    // a game invite was tapped: open the game so the friend can ask to join (if signed in)
-    OpenFromNotification(gameToOpen?.let(Routes::gameDetails), onGameOpened) { app.navController.navigate(it) }
-    // a friend's message was tapped: open the chat with them (if signed in)
-    OpenFromNotification(friendChatToOpen?.let { Routes.friendChat(it.chatId, it.friendName) }, onFriendChatOpened) {
-        app.navController.navigate(it)
-    }
+    // a notification was tapped: open where the user can act on it (if signed in)
+    OpenFromNotification(routeToOpen, onRouteOpened) { app.navController.navigate(it) }
 
     NavHost(
         navController = app.navController,
@@ -78,6 +75,8 @@ fun AppNavigation(
         composable(Routes.HOME) { HomeRoute(app, it, modifier) }
         composable(Routes.DISCOVER) { DiscoverRoute(app, it, modifier) }
         composable(Routes.FRIENDS) { FriendsRoute(app, it, modifier) }
+        composable(Routes.NOTIFICATIONS) { NotificationsRoute(app, it, modifier) }
+        composable(Routes.FRIEND_REQUESTS) { FriendRequestsRoute(app, it, modifier) }
         composable(Routes.GAME_DETAILS, arguments = gameIdArgument) { GameDetailsRoute(app, it, modifier) }
         composable(Routes.JOIN_REQUESTS, arguments = gameIdArgument) { JoinRequestsRoute(app, it, modifier) }
         composable(Routes.GAME_CHAT, arguments = gameIdArgument) { GameChatRoute(app, it, modifier) }
@@ -107,12 +106,18 @@ private fun ListenForAppEvents(app: AppState) {
     LaunchedEffect(Unit) {
         GameEvents.events.collect { event ->
             if (event.type == "join_request_approved" || event.type == "removed_from_game") app.homeState.refresh()
+            // most game notifications are saved for the Notifications screen too, update the bell
+            app.notificationsState.refresh()
         }
     }
 
     // a friend request arrived or was answered while the app is open
     LaunchedEffect(Unit) {
-        FriendEvents.events.collect { app.friendsState.refresh() }
+        FriendEvents.events.collect {
+            app.friendsState.refresh()
+            // the bell counts friend requests waiting for an answer
+            app.notificationsState.refresh()
+        }
     }
 }
 
