@@ -1,10 +1,10 @@
 package com.example.cpen321application.navigation.state
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.cpen321application.core.showToast
 import com.example.cpen321application.review.repository.ReputationScoreResult
 import com.example.cpen321application.review.repository.fetchMyReputationScore
 import com.example.cpen321application.user.repository.DeleteAccountResult
@@ -81,7 +81,7 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
                 is ProfileResult.Loaded -> {
                     profile = result.profile
                     error = null
-                    Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                    showToast(context, "Profile updated")
                     onSaved()
                 }
                 is ProfileResult.Failed -> saveError = result.message

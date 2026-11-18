@@ -1,6 +1,5 @@
 package com.example.cpen321application.navigation.routes
 
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
+import com.example.cpen321application.core.showToast
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.review.model.PlayerToRate
 import com.example.cpen321application.review.model.PlayersToRate
@@ -74,7 +74,7 @@ fun RatePlayersRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
             when (result) {
                 SubmitRatingResult.Submitted -> {
                     ratingPlayer = null
-                    Toast.makeText(context, "Rating submitted", Toast.LENGTH_SHORT).show()
+                    showToast(context, "Rating submitted")
                 }
                 is SubmitRatingResult.Failed -> ratingError = result.message
             }

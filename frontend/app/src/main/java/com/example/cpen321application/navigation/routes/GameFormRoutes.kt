@@ -1,6 +1,5 @@
 package com.example.cpen321application.navigation.routes
 
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.core.rememberUnexpectedErrorHandler
 import com.example.cpen321application.core.runGuarded
+import com.example.cpen321application.core.showToast
 import com.example.cpen321application.game.model.GameInfoForm
 import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.game.model.toGameSummary
@@ -56,10 +56,10 @@ fun CreateGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: 
                 is GameChangeResult.Done -> {
                     // show the new game right away, at the top of Organized Games
                     result.game?.let { app.homeState.organizedGames.add(0, it.toGameSummary()) }
-                    Toast.makeText(context, "Game created", Toast.LENGTH_SHORT).show()
+                    showToast(context, "Game created")
                     navController.popBackStack()
                 }
-                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                is GameChangeResult.Failed -> showToast(context, result.message, long = true)
             }
         }
     }
@@ -116,10 +116,10 @@ fun EditGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
             when (result) {
                 // Game Details reloads when it's shown again, so it has the changes
                 is GameChangeResult.Done -> {
-                    Toast.makeText(context, "Changes saved", Toast.LENGTH_SHORT).show()
+                    showToast(context, "Changes saved")
                     navController.popBackStack()
                 }
-                is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                is GameChangeResult.Failed -> showToast(context, result.message, long = true)
             }
         }
     }

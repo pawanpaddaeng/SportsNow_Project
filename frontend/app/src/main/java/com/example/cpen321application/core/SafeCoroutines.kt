@@ -1,7 +1,6 @@
 package com.example.cpen321application.core
 
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -30,7 +29,7 @@ fun rememberUnexpectedErrorHandler(): CoroutineExceptionHandler {
     val context = LocalContext.current.applicationContext
     return remember(context) {
         unexpectedErrorHandler {
-            Toast.makeText(context, UNEXPECTED_ERROR_MESSAGE, Toast.LENGTH_SHORT).show()
+            showToast(context, UNEXPECTED_ERROR_MESSAGE)
         }
     }
 }
