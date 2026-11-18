@@ -1,6 +1,5 @@
 package com.example.cpen321application.navigation.routes
 
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.core.notifications.GameEvents
+import com.example.cpen321application.core.showToast
 import com.example.cpen321application.game.model.JoinRequestItem
 import com.example.cpen321application.game.model.JoinRequestsHeader
 import com.example.cpen321application.game.model.toJoinRequestItem
@@ -80,10 +80,10 @@ fun JoinRequestsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier
                     requests.removeAll { it.requestId == request.requestId }
                     header = result.game.toJoinRequestsHeader()
                     val text = if (approve) "${request.name} was added to the game" else "Request declined"
-                    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+                    showToast(context, text)
                 }
                 is JoinRequestDecisionResult.Failed -> {
-                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                    showToast(context, result.message, long = true)
                     // e.g. the requester cancelled or the game filled up meanwhile
                     loadRequests()
                 }

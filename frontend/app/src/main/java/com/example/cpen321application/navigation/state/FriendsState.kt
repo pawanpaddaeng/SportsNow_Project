@@ -1,10 +1,10 @@
 package com.example.cpen321application.navigation.state
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.cpen321application.core.showToast
 import com.example.cpen321application.friend.model.FriendPerson
 import com.example.cpen321application.friend.model.FriendRequestItem
 import com.example.cpen321application.friend.model.FriendshipStatus
@@ -123,7 +123,7 @@ class FriendsState(private val context: Context, private val scope: CoroutineSco
                     if (it.userId == person.userId) it.copy(status = FriendshipStatus.RequestSent) else it
                 }
                 is FriendResult.Failed -> {
-                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                    showToast(context, result.message, long = true)
                     // e.g. they sent this user a request meanwhile, show where things stand now
                     retrySearch()
                 }
@@ -146,7 +146,7 @@ class FriendsState(private val context: Context, private val scope: CoroutineSco
                     if (accept) friends = (friends + request.sender).sortedBy { it.name }
                 }
                 is FriendResult.Failed -> {
-                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                    showToast(context, result.message, long = true)
                     // e.g. it was already answered on another device
                     refresh()
                 }
