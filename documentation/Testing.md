@@ -10,6 +10,7 @@
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the User component are written: sign up, login, registering a device for notifications, and reading, editing and deleting the user's own profile each get a test file without mocks and one with mocks. The public profile, which only had tests with mocks, gets a test file without mocks, and its tests with mocks are now listed here. A real sign up or login needs an ID token that Google signed, so the tests without mocks stop at Google's check, and the tests with mocks replace that check to test a successful one. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
+| Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
 
 ---
 
@@ -736,7 +737,42 @@ _To be added at CP2._
 
 ## 3. Tests of Non-Functional Requirements
 
-_To be added at CP2._
+### 3.1. Test Locations in Git
+
+| **Non-Functional Requirement** | **Location in Git** |
+| ------------------------------ | ------------------- |
+| **Performance (Discover in under 5 seconds)** | Back-end: [`backend/tests/nfr/discoverPerformance.test.ts`](../backend/tests/nfr/discoverPerformance.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/DiscoverPerformanceTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/DiscoverPerformanceTest.kt) |
+| **Chat Responsiveness (message delivered within 1 second)** | Back-end: [`backend/tests/nfr/chatResponsiveness.test.ts`](../backend/tests/nfr/chatResponsiveness.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/ChatResponsivenessTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/ChatResponsivenessTest.kt) |
+
+### 3.2. Test Verification
+
+- **Performance (Discover in under 5 seconds)**
+
+  - **Back-end test:** checks the server's share of the 5 seconds.
+    - **Before the test:** The test adds a user who searches, and a second user who organizes 1,000 upcoming games. The games are added in one database insert, spread from the search point to 45 km north of it. They are added in a shuffled order, so the closest-first order can't come from the order they were saved in. The search point is at a latitude no other Discover test uses, because all test files share one database.
+    - **The test:** It calls `GET /api/games/discover` at the search point 10 times and times each call. Every call must return `200` with exactly 50 games (the most Discover returns), sorted closest first, all within 50 km. The slowest call must take under 1 second. A 1-second limit for the server leaves most of the 5 seconds for the network and the phone.
+    - **After the test:** Deleting the organizer also deletes the 1,000 games.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Front-end test:** checks the whole 5 seconds on the phone, as the user sees it.
+    - **Before the test:** The user must be signed in, because Google Sign-In can't be automated. `scripts/run-frontend-nfr-tests` starts the back-end and the app, then waits while you sign in on the emulator. The test gives the app location permission with `pm grant`, so the permission pop-up doesn't appear. It allows test locations with `appops set ... android:mock_location allow`, then replaces the phone's location providers (fused, network and GPS) with test ones at a fixed test location at UBC.
+    - **The test:** It waits for the Home screen, then clicks the "Discover" tab (the compass) and starts the clock. It waits until Discover shows its result: "N games nearby" with the game cards, or "No games nearby right now...". Both are only shown once the games have loaded. If neither appears within 5 seconds, the test fails. The time is written to the log with the tag `NFR1`.
+    - **After the test:** The test location providers are removed.
+    - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks.
+
+- **Chat Responsiveness (message delivered within 1 second)**
+
+  - **Back-end test:** checks the time from a message reaching the server to it reaching another member.
+    - **Before the test:** The test starts the chat WebSocket server on its own port, since test files run at the same time. It adds two users, a game organized by one of them with the other as a player, and connects both to the game's chat with their own JWT.
+    - **The test:** The player sends 20 messages one after another. For each one, the test times from sending it to the organizer's connection getting it. The organizer must get a `new_message` with the same text, chat and sender, and each must arrive in under 1 second.
+    - **After the test:** The connections are closed. Deleting the users also deletes the game, its chat and the messages.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Front-end test:** checks the same time on the phone, including sending the message and showing it.
+    - **Before the test:** The user must be signed in, as for the Performance test. The test creates a game organized by the user through the app's own `createGame`, starting in 1 hour, so the user is in its chat. It then opens the app.
+    - **The test:** It finds the game "NFR Chat Test" on the Home screen, opens it, and taps "Open Chat". It waits until the chat is connected, when "Connecting..." and the loading bar are gone. Then it sends 20 messages one after another. The app shows each message as "Sending..." until the server sends it back, which the server does to every member with the chat open at the same time. So for each message the test types it, taps Send and starts the clock, then waits until the message is shown and "Sending..." is gone. If that takes over 1 second, the test fails. The times are written to the log with the tag `NFR2`.
+    - **After the test:** The test cancels the game, so it doesn't stay on the user's Home screen.
+    - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks. This runs both front-end NFR tests.
 
 ---
 
