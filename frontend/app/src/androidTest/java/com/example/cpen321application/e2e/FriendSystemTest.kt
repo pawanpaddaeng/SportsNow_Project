@@ -224,7 +224,14 @@ class FriendSystemTest {
         val offlineText = "E2E offline $runId"
         allowNotifications()
 
-        // Use case 6: Accept Friend Request
+        acceptFriendRequest()
+        sendFriendMessage(helloText, offlineText)
+        receiveFriendMessage(offlineText)
+        viewFriendMessages(helloText, offlineText)
+    }
+
+    // Use case 6: Accept Friend Request, ends on the Friends screen with User B as a friend
+    private fun acceptFriendRequest() {
         // 1. The other person sends the user a friend request
         askUserB("Click the Friends tab, search for User A and click Add")
 
@@ -248,8 +255,10 @@ class FriendSystemTest {
         clearSearchIfAny()
         waitForPersonCard(USER_B_NAME)
         askUserB("Check a 'Friend request accepted' notification arrived, and User A is in your friends")
+    }
 
-        // Use case 9: Send Friend Message (UC1)
+    // Use case 9: Send Friend Message (formal UC1, with 5a and 6a), ends in the chat with User B
+    private fun sendFriendMessage(helloText: String, offlineText: String) {
         // 1. User selects "Friends"   2. System displays the list of the user's friends
         composeRule.onNodeWithText("Your Friends").assertIsDisplayed()
         composeRule.onNode(personCard(USER_B_NAME)).assertIsDisplayed()
@@ -297,8 +306,10 @@ class FriendSystemTest {
         composeRule.onNodeWithText(NOT_SENT_TEXT).performClick()
         waitForSentMessage(offlineText)
         composeRule.onAllNodes(hasText(NOT_SENT_TEXT)).assertCountEquals(0)
+    }
 
-        // Use case 11: Receive Friend Message
+    // Use case 11: Receive Friend Message, live in the open chat and then as a notification
+    private fun receiveFriendMessage(offlineText: String) {
         // 1. The friend sends the user a message while the user has their chat open
         askUserB("In the chat with User A, send any message")
 
@@ -315,8 +326,10 @@ class FriendSystemTest {
         val notified = device.wait(Until.hasObject(By.text(USER_B_FIRST_NAME)), MESSAGE_TIMEOUT_MILLIS)
         device.pressBack()
         if (!notified) throw AssertionError("No notification titled \"$USER_B_FIRST_NAME\" arrived")
+    }
 
-        // Use case 10: View Friend Messages
+    // Use case 10: View Friend Messages, starting on the Friends screen
+    private fun viewFriendMessages(helloText: String, offlineText: String) {
         // 1. User opens the chat with a friend
         composeRule.onNode(personCard(USER_B_NAME)).performClick()
 
