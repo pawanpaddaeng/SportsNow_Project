@@ -3,7 +3,15 @@ import * as gamesDb from '../../../src/game/db/games';
 import { type ActiveGame } from '../../../src/game/db/games';
 import * as usersDb from '../../../src/user/db/users';
 import type * as MockEnv from '../mockEnv';
-import { api, cleanUpAfterTests, letNotificationsFinish, signIn, testOrganizer, withToken } from '../helpers';
+import {
+  api,
+  type ApiReply,
+  cleanUpAfterTests,
+  letNotificationsFinish,
+  signIn,
+  testOrganizer,
+  withToken,
+} from '../helpers';
 
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
 
@@ -27,10 +35,10 @@ function mockAccountDeletion(games: ActiveGame[]) {
 }
 
 // deletes the signed in user's account, and lets any notifications finish before the test checks them
-async function deleteAccount(token: string) {
+async function deleteAccount(token: string): Promise<ApiReply> {
   const response = await api.delete('/api/users/me').set(withToken(token));
   await letNotificationsFinish();
-  return response;
+  return response as ApiReply;
 }
 
 // Interface DELETE /api/users/me

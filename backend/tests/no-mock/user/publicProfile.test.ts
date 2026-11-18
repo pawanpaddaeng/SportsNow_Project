@@ -21,7 +21,7 @@ describe('Unmocked: GET /api/users/{userId}', () => {
   // Expected behavior: no profile is read
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    await expectSignInRequired((headers) => api.get(`/api/users/${benId}`).set(headers));
+    await expectSignInRequired('get', `/api/users/${benId}`);
   });
 
   // Input: Alice opens Ben's profile. Ben is new, so he never played, and isn't her friend

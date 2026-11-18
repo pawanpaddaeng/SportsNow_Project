@@ -24,7 +24,7 @@ describe('Unmocked: POST /api/register_notif', () => {
   test('Rejects a call that is not signed in', async () => {
     const body = { fcm_token: `no-mock-register-notif-${aliceId}` };
 
-    await expectSignInRequired((headers) => api.post('/api/register_notif').set(headers).send(body));
+    await expectSignInRequired('post', '/api/register_notif', body);
 
     expect(await getSavedTokens(aliceId)).toEqual([]);
   });

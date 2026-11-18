@@ -40,7 +40,7 @@ describe('Unmocked: DELETE /api/users/me', () => {
   // Expected behavior: no account is deleted
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    await expectSignInRequired((headers) => api.delete('/api/users/me').set(headers));
+    await expectSignInRequired('delete', '/api/users/me');
 
     expect(await findUserById(oliviaId)).not.toBeNull();
   });

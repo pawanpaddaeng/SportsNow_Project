@@ -1,7 +1,5 @@
 import path from 'path';
 
-import type { Test } from 'supertest';
-
 import { executeWrite, pool, selectRows } from '../../src/core/db/mysql';
 import { createGame, type NewGame } from '../../src/game/db/games';
 import { createAuthToken } from '../../src/user/auth/jwt';
@@ -39,15 +37,19 @@ export async function addUser(firstName: string): Promise<number> {
 }
 
 /*  checks a call that needs a signed in user is turned down without one: 400 invalid_request
-    with no token, then 401 invalid_token with a token that isn't a real JWT. send makes the
-    call with the headers given, e.g. (headers) => api.get('/api/users/me').set(headers)
+    with no token, then 401 invalid_token with a token that isn't a real JWT.
+    e.g. expectSignInRequired('put', '/api/users/me', newProfile)
  */
-export async function expectSignInRequired(send: (headers: AuthHeader) => Test): Promise<void> {
-  const noToken = await send({});
+export async function expectSignInRequired(
+  method: 'get' | 'post' | 'put' | 'delete',
+  url: string,
+  body?: object,
+): Promise<void> {
+  const noToken = await api[method](url).send(body);
   expect(noToken.status).toBe(400);
   expect(noToken.body).toMatchObject({ msg: 'invalid_request' });
 
-  const badToken = await send(withToken('not-a-real-token'));
+  const badToken = await api[method](url).set(withToken('not-a-real-token')).send(body);
   expect(badToken.status).toBe(401);
   expect(badToken.body).toEqual({ msg: 'invalid_token', error: 'Invalid jwt_token' });
 }

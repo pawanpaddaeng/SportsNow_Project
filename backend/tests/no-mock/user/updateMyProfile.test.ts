@@ -26,7 +26,7 @@ describe('Unmocked: PUT /api/users/me', () => {
   // Expected behavior: the profile doesn't change
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    await expectSignInRequired((headers) => api.put('/api/users/me').set(headers).send(NEW_PROFILE));
+    await expectSignInRequired('put', '/api/users/me', NEW_PROFILE);
 
     await expectSavedProfile(aliceId, ORIGINAL);
   });
