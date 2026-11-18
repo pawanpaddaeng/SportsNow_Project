@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -166,6 +167,9 @@ private fun SectionHeader(title: String, count: Int) {
     }
 }
 
+// tag on every person card, so E2E tests can find the cards and their order
+const val PERSON_CARD_TAG = "personCard"
+
 /*  one person: initial and name in a card like Home's game cards, trailing goes on the right.
     With onClick the card can be tapped to open the chat with a friend, and with onAvatarClick
     the circle to open their profile instead
@@ -180,6 +184,7 @@ private fun PersonCard(
     val tapToOpen = onClick?.let { Modifier.clickable(onClickLabel = "Open chat", onClick = it) } ?: Modifier
     CardRow(
         modifier = Modifier
+            .testTag(PERSON_CARD_TAG)
             .cardBackground(SportsSurfaceContainer)
             .border(1.dp, SportsOutlineVariant, RoundedCornerShape(12.dp))
             .then(tapToOpen)

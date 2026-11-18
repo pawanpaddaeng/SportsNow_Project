@@ -77,11 +77,14 @@ services:
     image: mysql:8.4
     container_name: mysql_db
     # Low-memory settings for the 1 GB EC2 instance (defaults target big servers
-    # and got the container OOM-killed with exit 137).
+    # and got the container OOM-killed with exit 137). max-connections is only a
+    # limit: memory is used per open connection, and the backend's pool opens at
+    # most 10. It's high enough for the backend tests, which run test files in
+    # parallel, each with its own pool.
     command:
       - --innodb-buffer-pool-size=32M
       - --performance-schema=OFF
-      - --max-connections=20
+      - --max-connections=200
       - --skip-log-bin
     # Credentials come from the root .env (gitignored); see .env.example.
     environment:
@@ -89,10 +92,16 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE must be set in .env}
       MYSQL_USER: ${MYSQL_USER:?MYSQL_USER must be set in .env}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
-    # No published ports: only reachable as mysql-db:3306 from services on the
-    # internal db network, which only the backend joins.
+    # The backend reaches it as mysql-db:3306 on the internal db network. It's also
+    # published on 127.0.0.1:3307 so the backend tests can run from this machine
+    # (backend/tests/setupEnv.ts connects there): bound to 127.0.0.1, it can't be
+    # reached from other machines, on EC2 or anywhere else. Docker won't publish a
+    # port of a container that is only on an internal network, so it also joins db-host.
     networks:
       - db
+      - db-host
+    ports:
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       # Schema scripts, run only when mysql_data is first created.
@@ -111,6 +120,8 @@ networks:
   default:
   db:
     internal: true
+  # only lets MySQL's port be published, nothing else joins it
+  db-host:
 
 volumes:
   # mongo-data:

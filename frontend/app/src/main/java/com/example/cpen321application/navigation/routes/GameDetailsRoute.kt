@@ -3,7 +3,6 @@ package com.example.cpen321application.navigation.routes
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.navigation.NavBackStackEntry
 import com.example.cpen321application.core.notifications.GameEvents
+import com.example.cpen321application.core.showToast
 import com.example.cpen321application.friend.repository.FriendResult
 import com.example.cpen321application.friend.repository.fetchFriends
 import com.example.cpen321application.game.model.GameDetails
@@ -181,10 +181,10 @@ fun GameDetailsRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier:
 private fun showChangeResult(context: Context, result: GameChangeResult, doneMessage: String, onDone: () -> Unit) {
     when (result) {
         is GameChangeResult.Done -> {
-            Toast.makeText(context, doneMessage, Toast.LENGTH_SHORT).show()
+            showToast(context, doneMessage)
             onDone()
         }
-        is GameChangeResult.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+        is GameChangeResult.Failed -> showToast(context, result.message, long = true)
     }
 }
 
@@ -228,7 +228,7 @@ private fun InviteFriendsPopup(app: AppState, details: GameDetails, onDismiss: (
                 when (result) {
                     InviteFriendsResult.Sent -> {
                         val sent = if (friendIds.size == 1) "Invite sent" else "${friendIds.size} invites sent"
-                        Toast.makeText(context, sent, Toast.LENGTH_SHORT).show()
+                        showToast(context, sent)
                         onDismiss()
                     }
                     is InviteFriendsResult.Failed -> state = state.copy(errorMessage = result.message)
@@ -268,7 +268,7 @@ private fun JoinRequestPopup(app: AppState, details: GameDetails, onDismiss: () 
                 }
                 when (result) {
                     is JoinRequestResult.Sent -> {
-                        Toast.makeText(context, "Request sent", Toast.LENGTH_SHORT).show()
+                        showToast(context, "Request sent")
                         onSent()
                     }
                     is JoinRequestResult.Failed -> error = result.message
@@ -285,6 +285,6 @@ private fun openDirections(context: Context, location: GameLocation) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     } catch (e: ActivityNotFoundException) {
-        Toast.makeText(context, "No app found to show directions", Toast.LENGTH_SHORT).show()
+        showToast(context, "No app found to show directions")
     }
 }
