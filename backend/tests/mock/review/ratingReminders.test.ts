@@ -2,7 +2,6 @@ import * as logger from '../../../src/core/logger';
 import * as push from '../../../src/core/notifications/push';
 import * as ratingRemindersDb from '../../../src/review/db/ratingReminders';
 import { sendDueRatingReminders, startRatingReminders } from '../../../src/review/ratingReminders';
-import type * as MockEnv from '../mockEnv';
 import { cleanUpAfterTests } from '../helpers';
 
 // the server looks for due reminders this often
