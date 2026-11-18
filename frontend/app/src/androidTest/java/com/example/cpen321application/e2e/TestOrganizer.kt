@@ -2,16 +2,10 @@ package com.example.cpen321application.e2e
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.cpen321application.BuildConfig
-import com.example.cpen321application.chat.dto.ChatSocketEvent
-import com.example.cpen321application.chat.socket.ChatConnection
-import com.example.cpen321application.chat.socket.ChatConnectionListener
-import com.example.cpen321application.chat.socket.ChatDisconnect
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 // how long a call to the server may take
 private const val CALL_TIMEOUT_MILLIS = 10_000
@@ -21,7 +15,7 @@ private const val STARTED_SECONDS_AGO = 30L
 
 /*  the test organizer saved by backend/tests/e2e/seedGameDiscovery.ts, which owns the test
     games. The E2E tests act as them through the server's interface, e.g. to cancel a game
-    while User A is asking to join it, or to send User A a game chat message. scripts/run-frontend-e2e-tests passes their token in
+    while User A is asking to join it, or to read the game chat. scripts/run-frontend-e2e-tests passes their token in
     as the organizerToken instrumentation argument.
  */
 object TestOrganizer {
@@ -49,31 +43,6 @@ object TestOrganizer {
     fun chatMessageTexts(title: String): List<String> {
         val messages = call("GET", "api/chats/${chatId(title)}/messages", body = null).getJSONArray("messages")
         return (0 until messages.length()).map { messages.getJSONObject(it).getString("text") }
-    }
-
-    /*  sends text to the chat of the organizer's game called title, live over the chat's
-        WebSocket like the app does, and waits until the server has sent it out
-     */
-    fun sendChatMessage(title: String, text: String) {
-        val opened = CountDownLatch(1)
-        val delivered = CountDownLatch(1)
-        val listener = object : ChatConnectionListener {
-            override fun onOpen() = opened.countDown()
-
-            override fun onEvent(event: ChatSocketEvent) {
-                if (event.message?.text == text) delivered.countDown()
-            }
-
-            override fun onDisconnected(reason: ChatDisconnect) = Unit
-        }
-        val connection = ChatConnection(chatId(title), token, listener)
-        try {
-            check(opened.await(CALL_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)) { "The chat didn't open" }
-            check(connection.send(text, clientId = "e2e-${System.currentTimeMillis()}")) { "The chat closed" }
-            check(delivered.await(CALL_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)) { "\"$text\" wasn't sent" }
-        } finally {
-            connection.close()
-        }
     }
 
     // the chat of the organizer's game called title

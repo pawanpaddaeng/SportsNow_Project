@@ -21,14 +21,15 @@ private const val ORGANIZED_GAME = "E2E Organized"
 private const val CHAT_GAME = "E2E Chat"
 private const val LEAVE_GAME = "E2E Leave"
 
-/*  E2E tests for View Upcoming Games (use case 29) and Leave Game (use case 28) in
+/*  E2E tests for View Upcoming Games (use case 27) and Leave Game (use case 26) in
     Requirements and Design, section 3.4. Both start on the Home screen.
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
       - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
         "E2E Organized", organized by User A, and "E2E Chat" and "E2E Leave", organized by a test
-        organizer and already joined by User A. Only the Leave Game test changes them.
+        organizer and already joined by User A. Only the Leave Game test changes them. User B is
+        also in "E2E Chat" when their account exists, so its player count isn't checked.
  */
 @RunWith(AndroidJUnit4::class)
 class MyGamesTest {
@@ -42,10 +43,10 @@ class MyGamesTest {
         // the user opens the Home screen
         composeRule.openTab("Home")
 
-        // the system lists the games the user joined, with their player count
+        // the system lists the games the user joined
         composeRule.waitForNode(homeCard(CHAT_GAME))
         composeRule.onNodeWithText("Joined Games").assertIsDisplayed()
-        assertHomeCard(CHAT_GAME, players = "2/10")
+        assertHomeCard(CHAT_GAME)
 
         // and the games the user organises
         assertHomeCard(ORGANIZED_GAME, players = "1/10")
@@ -60,7 +61,7 @@ class MyGamesTest {
         composeRule.scrollTo(hasText("Organized Games"))
         composeRule.onNodeWithContentDescription("Collapse Organized Games").performClick()
         composeRule.onNode(homeCard(ORGANIZED_GAME)).assertDoesNotExist()
-        assertHomeCard(CHAT_GAME, players = "2/10")
+        assertHomeCard(CHAT_GAME)
         composeRule.onNodeWithContentDescription("Expand Organized Games").performClick()
 
         // the user selects a game and the system opens its details
@@ -109,8 +110,9 @@ class MyGamesTest {
     // a game's card on Home. It's clickable, so its texts are merged into one node
     private fun homeCard(title: String) = hasText(title) and hasClickAction()
 
-    private fun assertHomeCard(title: String, players: String) {
-        val card = homeCard(title) and hasText(players)
+    // the game's card is on Home, showing how many players it has when players is given
+    private fun assertHomeCard(title: String, players: String? = null) {
+        val card = if (players == null) homeCard(title) else homeCard(title) and hasText(players)
         composeRule.scrollTo(card)
         composeRule.onNode(card).assertIsDisplayed()
     }

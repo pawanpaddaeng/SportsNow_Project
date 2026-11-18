@@ -13,7 +13,8 @@ import { createUser } from '../../src/user/db/users';
 
     Every run first removes what an earlier run saved, so the tests always start from the same
     games. The games belong to a test organizer, except one organized by User A, since Discover
-    never shows a user their own games. Prints E2E_ORGANIZER_TOKEN=<token>: the tests sign in
+    never shows a user their own games. User B (the manual tester's "Bea Tester" account) is
+    added to the chat game when that account exists. Prints E2E_ORGANIZER_TOKEN=<token>: the tests sign in
     as the test organizer with it to cancel or start a game while User A is joining it.
  */
 
@@ -68,6 +69,9 @@ const ORGANIZED_GAME: SeedGame = { title: 'E2E Organized', sport: 'tennis', spot
 // the earlier messages in the chat game, oldest first. The tests check they're shown
 const CHAT_MESSAGES = ['E2E hello from the organizer', 'E2E bring a ball please'];
 
+// User B, the manual tester's account (see Testing.md), who sends a live message in the chat game
+const USER_B = { firstName: 'Bea', lastName: 'Tester' };
+
 // the user who signed in to the app on the emulator. email isn't unique, so a match must be one user
 async function findUserA(email: string): Promise<number> {
   const rows = await selectRows<{ user_id: number }>('SELECT user_id FROM users WHERE email = ?', [email]);
@@ -106,7 +110,15 @@ function addGame(organizerId: number, game: SeedGame, n: number): Promise<number
   return createGame(newGame);
 }
 
-// puts User A in the game, as if the organizer had approved their join request
+// User B's user_id, null if the manual tester hasn't signed up as User B yet
+async function findUserB(): Promise<number | null> {
+  const rows = await selectRows<{ user_id: number }>(
+    'SELECT user_id FROM users WHERE first_name = ? AND last_name = ?', [USER_B.firstName, USER_B.lastName]);
+  if (rows.length > 1) throw new Error(`More than one user is named ${USER_B.firstName} ${USER_B.lastName}.`);
+  return rows[0]?.user_id ?? null;
+}
+
+// puts a user in the game, as if the organizer had approved their join request
 async function addPlayer(gameId: number, userId: number): Promise<void> {
   await executeWrite('INSERT INTO game_players (game_id, user_id) VALUES (?, ?)', [gameId, userId]);
 }
@@ -137,6 +149,12 @@ async function seed(email: string): Promise<void> {
   if (chatId === null) throw new Error('The chat game has no chat');
   for (const text of CHAT_MESSAGES) {
     await createChatMessage(chatId, organizerId, text);
+  }
+  const userBId = await findUserB();
+  if (userBId === null) {
+    logInfo(`No user is named ${USER_B.firstName} ${USER_B.lastName} yet, so GameChatTest's Receive test will fail`);
+  } else {
+    await addPlayer(chatGameId, userBId);
   }
 
   await addGame(userAId, ORGANIZED_GAME, organizerGames.length + 2);
