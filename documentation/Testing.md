@@ -8,12 +8,13 @@
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Game and Friend components are written. Each interface now has one test file without mocks and one with mocks, so section 2.1.1 gives those files and the line where each `describe` group starts. The test tables now match the tests that were written, and the Friend component's tests are added. Section 2.1.3 explains how to start the test database and run the tests. |
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Review component are written: its three interfaces, the rating reminder the server checks for every minute, and the score rules. The existing mocked rating tests are split into one file per interface, and each interface gets a test file without mocks. New edge cases cover the 1 to 6 star limits, values that aren't whole numbers, the edges of the 1-day rating window, games that aren't completed, players who didn't show up or left, rating twice or at the same time, the order games count in, and a game exactly 1.5 stars from a player's middle score. The Reputation score case of the join request list now gives the exact score its test checks, 3.86. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
+| Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
 
 ---
 
 ## 2. Back-end Test Specification: APIs
 
-We test every interface of the **Game**, **Friend**, **Review** and **Notification** components that is built (see Requirements and Design, section 4.1). The Review and Game components also have timed parts the app never calls, the rating reminder and the game start reminder the server checks for every minute, which are tested the same way. The test folders are named after the back-end components in `backend/src`, so the Game tests are in `game`, the Friend tests in `friend`, the Review tests in `review` and the Notification tests in `notification`.
+We test every interface of the **Game**, **Friend**, **Review**, **Notification** and **Message** components that is built (see Requirements and Design, section 4.1). The Review and Game components also have timed parts the app never calls, the rating reminder and the game start reminder the server checks for every minute, which are tested the same way. The Message component's `send_message` is a WebSocket request, not an HTTP route, and is tested the same way too. The test folders are named after the back-end components in `backend/src`, so the Game tests are in `game`, the Friend tests in `friend`, the Review tests in `review`, the Notification tests in `notification` and the Message tests in `chat`.
 
 Each interface has two test files, each with one `describe` group:
 - one **without mocks**, in `backend/tests/no-mock/`, for example `describe('Unmocked: GET /api/games/discover', ...)`
@@ -96,11 +97,20 @@ The unmocked Review tests share their setup helpers in [`backend/tests/no-mock/r
 
 The unmocked Notification tests share their setup helpers in [`backend/tests/no-mock/notification/notificationHelpers.ts`](../backend/tests/no-mock/notification/notificationHelpers.ts). The Game and Friend tests use them too, to check the notifications their routes save. `notifyUser` and `notifyUsers` are tested through the routes and reminders that call them.
 
+**Message component** (game and friend chats)
+
+| **Interface** | **Describe Group Location, No Mocks** | **Describe Group Location, With Mocks** | **Mocked Components** |
+| ------------- | ------------------------------------- | --------------------------------------- | --------------------- |
+| **GET /api/chats/{chatId}/messages** | [`backend/tests/no-mock/chat/getChatMessages.test.ts#L30`](../backend/tests/no-mock/chat/getChatMessages.test.ts#L30) | [`backend/tests/mock/chat/getChatMessages.test.ts#L13`](../backend/tests/mock/chat/getChatMessages.test.ts#L13) | Chats DB |
+| **WebSocket `send_message`** (`wss://DOMAIN/ws?chat_id=`) | [`backend/tests/no-mock/chat/sendMessage.test.ts#L55`](../backend/tests/no-mock/chat/sendMessage.test.ts#L55) | [`backend/tests/mock/chat/sendMessage.test.ts#L73`](../backend/tests/mock/chat/sendMessage.test.ts#L73) | Chats DB, Users DB, Firebase push, Logger, timers |
+
+The unmocked Message tests share their setup helpers in [`backend/tests/no-mock/chat/chatHelpers.ts`](../backend/tests/no-mock/chat/chatHelpers.ts). Both WebSocket test files connect with the test client in [`backend/tests/chatSocketClient.ts`](../backend/tests/chatSocketClient.ts). How a `send_message` request is checked has no database code, so it also has unit tests, in [`backend/tests/unit/chat/sendMessage.test.ts#L9`](../backend/tests/unit/chat/sendMessage.test.ts#L9).
+
 #### Test cases
 
 **Signing in**
 
-Every route checks that the user is signed in first, in the same middleware. The Friend, Review and Notification components' groups without mocks test it for each of their interfaces:
+Every route checks that the user is signed in first, in the same middleware. The Friend, Review, Notification and Message components' groups without mocks test it for each of their HTTP interfaces (the chat WebSocket checks the token when it connects, see the Message component):
 
 | **Test** | **Input** | **Expected status** | **What should happen** |
 | -------- | --------- | ------------------- | ---------------------- |
@@ -483,6 +493,66 @@ The tests without mocks save notifications straight in the table with set times,
 | With mocks | Marks the signed in user's notifications read | `markNotificationsRead` replaced | 200 | `markNotificationsRead` gets the signed in user. Returns `{ msg: "success" }` |
 | With mocks | Database fails | `markNotificationsRead` throws | 500 | Returns `{ msg: "server_error", error: "Could not update your notifications, try again later" }` |
 
+##### Message component
+
+The tests without mocks save messages straight in the `chat_messages` table, and take players out of games and end friendships straight in the database, to test what happens to a chat that is already open. The WebSocket tests start the chat server on a port of their own, since test files run at the same time, and connect to it with a real `ws` client, as the app does. Sending a message replies over the WebSocket, not with an HTTP status, so those tables give the reply instead.
+
+**GET /api/chats/{chatId}/messages** (a page of a chat's earlier messages)
+
+| **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
+| --------- | -------- | --------- | ------------------- | ---------------------- |
+| No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | No messages are read |
+| No mocks | New game chat has no messages | A player opens the chat of a new game | 200 | Returns `{ msg: "success", messages: [], is_closed: false }` |
+| No mocks | Player reads the game chat, newest first | The organizer sends "Hi all", then the player sends "See you there" | 200 | Both are listed, newest first. Each has `message_id`, `chat_id`, `sender` (`user_id`, `first_name`, `last_name`), `text` and `created_at` (UTC, no milliseconds). `is_closed` is false |
+| No mocks | Older messages load a page at a time with before | 55 messages. The newest page, then `?before=` the oldest message on it, then `?before=` the first message | 200 each time | The newest 50 (55 to 6), then the 5 older ones (5 to 1), then `[]`. No message is skipped or repeated |
+| No mocks | Both friends read their friend chat | Two friends, one message from each | 200 for both | Both see the same two messages, newest first. `is_closed` is false, a friend chat never closes |
+| No mocks | Chat of a completed or cancelled game is closed but readable | A completed game and a cancelled game, each with one message | 200 | The message is listed, and `is_closed` is true |
+| No mocks | Rejects a chatId that is not a valid id | `chatId` "abc", "0", "-1", "1.5" and "99999999999" | 400 | Returns `{ msg: "invalid_request", error: "chatId must be a positive whole number" }` |
+| No mocks | Rejects a before that is not a valid id | `?before=` "abc", "0", "-5" and empty | 400 | Returns `{ msg: "invalid_request", error: "before must be a positive whole number" }` |
+| No mocks | Chat does not exist | A `chatId` no chat has | 404 | Returns `{ msg: "chat_not_found", error: "This chat does not exist" }` |
+| No mocks | User who is not a player cannot open the game chat | A user who never played the game | 403 | The messages aren't shown. Returns `{ msg: "forbidden", error: "You can't open this chat" }` |
+| No mocks | Player who left the game cannot open its chat any more | The player is taken out of the game | 403 | Returns `{ msg: "forbidden", error: "You can't open this chat" }` |
+| No mocks | Stranger or former friend cannot open a friend chat | A user who isn't one of the two friends, then one of the friends after they stop being friends | 403 both times | Returns `{ msg: "forbidden", error: "You can't open this chat" }` |
+| With mocks | Database fails checking access to the chat | `getChatAccess` throws | 500 | The messages are never read. Returns `{ msg: "server_error", error: "Could not load messages, try again later" }` |
+| With mocks | Database fails reading the messages | `getChatAccess` lets the user in, `getChatMessages` throws. `?before=120` | 500 | `getChatMessages` was asked for the page before message 120. Returns `{ msg: "server_error", error: "Could not load messages, try again later" }` |
+
+**WebSocket `send_message`** (send a message to the chat that is open)
+
+| **Group** | **Test** | **Input** | **Expected reply** | **What should happen** |
+| --------- | -------- | --------- | ------------------ | ---------------------- |
+| No mocks | Rejects connections that may not open the chat | Connections with no `chat_id`, `chat_id` "abc", no token, a token that isn't real, a `chat_id` no chat has, and a user who isn't a player | HTTP 400, 400, 400, 401, 404, then 403 | The connection never opens |
+| No mocks | Plain HTTP request is answered 426 | A plain HTTP request, not a WebSocket | HTTP 426 | The chat server only accepts WebSocket connections |
+| No mocks | Message is saved and sent to everyone in the chat | The organizer and the player are connected, and the player also has a second game's chat open. The player sends `{ chat_id, text: "On my way", client_id: "c-1" }` | `{ type: "new_message", message, client_id: "c-1" }` to both | The message is saved. `message` has the same fields as in `GET /api/chats/{chatId}/messages`. The other chat's connection gets nothing |
+| No mocks | Outer spaces are trimmed and a missing client_id comes back null | `text: "   Running late   "`, no `client_id` | `new_message` with `client_id: null` | "Running late" is saved and sent |
+| No mocks | Text of 1000 characters is sent, 1001 is rejected | 1000 characters with spaces around them, then 1001 characters | `new_message`, then `{ type: "error", msg: "invalid_request", error: "text must be at most 1000 characters", client_id: null }` | Only the first is saved. The connection stays open |
+| No mocks | Bad requests are answered invalid_request | A request that isn't JSON, one with `type: "typing"`, and one with text "   " | `{ type: "error", msg: "invalid_request", error, client_id: null }` for each | The error is "Request must be a JSON object", "type must be send_message", then "text must not be empty". Nothing is saved, the connection stays open |
+| No mocks | Sending to a different chat than the connection is for | The connection is for the game chat, the player sends to another game's chat they are also in | `{ type: "error", msg: "forbidden", error: "This connection is for a different chat", client_id: "c-2" }` | Nothing is saved in either chat. The connection stays open |
+| No mocks | Chat of a game that ended cannot be written to | A completed game's chat is opened, and another game is cancelled while its chat is open. A message is sent on each | `{ type: "error", msg: "chat_closed", error: "This chat is closed because the game ended", client_id }` for each | A closed chat can still be opened, but nothing is saved |
+| No mocks | Player removed while connected cannot send | The player connects, is taken out of the game, then sends | `{ type: "error", msg: "forbidden", error: "You can't use this chat", client_id: "c-3" }` | Nothing is saved. The server closes the connection with code 4403, "Not a member of this chat" |
+| No mocks | Removed player is disconnected instead of getting new messages | Both are connected, the player is taken out of the game, then the organizer sends | `new_message` to the organizer only | The removed player's connection is closed with code 4403 and gets no message |
+| No mocks | Chat deleted while connected | Two friends' chat is deleted while one has it open (as when the other deletes their account), then they send | `{ type: "error", msg: "chat_not_found", error: "This chat does not exist", client_id: "c-4" }` | The connection is closed with code 4403, "This chat does not exist" |
+| No mocks | Friend is notified of a message unless they have the chat open | In a friend chat the player sends "Lunch?" while the friend doesn't have it open, then again once they do. `sendPushToUsers` is watched without replacing it, the test users have no devices | `new_message` | The first time the friend is sent a push: title "Pat", body "Lunch?", data `{ type: "friend_message", chatId, friendName: "Pat Tester" }`, tag `friend-<sender id>`. The second time nobody is left to notify |
+| No mocks | Game chat messages send no notification | The player sends in the game chat while the organizer isn't connected | `new_message` | `sendPushToUsers` is never called |
+| With mocks | Database fails while checking a new connection | `getChatAccess` throws | HTTP 500 | The connection never opens. The failure is logged as "Opening a chat connection failed:" |
+| With mocks | Database fails saving the message | `createChatMessage` throws | `{ type: "error", msg: "server_error", error: "Could not send the message", client_id: "c-1" }` | The failure is logged as "Sending to chat 7 failed:". The connection stays open |
+| With mocks | Database fails reading who is in the chat after saving | Both users are connected, `createChatMessage` saves the message, `getChatMemberIds` throws | `new_message` to the sender only | The message is already saved, so the sender is told it's sent. The other user gets it when their chat next loads. The failure is logged |
+| With mocks | Friend notification shows the first 100 characters | A friend chat. `sendPushToUsers` replaced. The sender sends 100 "a"s, then 101 emoji | `new_message` both times | The first push body is the 100 "a"s with no "...". The second is 100 emoji followed by "...", an emoji is never cut in two |
+| With mocks | Friend notification fails | A friend chat. `sendPushToUsers` throws | `new_message` | The message is still sent. The failure is logged as "Notifying about a message in chat 7 failed:" |
+| With mocks | Connections that stop answering pings are dropped | Fake timers for the check every 30 seconds. One user's app answers pings, the other's never does. Two checks pass | None | The silent connection is dropped (close code 1006). The one that answers stays open |
+
+**How a `send_message` request is checked** (unit tests of `parseSendMessage` in `backend/src/chat/validation/sendMessage.ts`, no database)
+
+| **Test** | **Input** | **Expected output** |
+| -------- | --------- | ------------------- |
+| A valid request is accepted with its text trimmed | `{ type: "send_message", chat_id: 7, text: "  Hi there  ", client_id: "c-1" }` | `{ chatId: 7, text: "Hi there", clientId: "c-1" }` |
+| A client_id that isn't a string becomes null | `client_id` missing, 12, then null | `clientId: null` |
+| A request that isn't a JSON object is rejected | "hello", "null", a JSON string, then a JSON number | Error "Request must be a JSON object" |
+| A type other than send_message is rejected | `type` missing, then "typing" | Error "type must be send_message" |
+| A chat_id that isn't a valid id is rejected | `chat_id` missing, "7" (a string), 0, -3, 1.5, then 4294967296 | Error "chat_id must be a positive whole number" |
+| An empty text is rejected | `text` missing, 42, "", then only spaces and line breaks | Error "text must not be empty" |
+| Text of 1000 characters is accepted, outer spaces don't count | 1000 characters with a space on each side | Accepted, without the spaces |
+| Text of 1001 characters is rejected | 1001 characters | Error "text must be at most 1000 characters" |
+
 #### 2.1.2. Commit Hash Where Tests Run
 
 _To be added at CP2._
@@ -524,6 +594,7 @@ In our Docker setup MySQL is only reachable from inside Docker, so `docker-compo
    - Tests without mocks: `npx jest tests/no-mock`
    - One component: `npx jest tests/no-mock/game` or `npx jest tests/mock/friend`
    - The Review component's tests: `npx jest tests/mock/review tests/no-mock/review tests/unit/review`
+   - The Message component's tests: `npx jest tests/mock/chat tests/no-mock/chat tests/unit/chat`
    - One interface: `npx jest tests/no-mock/friend/searchUsers.test.ts`
 4. **Stop the database** from the root folder when you're done:
    ```
