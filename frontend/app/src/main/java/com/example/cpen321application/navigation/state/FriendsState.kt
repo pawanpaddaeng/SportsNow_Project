@@ -12,6 +12,7 @@ import com.example.cpen321application.friend.repository.FriendResult
 import com.example.cpen321application.friend.repository.decideFriendRequest
 import com.example.cpen321application.friend.repository.fetchFriendRequests
 import com.example.cpen321application.friend.repository.fetchFriends
+import com.example.cpen321application.friend.repository.removeFriend
 import com.example.cpen321application.friend.repository.searchUsers
 import com.example.cpen321application.friend.repository.sendFriendRequest
 import kotlinx.coroutines.CoroutineScope
@@ -151,6 +152,24 @@ class FriendsState(private val context: Context, private val scope: CoroutineSco
                     refresh()
                 }
             }
+        }
+    }
+
+    // the server also deletes the chat the two shared, then the list is loaded again
+    fun remove(friend: FriendPerson) {
+        busyUserIds = busyUserIds + friend.userId
+        launchChange {
+            val result = try {
+                removeFriend(context, friend.userId)
+            } finally {
+                busyUserIds = busyUserIds - friend.userId
+            }
+            when (result) {
+                is FriendResult.Done -> friends = friends.filterNot { it.userId == friend.userId }
+                is FriendResult.Failed -> showToast(context, result.message, long = true)
+            }
+            // e.g. they removed this user first, show where things stand now
+            refresh()
         }
     }
 

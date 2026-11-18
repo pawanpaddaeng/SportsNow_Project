@@ -13,6 +13,8 @@ import {
   type FriendUser,
   getFriends,
   getIncomingFriendRequests,
+  removeFriend,
+  type RemoveFriendProblem,
   searchUsers,
   sendFriendRequest,
 } from '../db/friends';
@@ -31,6 +33,11 @@ const SEND_ERRORS: Record<FriendRequestProblem, ErrorResponse> = {
 const DECISION_ERRORS: Record<FriendDecisionProblem, ErrorResponse> = {
   request_not_found: { status: 404, body: { msg: 'request_not_found', error: 'This friend request does not exist' } },
   already_responded: { status: 409, body: { msg: 'already_responded', error: 'This request was already answered' } },
+};
+
+const REMOVE_ERRORS: Record<RemoveFriendProblem, ErrorResponse> = {
+  own_friend: { status: 409, body: { msg: 'own_friend', error: "You can't remove yourself as a friend" } },
+  not_friends: { status: 404, body: { msg: 'not_friends', error: "You're not friends with this user" } },
 };
 
 function friendUserJson(user: FriendUser) {
@@ -136,6 +143,24 @@ export function friendsRouter(): Router {
           gameId: null,
         }).catch(logNotificationError);
       }
+
+      return res.status(200).json({ msg: 'success' });
+    }));
+
+  /*  stops being friends with userId, for both users, and deletes the chat they shared with
+      its messages. The other user isn't notified. Errors: 400 invalid_request,
+      404 not_friends, 409 own_friend
+   */
+  router.delete('/api/friends/:userId', requireAuth, asyncRoute('Could not remove this friend, try again later',
+    async (req: Request<{ userId: string }>, res: Response) => {
+      const user = getAuthUser(res);
+      // user ids are INT UNSIGNED like game ids, so they're read the same way
+      const friendId = readGameId(req.params.userId);
+      if (friendId === null) return invalidRequest(res, 'userId must be a positive whole number');
+
+      const result = await removeFriend(user.userId, friendId);
+      if (!result.ok) return sendError(res, responseFor(REMOVE_ERRORS, result.problem));
+      logInfo(`User ${user.userId} removed friend ${friendId}`);
 
       return res.status(200).json({ msg: 'success' });
     }));

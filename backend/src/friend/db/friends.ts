@@ -1,4 +1,4 @@
-import { createFriendChat } from '../../chat/db/chats';
+import { createFriendChat, deleteFriendChat } from '../../chat/db/chats';
 import { executeWrite, inTransaction, type Queryable, selectRows } from '../../core/db/mysql';
 import { matchName } from '../search/nameMatch';
 
@@ -267,5 +267,32 @@ export async function decideFriendRequest(
       connection,
     );
     return { ok: true, senderId: request.sender_id };
+  });
+}
+
+// why a user can't remove a friend
+export type RemoveFriendProblem = 'own_friend' | 'not_friends';
+
+export type RemoveFriendResult = { ok: true } | { ok: false; problem: RemoveFriendProblem };
+
+/*  ends the friendship between userId and friendId, for both of them, and deletes the chat
+    they shared with its messages. Either one can send a new request afterwards. A missing
+    user counts as not a friend, so the id reveals nothing
+ */
+export async function removeFriend(userId: number, friendId: number): Promise<RemoveFriendResult> {
+  if (userId === friendId) return { ok: false, problem: 'own_friend' };
+
+  return inTransaction(async (connection) => {
+    // locked like a request, so removing can't run alongside accepting a request between the two
+    await lockUsers(connection, userId, friendId);
+    const removed = await executeWrite(
+      'DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
+      [userId, friendId, friendId, userId],
+      connection,
+    );
+    if (removed.affectedRows === 0) return { ok: false, problem: 'not_friends' };
+
+    await deleteFriendChat(connection, userId, friendId);
+    return { ok: true };
   });
 }
