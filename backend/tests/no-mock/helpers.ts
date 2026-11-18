@@ -36,20 +36,19 @@ export async function addUser(firstName: string): Promise<number> {
   return userId;
 }
 
+// a call to the server, typed as the parts of the reply the tests read
+export type Call = PromiseLike<{ status: number; body: unknown }>;
+
 /*  checks a call that needs a signed in user is turned down without one: 400 invalid_request
-    with no token, then 401 invalid_token with a token that isn't a real JWT.
-    e.g. expectSignInRequired('put', '/api/users/me', newProfile)
+    with no token, then 401 invalid_token with a token that isn't a real JWT. send makes the
+    call with the headers given, e.g. (headers) => api.get('/api/users/me').set(headers) as Call
  */
-export async function expectSignInRequired(
-  method: 'get' | 'post' | 'put' | 'delete',
-  url: string,
-  body?: object,
-): Promise<void> {
-  const noToken = await api[method](url).send(body);
+export async function expectSignInRequired(send: (headers: AuthHeader) => Call): Promise<void> {
+  const noToken = await send({});
   expect(noToken.status).toBe(400);
   expect(noToken.body).toMatchObject({ msg: 'invalid_request' });
 
-  const badToken = await api[method](url).set(withToken('not-a-real-token')).send(body);
+  const badToken = await send(withToken('not-a-real-token'));
   expect(badToken.status).toBe(401);
   expect(badToken.body).toEqual({ msg: 'invalid_token', error: 'Invalid jwt_token' });
 }

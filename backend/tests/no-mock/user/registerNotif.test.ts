@@ -1,5 +1,5 @@
 import { selectRows } from '../../../src/core/db/mysql';
-import { addUser, api, asUser, cleanUpAfterTests, expectSignInRequired } from '../helpers';
+import { addUser, api, asUser, type Call, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 
 let aliceId: number;
 
@@ -24,7 +24,7 @@ describe('Unmocked: POST /api/register_notif', () => {
   test('Rejects a call that is not signed in', async () => {
     const body = { fcm_token: `no-mock-register-notif-${aliceId}` };
 
-    await expectSignInRequired('post', '/api/register_notif', body);
+    await expectSignInRequired((headers) => api.post('/api/register_notif').set(headers).send(body) as Call);
 
     expect(await getSavedTokens(aliceId)).toEqual([]);
   });

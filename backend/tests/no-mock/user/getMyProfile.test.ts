@@ -1,4 +1,4 @@
-import { addUser, api, asUser, cleanUpAfterTests, expectSignInRequired } from '../helpers';
+import { addUser, api, asUser, type Call, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 import { expectedProfile } from './userHelpers';
 
 let aliceId: number;
@@ -16,7 +16,7 @@ describe('Unmocked: GET /api/users/me', () => {
   // Expected behavior: no profile is read
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    await expectSignInRequired('get', '/api/users/me');
+    await expectSignInRequired((headers) => api.get('/api/users/me').set(headers) as Call);
   });
 
   // Input: Alice asks for her own profile

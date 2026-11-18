@@ -7,6 +7,7 @@ import {
   addUser,
   api,
   asUser,
+  type Call,
   cleanUpAfterTests,
   expectSignInRequired,
   getPlayerIds,
@@ -40,7 +41,7 @@ describe('Unmocked: DELETE /api/users/me', () => {
   // Expected behavior: no account is deleted
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    await expectSignInRequired('delete', '/api/users/me');
+    await expectSignInRequired((headers) => api.delete('/api/users/me').set(headers) as Call);
 
     expect(await findUserById(oliviaId)).not.toBeNull();
   });

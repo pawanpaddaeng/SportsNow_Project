@@ -17,5 +17,9 @@ export function mockGoogleCheck(): void {
     email_verified: true,
     ...GOOGLE_ACCOUNT,
   });
-  jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve(ticket));
+  // verifyIdToken also has an older callback form that returns nothing, and jest.spyOn types
+  // the spy from that one. The routes use the form that returns a promise, so the spy is typed as that
+  const verifyIdToken = jest.spyOn(OAuth2Client.prototype, 'verifyIdToken') as unknown as
+    jest.SpyInstance<Promise<LoginTicket>>;
+  verifyIdToken.mockResolvedValue(ticket);
 }

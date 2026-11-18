@@ -1,5 +1,5 @@
 import { ageRange } from '../../../src/user/routes/publicProfileRoutes';
-import { addFriends, addUser, api, asUser, cleanUpAfterTests, expectSignInRequired } from '../helpers';
+import { addFriends, addUser, api, asUser, type Call, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 
 // a user id far above any id the tests create
 const MISSING_USER_ID = 999999999;
@@ -21,7 +21,7 @@ describe('Unmocked: GET /api/users/{userId}', () => {
   // Expected behavior: no profile is read
   // Expected output: { msg: "invalid_request" }, then { msg: "invalid_token", error: "Invalid jwt_token" }
   test('Rejects a call that is not signed in', async () => {
-    await expectSignInRequired('get', `/api/users/${benId}`);
+    await expectSignInRequired((headers) => api.get(`/api/users/${benId}`).set(headers) as Call);
   });
 
   // Input: Alice opens Ben's profile. Ben is new, so he never played, and isn't her friend
