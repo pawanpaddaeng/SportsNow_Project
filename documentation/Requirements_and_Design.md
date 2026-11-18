@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 18, 2026 | 3.1, 3.2, 3.3, 3.4, 3.5, 4.6 | Updated the use case diagram. Chat is now its own feature, Feature 2, with Send Message, View Messages and Receive Message each covering both friend chat and game chat, instead of separate friend and game chat use cases under Friend System and Game Discovery. Added the Delete Account use case to Authentication. Features and use cases are renumbered to follow the diagram's order: Authentication, Chat, Friend System, Player Reputation and Statistics, Game Planning, Game Discovery, and in Player Reputation and Statistics, View Player Statistics now comes before Mark No-shows. Formal Use Case 1 is renamed Send Message to match the diagram. |
 | Nov 18, 2026 | 3.1, 3.4, 4.1, 4.2 | Added the Notifications screen (issue #60). Join requests and their answers, invites, accepted friend requests and game start reminders are now saved as well as sent as a push, so they're listed on the Notifications tab, and tapping one, there or as a push, opens the screen to act on it. Added `GET /api/notifications`, `PATCH /api/notifications/read` and `notifyUser` / `notifyUsers` to the shared Notifications module, and a notifications table. Friend requests moved from the Friends tab to a Friend Requests screen opened from the top of Notifications, and the sender is no longer told when their request is declined. The organiser and players now get a reminder about 1 hour before a game starts. |
 | Nov 17, 2026 | 3.4, 4.1 | Players can rate each other for 1 day after the organiser marks a game completed, so old games stop changing scores. The "Game completed" notification now asks players to rate their teammates, and players who still have someone to rate get a reminder 1 hour before rating closes. Games played now counts the completed games a player showed up to, from the same attendance the score uses, so the two always agree and a game deleted after everyone left still counts. |
 | Nov 17, 2026 | 3.1, 3.4, 4.1 | Ratings are out of 6 stars. The reputation score no longer gives players a default of 5: a player with no ratings and no missed games is "Not rated yet" (a null score), and is left out of anything that ranks or filters by score, including badges. The score is now a weighted average of the player's games that starts from 5: each game scores the average over the other players who showed up, counting anyone who didn't rate as 5, newer games count more, unusual games count less, and each no-show counts as a game scoring 1. Section 4.1 gives the formula. |
@@ -30,22 +31,24 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 ## 3. Requirements Specification
 
 ### **3.1. List of Features**
-1. Authentication: To access app features, a user must Sign In using Google Authentication Service first. New users must set up a profile by providing their first name, last name, and birth year. Users can also sign out.
+1. Authentication: To access app features, a user must Sign In using Google Authentication Service first. New users must set up a profile by providing their first name, last name, and birth year. Users can also sign out, or delete their account and everything tied to it.
 
-2. Friend System: A user can search for other users and send, accept, or decline friend requests. Requests waiting for an answer are listed on a Friend Requests screen, opened from the top of the Notifications screen, and the sender is notified only when their request is accepted. A user can remove a friend. Friends can chat in real-time direct chat. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games.
+2. Chat: Friends can chat in a real-time direct chat, and each game has a temporary real-time chat room for its players and organiser, which is closed after the game ends. A user can send messages, read the earlier messages in a chat, and receive new messages live while the chat is open, or as a push notification when it is not.
 
-3. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill, and reliability, along with an overall rating, and the organiser marks players who did not show up. Our algorithm computes a reputation score out of 6, adjusting for the number of ratings, giving recent games more weight, counting unusual games less, and penalising no-shows. A player with no ratings shows “Not rated yet” instead of a score. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
+3. Friend System: A user can search for other users and send, accept, or decline friend requests. Requests waiting for an answer are listed on a Friend Requests screen, opened from the top of the Notifications screen, and the sender is notified only when their request is accepted. A user can remove a friend. A user can view a friend’s profile, badges, and upcoming games, and can invite them to games.
 
-4. Game Planning: A user can create a game by specifying the sport, title, date, start time, max players, skill level, and an optional description. The user picks the game location on a map using the Google Maps API. Every player who wants to join must send a join request that the organiser approves. The organiser can then review join requests, each shown with the player’s rating, history, and badges, and can accept or reject each one. The join request list updates live as new requests arrive. The Game Organiser can also invite friends and edit or cancel the game. Each game has a temporary real-time chat room, which is closed after the game ends. The organiser and players get a reminder about 1 hour before the game starts. Join requests and their answers, invites and start reminders are sent as push notifications and also listed on a Notifications screen, where tapping one opens the screen to act on it, and a badge on the Notifications tab counts the unread ones and the friend requests waiting for an answer.
+4. Player Reputation and Statistics: After each game, players rate each other on punctuality, sportsmanship, skill, and reliability, along with an overall rating, and the organiser marks players who did not show up. Our algorithm computes a reputation score out of 6, adjusting for the number of ratings, giving recent games more weight, counting unusual games less, and penalising no-shows. A player with no ratings shows “Not rated yet” instead of a score. The score updates after every game and is shown to organisers reviewing join requests. Milestones and badges are awarded automatically: “10 Games Completed”, “5 Games in One Week”, “Reliable Player”, “Always On Time”, and “Hosted 5 Games”. Badges are displayed on the user’s profile.
 
-5. Game Discovery: A user can browse a list of games near their location, or near a place they choose on a map using the Google Maps API. Games are sorted by distance and can be filtered by sport. A user can view game details and the organiser’s reputation, and can send a join request with their skill level, how often they play, and an optional message. The user is notified when a request is accepted or rejected, and the game status updates automatically. A user can also view upcoming games and leave a game before it starts.
+5. Game Planning: A user can create a game by specifying the sport, title, date, start time, max players, skill level, and an optional description. The user picks the game location on a map using the Google Maps API. Every player who wants to join must send a join request that the organiser approves. The organiser can then review join requests, each shown with the player’s rating, history, and badges, and can accept or reject each one. The join request list updates live as new requests arrive. The Game Organiser can also invite friends and edit or cancel the game. The organiser and players get a reminder about 1 hour before the game starts. Join requests and their answers, invites and start reminders are sent as push notifications and also listed on a Notifications screen, where tapping one opens the screen to act on it, and a badge on the Notifications tab counts the unread ones and the friend requests waiting for an answer.
+
+6. Game Discovery: A user can browse a list of games near their location, or near a place they choose on a map using the Google Maps API. Games are sorted by distance and can be filtered by sport. A user can view game details and the organiser’s reputation, and can send a join request with their skill level, how often they play, and an optional message. The user is notified when a request is accepted or rejected, and the game status updates automatically. A user can also view upcoming games and leave a game before it starts.
 
 
 ### **3.2. Use Case Diagram**
-![Use Case Diagram](images/UCD_ver4.png)
+![Use Case Diagram](images/UCD_ver5.png)
 
 ### **3.3. Actors Description**
-1. User: A user is anyone with a SportsNow account. A user signs up, logs in, signs out, manages friends, chats with friends, rates players, and views player statistics.
+1. User: A user is anyone with a SportsNow account. A user signs up, logs in, signs out, deletes their account, chats, manages friends, rates players, and views player statistics.
 2. Player: A player is a user who joins games. A player discovers nearby games, requests to join them, and chats with other participants. A player builds a reputation and earns badges over time.
 3. Game Organiser: A game organiser is a user who creates games. A game organiser creates and manages games, reviews join requests using each player’s stats, invites friends to a game, and chats with the players in their game.
 
@@ -54,47 +57,47 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 1. Log In: A returning user opens the app and signs in by verifying their identity with Google.
 2. Log Out: A logged-in user signs out of their account and is returned to the first screen. 
 3. Create Account: A new user opens the app and signs up. The user verifies their identity with Google, then provides their first name, last name, and birth year.
+4. Delete Account: A logged-in user deletes their account and everything tied to it. Players of the games they organise that are still on are told the game was cancelled, and organisers of the games they joined are told they left.
 
-#### - Use cases for Feature 2 Friend System: 
-4. Search Users: A user searches for other users by name.
-5. Send Friend Request: A user sends a friend request to a user they found, and the other user is notified.
-6. Accept Friend Request: A user opens the Friend Requests screen from the Notifications screen and accepts a friend request sent to them. The two users become friends and the sender is notified.
-7. Decline Friend Request: A user opens the Friend Requests screen from the Notifications screen and declines a friend request sent to them. The sender is not notified.
-8. Remove Friend: A user removes someone from their list of friends. 
-9. Send Friend Message: A user selects a friend from their friend list, opens their chat, and sends them a message.
-10. View Friend Messages: A user opens the chat with a friend and reads their earlier messages.
-11. Receive Friend Message: A user receives a new message from a friend, live if the chat is open or as a push notification if it is not.
-12. View Friend Profile: A user views a friend’s profile, including their badges and upcoming games.
+#### - Use cases for Feature 2 Chat: 
+5. Send Message: A user opens a chat, either with a friend from their friend list or the chat room of a game they organise or have joined, and sends a message to the other members.
+6. View Messages: A user opens a friend chat or a game chat room and reads the earlier messages.
+7. Receive Message: A user receives a new message in a friend chat or game chat room, live if the chat is open or as a push notification if it is not.
 
-#### - Use cases for Feature 3 Player Reputation and Statistics: 
-13. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on punctuality, sportsmanship, skill, and reliability, along with an overall rating.
-14. Mark No-shows: After a game has finished, the game organiser marks the players who did not show up.
+#### - Use cases for Feature 3 Friend System: 
+8. Search Users: A user searches for other users by name.
+9. Send Friend Request: A user sends a friend request to a user they found, and the other user is notified.
+10. Accept Friend Request: A user opens the Friend Requests screen from the Notifications screen and accepts a friend request sent to them. The two users become friends and the sender is notified.
+11. Decline Friend Request: A user opens the Friend Requests screen from the Notifications screen and declines a friend request sent to them. The sender is not notified.
+12. Remove Friend: A user removes someone from their list of friends. 
+13. View Friend Profile: A user views a friend’s profile, including their badges and upcoming games.
+
+#### - Use cases for Feature 4 Player Reputation and Statistics: 
+14. Rate Players: After a game has finished, a user rates the other players. The user selects a player and rates them on punctuality, sportsmanship, skill, and reliability, along with an overall rating.
 15. View Player Statistics: A user views a player’s statistics, including their reputation score and the badges they have earned. 
+16. Mark No-shows: After a game has finished, the game organiser marks the players who did not show up.
 
-#### - Use cases for Feature 4 Game Planning: 
-16. Create Game: A game organiser creates a new game by entering its details and selecting a location on the map.
-17. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
-18. Cancel Game: A game organiser cancels a game they created, and its players are notified.
-19. Invite Friends: A game organiser invites one or more of their friends to a game they created. Each friend gets a notification, also listed on their Notifications screen, that opens the game.
-20. Accept Join Request: A game organiser opens a join request for their game, from the game or from its notification, reviews it using the player’s rating, history, and badges, and accepts it, adding the player to the game. The player is notified.
-21. Reject Join Request: A game organiser opens a join request for their game, from the game or from its notification, reviews it using the player’s rating, history, and badges, and rejects it. The player is notified.
-22. Remove Player: A game organiser removes a player from a game they created. 
+#### - Use cases for Feature 5 Game Planning: 
+17. Create Game: A game organiser creates a new game by entering its details and selecting a location on the map.
+18. Edit Game: A game organiser changes the details of a game they created, such as the date, time, or location. 
+19. Cancel Game: A game organiser cancels a game they created, and its players are notified.
+20. Invite Friends: A game organiser invites one or more of their friends to a game they created. Each friend gets a notification, also listed on their Notifications screen, that opens the game.
+21. Accept Join Request: A game organiser opens a join request for their game, from the game or from its notification, reviews it using the player’s rating, history, and badges, and accepts it, adding the player to the game. The player is notified.
+22. Reject Join Request: A game organiser opens a join request for their game, from the game or from its notification, reviews it using the player’s rating, history, and badges, and rejects it. The player is notified.
+23. Remove Player: A game organiser removes a player from a game they created. 
 
-#### - Use cases for Feature 5 Game Discovery: 
-23. Send Game Chat Message: A player who has joined a game, or its game organiser, sends a message to the other participants in the game’s temporary chat room, which is closed after the game ends.
-24. View Game Chat Messages: A player who has joined a game, or its game organiser, opens its chat room and reads the earlier messages.
-25. Receive Game Chat Message: A player or game organiser who has the game’s chat room open sees new messages from the other participants as they are sent.
-26. Discover Game: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
-27. Join Game: A player views the details of a game and sends a request to join it, stating their skill level, how often they play, and an optional message. 
-28. Leave Game: A player who has joined a game withdraws from it before it starts. 
-29. View Upcoming Games: A user views the upcoming games they organise and the games they have joined.
+#### - Use cases for Feature 6 Game Discovery: 
+24. Discover Game: A player finds games happening nearby. The system uses the player’s location, or a place they choose on the map, to show nearby games and their information, and the player can filter the list by sport.
+25. Join Game: A player views the details of a game and sends a request to join it, stating their skill level, how often they play, and an optional message. 
+26. Leave Game: A player who has joined a game withdraws from it before it starts. 
+27. View Upcoming Games: A user views the upcoming games they organise and the games they have joined.
 
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a id="uc1r"></a>
-#### **Use Case 1: Send Friend Message**
+#### **Use Case 1: Send Message**
 
-**Description**: A user selects a friend from their friend list, opens their chat, and sends them a message.
+**Description**: A user opens a chat, either with a friend from their friend list or the chat room of a game they organise or have joined, and sends a message to the other members. The scenario below shows a friend chat; a game chat works the same way once it is open.
 
 **Primary actor(s)**: User
 
@@ -497,7 +500,7 @@ On the app, tapping a notification, on the Notifications screen or as a push, op
 
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
-1. <a id="seq-uc1"></a> [**Use Case 1: Send Friend Message**](#uc1r)\
+1. <a id="seq-uc1"></a> [**Use Case 1: Send Message**](#uc1r)\
 ![Sequence Diagram UC1](images/UC1%20-%20Send%20Friend%20Message_ver5.png)
 <br><br>
 
