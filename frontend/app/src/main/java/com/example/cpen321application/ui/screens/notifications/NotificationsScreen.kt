@@ -37,6 +37,7 @@ import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.PeopleIcon
+import com.example.cpen321application.ui.components.badgeText
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.components.pillBackground
@@ -115,7 +116,7 @@ private fun FriendRequestsButton(count: Int, onClick: () -> Unit) {
         }
         if (count > 0) {
             Text(
-                text = count.toString(),
+                text = badgeText(count),
                 color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,

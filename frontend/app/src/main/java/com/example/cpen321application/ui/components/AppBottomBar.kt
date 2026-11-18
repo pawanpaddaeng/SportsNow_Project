@@ -72,8 +72,11 @@ fun AppBottomBar(
     }
 }
 
-// the most a badge shows, more reads "99+"
+// the most a count badge shows, more reads "99+"
 private const val MAX_BADGE = 99
+
+// a count as a badge shows it: the number up to MAX_BADGE, then "99+", so it never keeps growing
+internal fun badgeText(count: Int): String = if (count > MAX_BADGE) "$MAX_BADGE+" else count.toString()
 
 // the tab's icon, with a red count on it when badge is above 0 (the Notifications bell)
 @Composable
@@ -82,8 +85,7 @@ private fun TabIcon(tab: BottomTab, badge: Int) {
         Icon(imageVector = tab.icon, contentDescription = tab.label)
         return
     }
-    val count = if (badge > MAX_BADGE) "$MAX_BADGE+" else badge.toString()
-    BadgedBox(badge = { Badge { Text(count) } }) {
+    BadgedBox(badge = { Badge { Text(badgeText(badge)) } }) {
         Icon(imageVector = tab.icon, contentDescription = "${tab.label}, $badge new")
     }
 }
