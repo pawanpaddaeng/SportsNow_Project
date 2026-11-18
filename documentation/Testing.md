@@ -8,6 +8,7 @@
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Game and Friend components are written. Each interface now has one test file without mocks and one with mocks, so section 2.1.1 gives those files and the line where each `describe` group starts. The test tables now match the tests that were written, and the Friend component's tests are added. Section 2.1.3 explains how to start the test database and run the tests. |
 | Nov 17, 2026 | 2, 2.1 | The back-end tests for the Review component are written: its three interfaces, the rating reminder the server checks for every minute, and the score rules. The existing mocked rating tests are split into one file per interface, and each interface gets a test file without mocks. New edge cases cover the 1 to 6 star limits, values that aren't whole numbers, the edges of the 1-day rating window, games that aren't completed, players who didn't show up or left, rating twice or at the same time, the order games count in, and a game exactly 1.5 stars from a player's middle score. The Reputation score case of the join request list now gives the exact score its test checks, 3.86. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
+| Nov 18, 2026 | 4.1, 4.2 | Added the front-end test for the Friend System's Search Users use case (`FriendSystemTest.kt`). Section 4.1 lists the test file for each feature, and section 4.2 gives the test's setup, including the manual User B account, and its expected behaviors. Its logs will be added once it passes. |
 
 ---
 
@@ -574,9 +575,50 @@ _To be added at CP2._
 
 ### 4.1. Location in Git of Front-end Test Suite:
 
-`frontend/app/src/androidTest/java/com/example/cpen321application/e2e/DiscoverGameTest.kt` _(written at CP2)_
+`frontend/app/src/androidTest/java/com/example/cpen321application/e2e/`
+
+| **Feature** | **Test file** |
+| ----------- | ------------- |
+| Friend System | [`FriendSystemTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/FriendSystemTest.kt) |
+| Game Discovery | `DiscoverGameTest.kt` _(written at CP2)_ |
 
 ### 4.2. Tests
+
+#### Running the tests on User A's device only
+
+Some tests involve two users: User A is tested automatically on the emulator that runs the tests, and the manual tester acts as User B on another device. The tests run on every device connected to `adb`, so if User B uses an emulator on the same computer, the tests would also run as User B and fail. To prevent this, set `ANDROID_SERIAL` to User A's emulator, in the same terminal, before running the tests. An emulator's serial (such as `emulator-5556`) depends on which emulator was started first, so check it each time:
+
+1. List the connected emulators and the name of each one. Use the serial whose name is User A's emulator (for example `Pixel_9`).
+
+   PowerShell:
+   ```powershell
+   adb devices
+   adb -s emulator-5554 emu avd name
+   adb -s emulator-5556 emu avd name
+   ```
+   Bash:
+   ```bash
+   adb devices
+   adb -s emulator-5554 emu avd name
+   adb -s emulator-5556 emu avd name
+   ```
+2. Set it, using User A's serial:
+
+   PowerShell:
+   ```powershell
+   $env:ANDROID_SERIAL = "emulator-5556"
+   ```
+   Bash:
+   ```bash
+   export ANDROID_SERIAL=emulator-5556
+   ```
+3. Run the tests from the same terminal. To use every connected device again, remove it with `Remove-Item Env:ANDROID_SERIAL` (PowerShell) or `unset ANDROID_SERIAL` (Bash).
+
+If `adb` isn't found, it is in the Android SDK's `platform-tools` folder: `$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe` on Windows, `~/Library/Android/sdk/platform-tools/adb` on macOS and `~/Android/Sdk/platform-tools/adb` on Linux.
+
+If User B uses a real phone that isn't connected with USB debugging, `adb` can't see it and none of this is needed.
+
+#### Use cases
 
 - **Use Case: Discover Game (Use Case 4)**
 
@@ -610,4 +652,34 @@ _To be added at CP2._
   - **Test Logs:**
     ```
     To be added at CP2, once the test is written and run.
+    ```
+
+- **Use Case: Search Users (Use Case 4 of the Friend System, test `FriendSystemTest.searchUsers`)**
+
+  Search Users has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **User B (manual tester):** an account named "Bea Tester" exists, made with the app's sign up on another device that uses the same back end. No other user has this name. User A and User B are not friends and have no pending friend requests. User B does nothing during this test.
+    - **One device:** User B uses another device, so the tests must only run on User A's emulator. See [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only).
+    - **No connection (3b):** the 3b test turns the phone's Wi-Fi and mobile data off with UI Automator (`svc wifi disable`, `svc data disable`). It turns them back on, and waits for the phone to be online again, before retrying. They are also turned back on after the test if it fails.
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User selects "Friends" in the navigation bar. | Click the "Friends" tab in the bottom bar. |
+    | 2. System displays the Friends screen with a search field and the user's friends. | Check that the text "Friends" is on the screen.<br>Check that a text field with the placeholder "Search by name" is on the screen.<br>Check that "Your Friends" is on the screen. |
+    | 3. User types a name in the search field. | Input "Bea Tester" in the text field "Search by name". |
+    | 4. System displays the matching users, best match first. | Wait until a card with the text "Bea Tester" is on the screen.<br>Check that the "Bea Tester" card is the first result. |
+    | 3a. No user matches the name. | Clear the text field.<br>Input "Zqxv Wjkplm" in the text field "Search by name". |
+    | 3a1. System displays a message saying nobody was found. | Wait until the text "No one found with that name." is on the screen.<br>Check that there are no person cards on the screen. |
+    | 3b. The search could not be done (e.g. no internet connection). | Turn the phone's Wi-Fi and mobile data off.<br>Clear the text field.<br>Input "Bea Tester" in the text field "Search by name". |
+    | 3b1. System displays an error message and lets the user try again. | Wait until the text "Couldn't reach the server, try again" is on the screen.<br>Check that a button labelled "Retry" is on the screen.<br>Turn Wi-Fi and mobile data back on, and wait for the phone to be online.<br>Click the button labelled "Retry".<br>Check that a card with the text "Bea Tester" is on the screen. |
+    | 5. User clears the search. | Click the button "Clear search" (the × in the search field). |
+    | 6. System shows the user's friends again. | Check that "Your Friends" is on the screen.<br>Check that the "Bea Tester" card is not on the screen. |
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
     ```
