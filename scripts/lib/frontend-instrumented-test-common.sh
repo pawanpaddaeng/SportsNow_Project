@@ -61,7 +61,7 @@ discover_test_files() {
   TEST_FILES=()
   while IFS= read -r file; do
     [[ -n "$file" ]] && TEST_FILES+=("$file")
-  done < <(find "$TEST_ROOT" -path "*/${subdir}/*" -name '*.kt' 2>/dev/null | sort)
+    done < <(find "$TEST_ROOT" -path "*/${subdir}/*" -name '*.kt' -exec grep -l '@Test' {} + 2>/dev/null | sort)
 }
 
 ensure_backend() {

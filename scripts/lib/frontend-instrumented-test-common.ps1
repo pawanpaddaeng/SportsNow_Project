@@ -85,6 +85,7 @@ function Discover-TestFiles($subdir) {
     $script:TestFiles = @(
         Get-ChildItem -Path $script:TestRoot -Recurse -File -Filter '*.kt' -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match "[\\/]$([regex]::Escape($subdir))[\\/]" } |
+            Where-Object { Select-String -Path $_.FullName -Pattern '@Test' -SimpleMatch -Quiet } |
             Sort-Object FullName |
             ForEach-Object { $_.FullName }
     )
