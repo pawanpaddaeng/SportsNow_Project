@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.testutil
 
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor

@@ -12,6 +12,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.cpen321application.MainActivity
+import com.example.cpen321application.testutil.LOAD_TIMEOUT_MILLIS
+import com.example.cpen321application.testutil.openTab
+import com.example.cpen321application.testutil.scrollTo
+import com.example.cpen321application.testutil.waitForNode
+import com.example.cpen321application.testutil.waitForText
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

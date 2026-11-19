@@ -18,6 +18,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.example.cpen321application.MainActivity
+import com.example.cpen321application.testutil.LOAD_TIMEOUT_MILLIS
+import com.example.cpen321application.testutil.TestOrganizer
+import com.example.cpen321application.testutil.UserB
+import com.example.cpen321application.testutil.openTab
+import com.example.cpen321application.testutil.scrollTo
+import com.example.cpen321application.testutil.waitForNode
+import com.example.cpen321application.testutil.waitForText
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,9 +36,8 @@ private const val ORGANIZER_NAME = "Olive Organizer"
 private const val OLDER_MESSAGE = "E2E hello from the organizer"
 private const val NEWER_MESSAGE = "E2E bring a ball please"
 
-// the manual tester's account (see Testing.md), and the message they send in Receive
+// the manual tester's account (see Testing.md), who sends any message in Receive
 private const val USER_B_NAME = "Bea Tester"
-private const val USER_B_MESSAGE = "Hi from User B"
 
 // how long User B's message may take to show once they pressed Enter
 private const val USER_B_SYNC_TIMEOUT_MILLIS = 30_000L
@@ -99,13 +105,21 @@ class GameChatTest {
         openGameChat()
 
         // another player (User B) sends a message in the game's chat
-        userB.ask("On Home, open \"$CHAT_GAME\", click Open Chat and send the message: $USER_B_MESSAGE")
+        userB.ask("On Home, open \"$CHAT_GAME\", click Open Chat and send any message")
 
-        // the system shows it at the bottom of the chat, from User B, without the player doing anything
-        composeRule.waitForText(USER_B_MESSAGE, USER_B_SYNC_TIMEOUT_MILLIS)
-        composeRule.onNodeWithText(USER_B_MESSAGE).assertIsDisplayed()
-        composeRule.onNode(hasText(USER_B_NAME) and hasClickAction()).assertIsDisplayed()
-        assertTrue("The new message should be below the earlier ones", top(USER_B_MESSAGE) > top(NEWER_MESSAGE))
+        // the system shows it below the earlier messages, from User B, without the player doing anything.
+        // Only User B's name is checked, since their message can say anything
+        composeRule.waitUntil(USER_B_SYNC_TIMEOUT_MILLIS) { messagesFromUserBBelow(NEWER_MESSAGE) >= 1 }
+        composeRule.onNode(userBSenderName()).assertIsDisplayed()
+    }
+
+    // the sender name on User B's messages, which opens their profile when tapped
+    private fun userBSenderName(): SemanticsMatcher = hasText(USER_B_NAME) and hasClickAction()
+
+    // how many of User B's messages are below the message, i.e. newer than it
+    private fun messagesFromUserBBelow(text: String): Int {
+        val top = top(text)
+        return composeRule.onAllNodes(userBSenderName()).fetchSemanticsNodes().count { it.boundsInRoot.top > top }
     }
 
     /*  Home > "E2E Chat" > Open Chat, then waits until the earlier messages have loaded and the
