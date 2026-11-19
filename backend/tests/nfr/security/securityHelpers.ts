@@ -48,6 +48,7 @@ export const PROTECTED_ROUTES: Route[] = [
   { method: 'get', path: '/api/friends/requests' },
   { method: 'post', path: '/api/friends/requests', body: { user_id: 1 } },
   { method: 'patch', path: '/api/friends/requests/:requestId', body: { decision: 'accept' } },
+  { method: 'delete', path: '/api/friends/:userId' },
   { method: 'get', path: '/api/users/me' },
   { method: 'put', path: '/api/users/me', body: { f_name: 'Changed', l_name: 'ByAttacker', birthYear: 1990 } },
   { method: 'delete', path: '/api/users/me' },
