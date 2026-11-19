@@ -15,6 +15,7 @@
 | Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
 | Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for Game Discovery and game chat (issue #80): Discover Game (formal Use Case 4) with its failures 2a, 3a and 5a, Join Game (formal Use Case 5) with 3a, 4a, 4b and 4c, View Upcoming Games, Leave Game, and Send, View and Receive Message in a game chat, where User B sends the live message. The planned Discover Game test from CP1 is replaced by the one that was written. Section 4.2 explains the test games that `scripts/run-frontend-e2e-tests` now saves before the tests with `backend/tests/e2e/seedGameDiscovery.ts`, and how the tests set the phone's location and act as the games' organizer. Logs will be added once the tests pass. |
 | Nov 18, 2026 | 2.1, 4.2 | Added the back-end tests for `DELETE /api/friends/{userId}` (issue #75), a test file without mocks and one with mocks. They cover signing in, bad ids, removing yourself, removing someone who isn't a friend, a successful removal deleting the chat and its messages, removing twice, a removed friend who has the chat open being disconnected, and becoming friends again with a new, empty chat. In section 4.2, the Friend System tests no longer need the tester to remove the friendship by hand: they use Remove friend in the app, and a new chat starts empty, so old messages can't mix with a new run's. |
+| Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for Game Planning: Create Game (formal Use Case 3) with its failures 6a, 7a, 7b and 8a in `CreateGameTest.kt`, and Edit Game, Cancel Game, Invite Friends, Accept Join Request, Reject Join Request and Remove Player in `GamePlanningTest.kt`. 6a and 7a follow the updated Use Case 3 in Requirements and Design. 4a and 8b can't be tested end to end, and section 4.2 says why. `backend/tests/e2e/seedGameDiscovery.ts` now also saves User A's games, friends, join requests and player for these tests. `scripts/run-frontend-e2e-tests` now runs only the files with a `@Test`, so helper files like `ComposeWaits.kt` aren't run as test classes. Logs will be added once the tests pass. |
 
 ---
 
@@ -814,9 +815,10 @@ _To be added at CP2._
 | ----------- | ------------- |
 | Friend System | [`FriendSystemTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/FriendSystemTest.kt) |
 | Game Discovery | [`DiscoverGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/DiscoverGameTest.kt), [`JoinGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/JoinGameTest.kt), [`MyGamesTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/MyGamesTest.kt) |
+| Game Planning | [`CreateGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/CreateGameTest.kt), [`GamePlanningTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/GamePlanningTest.kt) |
 | Chat (game chat) | [`GameChatTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/GameChatTest.kt) |
 
-The game discovery and game chat tests share helpers in the same folder: `TestLocation.kt` sets the phone's location, `TestOrganizer.kt` acts as the test games' organizer through the back end, `UserB.kt` waits for User B's steps, and `ComposeWaits.kt` waits for the screen. Their test data comes from [`backend/tests/e2e/seedGameDiscovery.ts`](../backend/tests/e2e/seedGameDiscovery.ts), see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
+The game discovery and game chat tests share helpers in the same folder: `TestLocation.kt` sets the phone's location, `TestOrganizer.kt` acts as the test games' organizer through the back end, `UserB.kt` waits for User B's steps, and `ComposeWaits.kt` waits for the screen. Their test data comes from [`backend/tests/e2e/seedGameDiscovery.ts`](../backend/tests/e2e/seedGameDiscovery.ts), see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests). The game planning tests also use `ComposeWaits.kt`, and `ToastWaits.kt` checks the app's toasts. The same seed script saves their test data, see [Test data for the game planning tests](#test-data-for-the-game-planning-tests). `scripts/run-frontend-e2e-tests` only runs the files in the folder that have a `@Test`, so the helper files aren't run as tests.
 
 ### 4.2. Tests
 
@@ -900,11 +902,238 @@ Every game starts on a different day, 1 to 10 days after the seed runs, so the l
 - **Location off:** `cmd location set-location-enabled false` turns the phone's location off, and it's turned back on after the test.
 - **No connection:** `cmd connectivity airplane-mode enable` cuts the phone off from the server. Airplane mode is turned off after the test, waiting for the phone to reconnect.
 
+#### Test data for the game planning tests
+
+`CreateGameTest` and `GamePlanningTest` work on User A's own games. The same seed run, `backend/tests/e2e/seedGameDiscovery.ts` (see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests)), first removes User A's games whose titles start with "E2E ", including the ones `CreateGameTest` made in an earlier run, and the test users below. It then saves:
+
+| **Saved** | **Used by** |
+| --------- | ----------- |
+| "E2E Edit", with only User A in it | `GamePlanningTest.editGame_savesTheChanges` |
+| "E2E Cancel", with only User A in it | `GamePlanningTest.cancelGame_marksTheGameCancelled` |
+| "E2E Invite", with only User A in it, and User A's friends "Fiona Friend" and "Finn Friend" | `GamePlanningTest.inviteFriends_sendsTheInvite` |
+| "E2E Accept", with a pending join request from "Alex Asker": Intermediate, plays weekly, "Happy to play any position!" | `GamePlanningTest.acceptJoinRequest_addsThePlayer` |
+| "E2E Reject", with a pending join request from "Blake Asker": Beginner, plays rarely, "First time playing, hope that is okay." | `GamePlanningTest.rejectJoinRequest_declinesTheRequest` |
+| "E2E Remove", with "Riley Player" in it | `GamePlanningTest.removePlayer_removesThePlayer` |
+
+Every game is organized by User A, has room for 10 players and starts 11 to 16 days after the seed runs, after "E2E Organized". The friendships and join requests are saved by the back end's own functions (`sendFriendRequest`, `decideFriendRequest` and `createJoinRequest`), as the app saves them. The test users' Google ids start with `e2e-test-`, which no real account has. `CreateGameTest` only uses "E2E Organized", to know Home has loaded. The tests change these games, so they need a fresh seed for each run, which `scripts/run-frontend-e2e-tests` always does.
+
+The game planning tests also need:
+
+- **Emulator:** a Google Play or Google APIs system image, which can look up addresses, with the language set to English (United States). The tests type dates as MM/DD/YYYY and pick times by the clock's English labels.
+- **Location permission:** `CreateGameTest` gives the app location permission before each test (`grantRuntimePermission`), since the map asks for it when it opens.
+- **No connection:** `cmd connectivity airplane-mode enable`, as in `JoinGameTest`. Without the network, the phone can't look up addresses (Create Game 6a) or reach the server (Create Game 8a). Airplane mode is turned off after each test, waiting for the phone to reconnect.
+- **Map:** the map is drawn by Google Maps, not Compose, so the tests drag it with UI Automator (`UiDevice.swipe`).
+- **Toasts:** the app shows "Game created", "Couldn't reach the server, try again" and "Invite sent" as toasts, which Android draws outside the app's Compose screens. `ToastWaits.kt` checks them through the accessibility event Android sends for each toast (`UiAutomation.executeAndWaitForEvent`).
+
 #### Use cases
 
 The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests with Remove friend on the Friends tab.
 
-The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest`) can run in any order: each test has its own game, or only reads games no other test changes.
+The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest`) can run in any order: each test has its own game, or only reads games no other test changes. So can the game planning tests (`CreateGameTest` and `GamePlanningTest`): each `GamePlanningTest` test has its own game, and each `CreateGameTest` test makes a game with a new title.
+
+- **Use Case: Create Game (Use Case 17, formal Use Case 3, tests in `CreateGameTest`)**
+
+  The scenario steps come from the formal specification (Requirements and Design section 3.5, Use Case 3). Each test opens the form the same way: click the "Home" tab, wait until the "E2E Organized" card is on the screen so Home has loaded, click the button "Organize a new game", and wait until "Sport *" is on the screen. Each game a test makes gets a new title, "E2E" and the time, such as "E2E New Game 143052".
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the tests, on the main screen.
+    - **Test data:** "E2E Organized", see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+    - **Location permission:** given by the test before it starts.
+
+  - **Expected Behaviors, main success scenario (`createGame_createsTheGameAndShowsItOnHome`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Game Organiser selects “Create game”. | Open the form. |
+    | 2. System displays the game creation form with fields for the sport, title, date, time, max players, skill level, description (optional), and a map for selecting the location. | Check that "Sport \*", "Title \*", "Date \*", "Time \*", "Location \*", "Max players", "Skill level" and "Description (optional)" are on the screen.<br>Check that "Choose a location" is on the screen. |
+    | 3. Game Organiser fills in all the details and clicks on the map. | Click the "Basketball" chip.<br>Input "E2E New Game &lt;time&gt;" in the title field.<br>Click "Select date", click the button "Switch to text input mode", input the date in 3 days and click the button "OK".<br>Click "Select time" and click the button "OK", keeping 6:00 PM.<br>Click the button "More players", for 11 players.<br>Click the "Intermediate" chip.<br>Input "Bring water, we play two halves." in the description field.<br>Click "Choose a location". |
+    | 4. System opens the Map API. | Wait until "SELECTED LOCATION" is on the screen.<br>Check that "Drag the map to move the pin, or search above." is on the screen. |
+    | 5. Game Organiser selects the game location on the map. | Drag the map a little to the left with UI Automator, so the pin is over another place. |
+    | 6. System determines and displays the address of the selected location, then closes the map. | Wait until the button "Confirm Location" is enabled, which happens once the phone has looked up the place under the pin.<br>Check that "Dropped pin" is not on the screen, so an address was found.<br>Click the button "Confirm Location".<br>Wait until "Change" is on the screen, and check that "Choose a location" is not. |
+    | 7. Game Organiser clicks “Create game”. | Check that the button "Create Game" is enabled, and click it. |
+    | 8. System creates the game and displays a confirmation message. | Check that the toast "Game created" is shown.<br>Wait until Home has the card "E2E New Game &lt;time&gt;" showing "1/11". |
+
+  - **4a, System cannot connect to the Map API: not tested.** The map and the address lookup reach Google over the same network as the rest of the phone, so a test can't cut off the Map API alone. With the whole network off, the address can't be looked up, which the 6a test checks.
+
+  - **Expected Behaviors, 6a (`createGame_noAddress_usesDroppedPin`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–5. Game Organiser opens the form, fills it in and clicks on the map. | Open the form.<br>Click the "Basketball" chip, input a title, and pick the date in 3 days and 6:00 PM.<br>Turn airplane mode on.<br>Click "Choose a location". |
+    | 6a. The Map API cannot determine an address for the selected location. | (In airplane mode, the phone can't look up an address.) |
+    | 6a1. System shows the location as "Dropped pin", with its coordinates in place of the address. The Game Organiser can confirm it or move the pin to another spot. | Wait until "Dropped pin" is on the screen.<br>Check that the map's starting point, "49.26060, -123.24600", is on the screen.<br>Check that the button "Confirm Location" is enabled, and click it.<br>Wait until "Change" is on the screen, and check that "Dropped pin" is on the form.<br>Check that the button "Create Game" is enabled. |
+
+  - **Expected Behaviors, 7a (`createGame_missingField_keepsCreateDisabled`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–2. Game Organiser selects “Create game” and the system displays the form. | Open the form. |
+    | 7a. Game Organiser left a compulsory field empty or did not select a location. | (Every field is empty.) |
+    | 7a1. System keeps the "Create game" button disabled until every compulsory field, marked with \*, is filled in and a location is selected. | Check that "Sport \*", "Title \*", "Date \*", "Time \*" and "Location \*" are on the screen, and the button "Create Game" is disabled.<br>Click the "Basketball" chip, input a title, and pick the date in 3 days and 6:00 PM, leaving the location empty.<br>Check that the button "Create Game" is still disabled.<br>Click "Choose a location", wait until the button "Confirm Location" is enabled and click it.<br>Check that the button "Create Game" is enabled.<br>Clear the title field, and check that the button "Create Game" is disabled again. |
+
+  - **Expected Behaviors, 7b (`createGame_startInThePast_showsError`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–6. Game Organiser opens the form and fills it in. | Open the form.<br>Click the "Basketball" chip and input a title.<br>Pick today's date.<br>Click "Select time", click "12 o'clock", then the button "AM", then the button "OK", for 12:00 AM.<br>Choose a location. |
+    | 7b. Game Organiser entered an invalid value in any field. | (12:00 AM today has already passed. The form doesn't let any other field get an invalid value: the max players buttons stop at 2 and 100, the title at 100 characters, the description at 1000, and the date picker only allows today or later.) |
+    | 7b1. System displays an error message identifying the invalid field and the reason. | Check that "12:00 AM" and "The game has to start in the future." are on the screen.<br>Check that the button "Create Game" is disabled. Every field is filled in, so the start time is the only problem. |
+
+  - **Expected Behaviors, 8a (`createGame_noConnection_showsErrorAndTryAgain`):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1–7. Game Organiser fills in the form and clicks “Create game”. | Open the form.<br>Click the "Basketball" chip, input "E2E Offline Game &lt;time&gt;" as the title, pick the date in 3 days and 6:00 PM, and choose a location.<br>Turn airplane mode on.<br>Click the button "Create Game". |
+    | 8a. The phone cannot reach the server (e.g. no internet connection). | (Airplane mode is on.) |
+    | 8a1. System displays "Couldn't reach the server, try again" and lets the Game Organiser try again. | Check that the toast "Couldn't reach the server, try again" is shown.<br>Wait until the button "Create Game" is enabled again, and check that the title field still has the title.<br>Turn airplane mode off and wait for the phone to reconnect.<br>Click the button "Create Game".<br>Check that the toast "Game created" is shown, and wait until Home has the game's card. |
+
+  - **8b, The server fails while creating the game: not tested.** The server only fails like this when its database does. An E2E test uses the real back end with valid input, so it can't make the database fail. The back-end test with mocks makes `createGame` throw and checks the `500 server_error` reply (`POST /api/games`, section 2.1), and for that reply the app shows "Could not create game, try again" and keeps the form.
+
+  - **Test Logs:**
+    ```
+    To be added once the tests pass on User A's emulator.
+    ```
+
+- **Use Case: Edit Game (Use Case 18, test `GamePlanningTest.editGame_savesTheChanges`)**
+
+  Edit Game has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does. Each `GamePlanningTest` test opens its game the same way: click the "Home" tab, scroll Home's list until the game's card is on the screen, click it, and wait until "Organized by you" is on the screen.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Edit", with only User A in it and room for 10 players, see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Organiser opens their game and selects "Edit". | Open "E2E Edit".<br>Click the button "Edit". |
+    | 2. System shows the form filled in with the game's details, with nothing to save yet. | Wait until the title field has "E2E Edit".<br>Check that "Edit Game" is on the screen.<br>Check that the button "Save Changes" is disabled. |
+    | 3. Organiser changes the details and saves. | Replace the title with "E2E Edited".<br>Click the button "More players", from 10 to 11 players.<br>Click the "Intermediate" chip.<br>Check that the button "Save Changes" is enabled, and click it. |
+    | 4. System saves the changes and shows the game's details with them. | Wait until "Players · 1/11" is on the screen.<br>Check that "E2E Edited" and "Intermediate" are on the screen.<br>Check that "E2E Edit" is not on the screen. |
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Case: Cancel Game (Use Case 19, test `GamePlanningTest.cancelGame_marksTheGameCancelled`)**
+
+  Cancel Game has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Cancel", see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Organiser opens their game and selects "Cancel Game". | Open "E2E Cancel".<br>Click the button "Cancel Game". |
+    | 2. System asks the organiser to confirm, saying the players will be told. | Wait until "Cancel this game?" is on the screen.<br>Check that "E2E Cancel will be cancelled for everyone" is on the screen. |
+    | 3. Organiser confirms. | Click the button "Cancel Game" in the dialog. |
+    | 4. System cancels the game and notifies its players. The game can't be changed any more. | Wait until "This game was cancelled." is on the screen.<br>Check that the buttons "Edit", "Cancel Game" and "Invite Friends" are not on the screen. |
+
+    The players' notifications can't be seen on User A's phone. The back-end tests check who is notified (`POST /api/games/{gameId}/cancel`, section 2.1).
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Case: Invite Friends (Use Case 20, test `GamePlanningTest.inviteFriends_sendsTheInvite`)**
+
+  Invite Friends has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Invite", and User A's friends "Fiona Friend" and "Finn Friend", see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Organiser opens their game and selects "Invite Friends". | Open "E2E Invite".<br>Click the button "Invite Friends". |
+    | 2. System lists the organiser's friends who aren't in the game. | Wait until "Fiona Friend" is in the list, and check that "Finn Friend" is too.<br>Check that the button "Invite" is disabled. |
+    | 3. Organiser selects one or more friends. | Click "Fiona Friend", and check that her row is ticked. |
+    | 4. Organiser selects "Invite", and the system sends each friend a notification. | Click the button "Invite (1)".<br>Check that the toast "Invite sent" is shown.<br>Wait until the list is closed. |
+
+    Fiona has no device, so her notification can't be seen. The back-end tests check the notification each invite saves and sends (`POST /api/games/{gameId}/invites`, section 2.1).
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Case: Accept Join Request (Use Case 21, test `GamePlanningTest.acceptJoinRequest_addsThePlayer`)**
+
+  Accept Join Request has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Accept", with a pending join request from "Alex Asker", see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Organiser opens a join request from their game. | Open "E2E Accept".<br>Click "1 pending join request".<br>Wait until "Join Requests" is on the screen. |
+    | 2. System shows the request with the player's rating, how often they play and their message. | Wait until "Alex Asker" is on the screen.<br>Check that "Not rated yet · Intermediate · Plays weekly" and "Happy to play any position!" are on the screen.<br>Check that "1/10 players" is on the screen. |
+    | 3. Organiser accepts it. | Click the button "Approve". |
+    | 4. System adds the player to the game and notifies them. | Wait until "Alex Asker" is not on the screen.<br>Check that "No join requests right now. You'll get a notification when someone asks to join." and "2/10 players" are on the screen.<br>Click the button "Back", and wait until "Players · 2/10" is on the screen.<br>Click "See all", and check that "Alex Asker" is in the list of players. |
+
+    Badges aren't built yet, so the request shows the player's rating, skill level and how often they play. The seed script saves Alex's request straight to the database, so no notification is sent for it, and the test opens it from the game. Alex's notification is checked by the back-end tests (`PATCH /api/games/{gameId}/join-requests/{requestId}`, section 2.1).
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Case: Reject Join Request (Use Case 22, test `GamePlanningTest.rejectJoinRequest_declinesTheRequest`)**
+
+  Reject Join Request has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Reject", with a pending join request from "Blake Asker", see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Organiser opens a join request from their game. | Open "E2E Reject".<br>Click "1 pending join request".<br>Wait until "Join Requests" is on the screen. |
+    | 2. System shows the request with the player's rating, how often they play and their message. | Wait until "Blake Asker" is on the screen.<br>Check that "Not rated yet · Beginner · Plays rarely" and "First time playing, hope that is okay." are on the screen. |
+    | 3. Organiser rejects it. | Click the button "Decline". |
+    | 4. System declines the request and notifies the player, who isn't added to the game. | Wait until "Blake Asker" is not on the screen.<br>Check that "No join requests right now. You'll get a notification when someone asks to join." and "1/10 players" are on the screen.<br>Click the button "Back", wait until "Players · 1/10" is on the screen, and wait until "1 pending join request" is not.<br>Click "See all", and check that "Blake Asker" is not in the list of players. |
+
+    Blake's notification is checked by the back-end tests (`PATCH /api/games/{gameId}/join-requests/{requestId}`, section 2.1).
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
+
+- **Use Case: Remove Player (Use Case 23, test `GamePlanningTest.removePlayer_removesThePlayer`)**
+
+  Remove Player has no formal use case specification in Requirements and Design section 3.5, so the scenario steps below describe what the app does.
+
+  - **Before the tests:**
+    - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
+    - **Test data:** "E2E Remove", with "Riley Player" in it, see [Test data for the game planning tests](#test-data-for-the-game-planning-tests).
+
+  - **Expected Behaviors:**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. Organiser opens their game's list of players. | Open "E2E Remove".<br>Wait until "Players · 2/10" is on the screen.<br>Click "See all", and check that "Riley Player" is in the list. |
+    | 2. Organiser selects "Remove" next to the player. | Click the button "Remove". |
+    | 3. System asks the organiser to confirm. | Wait until "Remove Riley Player?" is on the screen. |
+    | 4. Organiser confirms. | Click the button "Remove" in that dialog. |
+    | 5. System removes the player from the game. | Wait until "Players · 1/10" is on the screen, and until "Riley Player" is not.<br>Click the button "Close", and check that "Players · 1/10" is on the screen. |
+
+  - **Test Logs:**
+    ```
+    To be added once the test passes on User A's emulator.
+    ```
 
 - **Use Case: Discover Game (Use Case 24, formal Use Case 4, tests in `DiscoverGameTest`)**
 
