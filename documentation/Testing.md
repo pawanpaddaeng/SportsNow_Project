@@ -678,7 +678,7 @@ The tests without mocks save messages straight in the `chat_messages` table, and
 
 #### 2.1.2. Commit Hash Where Tests Run
 
-_To be added at CP2._
+`6c5ca1383a81a5f5ffbb05042c18b0c06a1ea170`
 
 #### 2.1.3. Explanation on How to Run the Tests
 
@@ -774,11 +774,11 @@ The front-end E2E tests don't run in GitHub Actions, since they need an emulator
 
 ### 2.3. Jest Coverage Report Screenshots With Mocks
 
-_To be added at CP2._
+![Mock tests](images/mock-coverage.png)
 
 ### 2.4. Jest Coverage Report Screenshots Without Mocks
 
-_To be added at CP2._
+![No Mock tests](images/no-mock-coverage.png)
 
 ---
 

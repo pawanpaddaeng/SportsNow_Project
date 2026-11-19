@@ -13,7 +13,7 @@
 
 ### 2.1. Commit Hash Where Codacy Ran
 
-`7ba4248da9b96ccb74851be2b4eae3cedf0c8f87`
+`6c5ca1383a81a5f5ffbb05042c18b0c06a1ea170`
 
 ### 2.2. Unfixed Issues per Codacy Category
 
