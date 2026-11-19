@@ -56,6 +56,10 @@ class ChatResponsivenessTest {
     // creates a game organized by the signed in user, so they are in its chat
     @Before
     fun setUp() {
+        // the app asks for notification permission when it opens, and the pop-up would cover it
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .executeShellCommand("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
+            .close()
         val form = GameInfoForm(
             sport = "basketball",
             title = GAME_TITLE,

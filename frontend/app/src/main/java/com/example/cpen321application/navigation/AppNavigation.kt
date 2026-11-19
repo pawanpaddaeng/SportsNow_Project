@@ -32,6 +32,8 @@ import com.example.cpen321application.navigation.routes.SignInRoute
 import com.example.cpen321application.navigation.routes.SignUpRoute
 import com.example.cpen321application.navigation.state.AppState
 import com.example.cpen321application.navigation.state.rememberAppState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val gameIdArgument = listOf(navArgument(Routes.GAME_ID_ARG) { type = NavType.IntType })
 private val friendChatArguments = listOf(
@@ -96,9 +98,12 @@ fun AppNavigation(
 // what can happen anywhere in the app, whichever screen is showing
 @Composable
 private fun ListenForAppEvents(app: AppState) {
-    // any API call whose session can't be used or renewed asks for sign in through Session
+    // any API call whose session can't be used or renewed asks for sign in through Session.
+    // It can be asked from a network thread, and navigating must happen on the main thread
     LaunchedEffect(Unit) {
-        Session.signInRequired.collect { app.returnToSignIn() }
+        Session.signInRequired.collect {
+            withContext(Dispatchers.Main.immediate) { app.returnToSignIn() }
+        }
     }
 
     // a join request was approved, or the user was removed from a game, while the app is

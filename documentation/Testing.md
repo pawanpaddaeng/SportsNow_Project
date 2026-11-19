@@ -11,6 +11,7 @@
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Notification component are written (issue #83): its two interfaces, `GET /api/notifications` and `PATCH /api/notifications/read`, and the game start reminder the server checks for every minute, with unit tests for how the reminder says how soon the game starts. The join request, invite and friend request tests now also check the notification each one saves, and the decline friend request tests check that none is. Added an unmocked test for inviting friends successfully. Tests with mocks now replace saving notifications before every test, so they never reach the database. The start reminder tests found a deadlock with other transactions on `games`, fixed by skipping locked games (`FOR UPDATE SKIP LOCKED`). The describe group locations of the changed Game and Friend tests are updated. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
 | Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
+| Nov 18, 2026 | 3 | The Performance requirement is replaced by Security (see Requirements and Design 3.7), so its tests are replaced. Four Jest tests check that every route is in the list the tests check, that every protected route turns down 6 kinds of bad token without changing anything, that a signed in user can't read the chat of, or change, a game they aren't in, and that the chat WebSocket turns down bad tokens and users who aren't in the chat. An Android instrumented test checks that the app goes back to sign in and clears its token when the server turns the token down. The Chat Responsiveness back-end test moved to port 18104, because 18103 is also used by a chat test with mocks that runs at the same time. |
 
 ---
 
@@ -741,24 +742,40 @@ _To be added at CP2._
 
 | **Non-Functional Requirement** | **Location in Git** |
 | ------------------------------ | ------------------- |
-| **Performance (Discover in under 5 seconds)** | Back-end: [`backend/tests/nfr/discoverPerformance.test.ts`](../backend/tests/nfr/discoverPerformance.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/DiscoverPerformanceTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/DiscoverPerformanceTest.kt) |
+| **Security (only signed in users, only their own data)** | Back-end: [`backend/tests/nfr/security/everyRouteIsChecked.test.ts`](../backend/tests/nfr/security/everyRouteIsChecked.test.ts)<br>[`backend/tests/nfr/security/badSignInsAreRejected.test.ts`](../backend/tests/nfr/security/badSignInsAreRejected.test.ts)<br>[`backend/tests/nfr/security/othersGameIsProtected.test.ts`](../backend/tests/nfr/security/othersGameIsProtected.test.ts)<br>[`backend/tests/nfr/security/chatSocketIsProtected.test.ts`](../backend/tests/nfr/security/chatSocketIsProtected.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/SecurityTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/SecurityTest.kt) |
 | **Chat Responsiveness (message delivered within 1 second)** | Back-end: [`backend/tests/nfr/chatResponsiveness.test.ts`](../backend/tests/nfr/chatResponsiveness.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/ChatResponsivenessTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/ChatResponsivenessTest.kt) |
 
 ### 3.2. Test Verification
 
-- **Performance (Discover in under 5 seconds)**
+- **Security (only signed in users, only their own data)**
 
-  - **Back-end test:** checks the server's share of the 5 seconds.
-    - **Before the test:** The test adds a user who searches, and a second user who organizes 1,000 upcoming games. The games are added in one database insert, spread from the search point to 45 km north of it. They are added in a shuffled order, so the closest-first order can't come from the order they were saved in. The search point is at a latitude no other Discover test uses, because all test files share one database.
-    - **The test:** It calls `GET /api/games/discover` at the search point 10 times and times each call. Every call must return `200` with exactly 50 games (the most Discover returns), sorted closest first, all within 50 km. The slowest call must take under 1 second. A 1-second limit for the server leaves most of the 5 seconds for the network and the phone.
-    - **After the test:** Deleting the organizer also deletes the 1,000 games.
+  - **Back-end test 1, every route is checked:** makes sure the other tests miss no endpoint.
+    - **The test:** It reads every route registered on the Express app, including the routers `app.ts` mounts, and compares them with the public routes (sign up, login and health) plus the list of protected routes the next test calls. They must match exactly, so a new route added without being added to the list fails this test.
     - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
 
-  - **Front-end test:** checks the whole 5 seconds on the phone, as the user sees it.
-    - **Before the test:** The user must be signed in, because Google Sign-In can't be automated. `scripts/run-frontend-nfr-tests` starts the back-end and the app, then waits while you sign in on the emulator. The test gives the app location permission with `pm grant`, so the permission pop-up doesn't appear. It allows test locations with `appops set ... android:mock_location allow`, then replaces the phone's location providers (fused, network and GPS) with test ones at a fixed test location at UBC.
-    - **The test:** It waits for the Home screen, then clicks the "Discover" tab (the compass) and starts the clock. It waits until Discover shows its result: "N games nearby" with the game cards, or "No games nearby right now...". Both are only shown once the games have loaded. If neither appears within 5 seconds, the test fails. The time is written to the log with the tag `NFR1`.
-    - **After the test:** The test location providers are removed.
-    - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks.
+  - **Back-end test 2, bad sign ins are turned down:** checks every protected route turns down every kind of bad token and changes nothing.
+    - **Before the test:** The test adds a victim with a game, a player in it, a chat message, a pending join request, a pending friend request, a notification and a registered device, so every route has something it could read or change. It also adds a user, makes a token for them, then deletes them.
+    - **The test:** It calls every protected route (29 of them) on the victim's game, chat, requests and account, each with 6 bad sign ins. All but the last claim to be the victim, as an attacker would: no token (`400 invalid_request`), a token that isn't a JWT, a token signed with a secret that isn't the server's, and a token with no signature (`"alg": "none"`) (each `401 invalid_token`), a token the server signed that expired a minute ago (`401 expired_token`), and a token for the deleted user (`401 no_user`). Requests that change data send a real body, such as a new name or a game edit, so one that got through would change something. Every request must get the expected status and `msg`. Afterwards everything saved about the victim, their games, players, join and friend requests, chat messages, notifications and devices, must be exactly as before.
+    - **After the test:** Deleting the users also deletes their game, chat and requests.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Back-end test 3, someone else's game is protected:** checks a signed in user can't use a game or chat they aren't in.
+    - **Before the test:** The test adds an organizer with a game, a player in it, a chat message and a pending join request, and an outsider who isn't in the game.
+    - **The test:** With the outsider's own valid token, it reads the game's chat messages, edits, cancels and completes the game, removes its player, lists and approves its join request, and invites to it. Each must be turned down with `403 forbidden`, and everything saved about the organizer, their game and its chat must be exactly as before.
+    - **After the test:** Deleting the users also deletes the game, chat and request.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Back-end test 4, the chat WebSocket is protected:** checks only members can open a chat.
+    - **Before the test:** The test starts the chat WebSocket server on its own port, and adds a game with a player and an outsider who isn't in it.
+    - **The test:** It tries to connect to the game's chat with no token (`400`), a token that isn't a JWT, a forged token, a token with no signature and an expired token for the player (each `401`), and the outsider's valid token (`403`). Each must be turned down with that status. The player's own valid token must then connect, which shows the others were turned down for their token and not for another reason.
+    - **After the test:** The connections are closed and the server is stopped.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Front-end test:** checks what the app does when the server turns its token down.
+    - **Before the test:** The test keeps the token the app saved, if there is one, and saves a forged token instead: a JWT in the server's format with a made-up signature, as an attacker without the server's secret would make. This test doesn't need you to sign in.
+    - **The test:** It opens the app, which starts on Home with the saved token and asks the server for its data. The server answers `401 invalid_token`. The test waits until the sign in screen shows "Your session ended. Please sign in again.", checks the bottom bar with the "Home" tab is gone, and checks the app cleared the forged token so it isn't used again.
+    - **After the test:** The token kept before the test is saved again, so the user stays signed in for the Chat Responsiveness test.
+    - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks (the Chat Responsiveness test needs it).
 
 - **Chat Responsiveness (message delivered within 1 second)**
 
@@ -769,7 +786,7 @@ _To be added at CP2._
     - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
 
   - **Front-end test:** checks the same time on the phone, including sending the message and showing it.
-    - **Before the test:** The user must be signed in, as for the Performance test. The test creates a game organized by the user through the app's own `createGame`, starting in 1 hour, so the user is in its chat. It then opens the app.
+    - **Before the test:** The user must be signed in, because Google Sign-In can't be automated. `scripts/run-frontend-nfr-tests` starts the back-end and the app, then waits while you sign in on the emulator. The test creates a game organized by the user through the app's own `createGame`, starting in 1 hour, so the user is in its chat. It then opens the app.
     - **The test:** It finds the game "NFR Chat Test" on the Home screen, opens it, and taps "Open Chat". It waits until the chat is connected, when "Connecting..." and the loading bar are gone. Then it sends 20 messages one after another. The app shows each message as "Sending..." until the server sends it back, which the server does to every member with the chat open at the same time. So for each message the test types it, taps Send and starts the clock, then waits until the message is shown and "Sending..." is gone. If that takes over 1 second, the test fails. The times are written to the log with the tag `NFR2`.
     - **After the test:** The test cancels the game, so it doesn't stay on the user's Home screen.
     - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks. This runs both front-end NFR tests.
