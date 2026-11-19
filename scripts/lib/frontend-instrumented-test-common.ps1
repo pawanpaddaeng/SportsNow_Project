@@ -108,29 +108,6 @@ function Wait-ForAppSignIn {
     [void](Read-Host)
 }
 
-# saves the games the E2E tests need (backend\tests\e2e\seedGameDiscovery.ts) for the signed in
-# user, found by $env:E2E_USER_EMAIL or the email typed in. Returns the instrumentation
-# arguments that pass the seed's output to the tests
-function Seed-E2eGames {
-    $email = $env:E2E_USER_EMAIL
-    if (-not $email) { $email = Read-Host 'Email of the Google account signed in to the app' }
-    if (-not $email) { Die 'No email given.' }
-
-    Info 'Saving the E2E test games ...'
-    Push-Location $Root
-    try {
-        $output = & docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts $email
-        if ($LASTEXITCODE -ne 0) { Die 'Could not save the E2E test games.' }
-    }
-    finally {
-        Pop-Location
-    }
-    $tokenLine = @($output) | Where-Object { $_ -match '^E2E_ORGANIZER_TOKEN=' } | Select-Object -First 1
-    if (-not $tokenLine) { Die 'The seed script gave no E2E_ORGANIZER_TOKEN.' }
-    $token = ($tokenLine -replace '^E2E_ORGANIZER_TOKEN=', '').Trim()
-    return @("-Pandroid.testInstrumentationRunnerArguments.organizerToken=$token")
-}
-
 function Run-InstrumentedTests($suite) {
     $subdir = $null
     $label = $null
@@ -165,8 +142,6 @@ function Run-InstrumentedTests($suite) {
     }
 
     Wait-ForAppSignIn
-    $seedArgs = @()
-    if ($suite -eq 'e2e') { $seedArgs = @(Seed-E2eGames) }
     & $adb shell am force-stop $appId 2>$null | Out-Null
 
     $classes = @()
@@ -178,7 +153,7 @@ function Run-InstrumentedTests($suite) {
     Info "Running frontend ${label} tests (${classArg}) ..."
     Push-Location $FrontendDir
     try {
-        & .\gradlew.bat $script:GradleTask "-Pandroid.testInstrumentationRunnerArguments.class=$classArg" @seedArgs
+        & .\gradlew.bat $script:GradleTask "-Pandroid.testInstrumentationRunnerArguments.class=$classArg"
         if ($LASTEXITCODE -ne 0) { Die "Frontend ${label} tests failed." }
     }
     finally {
