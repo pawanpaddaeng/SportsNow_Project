@@ -98,3 +98,12 @@ suspend fun decideFriendRequest(context: Context, requestId: Int, accept: Boolea
         { }
     )
 }
+
+suspend fun removeFriend(context: Context, userId: Int): FriendResult<Unit> =
+    askServer(
+        context,
+        "Couldn't remove this friend, try again",
+        FriendChangeResponse::class.java,
+        { authorization -> ServerApi.friendService.removeFriend(authorization, userId) },
+        { }
+    )

@@ -10,13 +10,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,6 +31,8 @@ import com.example.cpen321application.friend.model.FriendshipStatus
 import com.example.cpen321application.ui.components.AppBottomBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
+import com.example.cpen321application.ui.components.ConfirmDialog
+import com.example.cpen321application.ui.components.ConfirmText
 import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.loadStatus
@@ -34,7 +42,7 @@ import com.example.cpen321application.ui.theme.*
 
 /*  what the Friends screen shows. A non blank query shows searchResults instead of the
     friends. isLoading shows a loading bar and errorMessage a problem.
-    busyUserIds are requests being sent, their Add buttons are disabled
+    busyUserIds are requests being sent or friends being removed, their buttons are disabled
  */
 data class FriendsUiState(
     val query: String = "",
@@ -53,6 +61,8 @@ data class FriendsActions(
     val onOpenFriendRequests: () -> Unit = {},
     val onOpenProfile: (Int) -> Unit = {},
     val onOpenChat: (FriendPerson) -> Unit = {},
+    // called once the user confirmed, removing also deletes the chat with them
+    val onRemoveFriend: (FriendPerson) -> Unit = {},
     val onTabSelected: (BottomTab) -> Unit = {}
 )
 
@@ -64,6 +74,9 @@ data class FriendsActions(
  */
 @Composable
 fun FriendsScreen(state: FriendsUiState, actions: FriendsActions, modifier: Modifier = Modifier) {
+    // the friend the user chose to remove, asked to confirm before anything is sent
+    var removing by remember { mutableStateOf<FriendPerson?>(null) }
+
     Scaffold(
         modifier = modifier,
         containerColor = Color.White,
@@ -87,11 +100,28 @@ fun FriendsScreen(state: FriendsUiState, actions: FriendsActions, modifier: Modi
             loadStatus(isLoading = state.isLoading, errorMessage = state.errorMessage, onRetry = actions.onRetry)
 
             if (state.query.isBlank()) {
-                friendsList(state, actions)
+                friendsList(state, actions, onAskRemove = { removing = it })
             } else {
                 searchResults(state, actions)
             }
         }
+    }
+
+    removing?.let { friend ->
+        ConfirmDialog(
+            text = ConfirmText(
+                title = "Remove ${friend.name}?",
+                body = "You'll stop being friends and your chat with them will be deleted. " +
+                    "You can send them a new friend request later.",
+                confirm = "Remove",
+                dismiss = "Cancel"
+            ),
+            onConfirm = {
+                removing = null
+                actions.onRemoveFriend(friend)
+            },
+            onDismiss = { removing = null }
+        )
     }
 }
 
@@ -113,14 +143,24 @@ private fun LazyListScope.searchResults(state: FriendsUiState, actions: FriendsA
     }
 }
 
-private fun LazyListScope.friendsList(state: FriendsUiState, actions: FriendsActions) {
+private fun LazyListScope.friendsList(
+    state: FriendsUiState,
+    actions: FriendsActions,
+    onAskRemove: (FriendPerson) -> Unit
+) {
     item(key = "friendsHeader") { SectionHeader(title = "Your Friends", count = state.friends.size) }
     items(state.friends, key = { "friend${it.userId}" }) { friend ->
         PersonCard(
             person = friend,
             onClick = { actions.onOpenChat(friend) },
             onAvatarClick = { actions.onOpenProfile(friend.userId) }
-        )
+        ) {
+            FriendMenu(
+                name = friend.name,
+                isBusy = friend.userId in state.busyUserIds,
+                onRemove = { onAskRemove(friend) }
+            )
+        }
     }
     if (state.friends.isEmpty() && !state.isLoading && state.errorMessage == null) {
         item(key = "noFriends") { ListNote("No friends yet. Search for someone by name to send them a request.") }
@@ -166,6 +206,9 @@ private fun SectionHeader(title: String, count: Int) {
     }
 }
 
+// tag on every person card, so E2E tests can find the cards and their order
+const val PERSON_CARD_TAG = "personCard"
+
 /*  one person: initial and name in a card like Home's game cards, trailing goes on the right.
     With onClick the card can be tapped to open the chat with a friend, and with onAvatarClick
     the circle to open their profile instead
@@ -180,6 +223,7 @@ private fun PersonCard(
     val tapToOpen = onClick?.let { Modifier.clickable(onClickLabel = "Open chat", onClick = it) } ?: Modifier
     CardRow(
         modifier = Modifier
+            .testTag(PERSON_CARD_TAG)
             .cardBackground(SportsSurfaceContainer)
             .border(1.dp, SportsOutlineVariant, RoundedCornerShape(12.dp))
             .then(tapToOpen)
@@ -212,6 +256,26 @@ private fun StatusPill(text: String, onClick: (() -> Unit)? = null) {
             .then(tapToOpen)
             .pillBackground(Color.White, borderColor = SportsPrimary, horizontalPadding = 10.dp)
     )
+}
+
+// the ⋮ button on a friend's card, its menu holds Remove friend
+@Composable
+private fun FriendMenu(name: String, isBusy: Boolean, onRemove: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, enabled = !isBusy) {
+            Icon(Icons.Filled.MoreVert, contentDescription = "More options for $name", tint = SportsOnSurfaceVariant)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("Remove friend", color = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    expanded = false
+                    onRemove()
+                }
+            )
+        }
+    }
 }
 
 @Composable

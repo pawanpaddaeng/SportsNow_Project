@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,6 +90,9 @@ fun FriendRequestsScreen(state: FriendRequestsUiState, actions: FriendRequestsAc
     }
 }
 
+// tag on every request card, so E2E tests can find one person's request among others
+const val FRIEND_REQUEST_CARD_TAG = "friendRequestCard"
+
 // a request: who sent it, then Decline and Accept, like the Join Requests cards
 @Composable
 private fun RequestCard(
@@ -102,6 +106,7 @@ private fun RequestCard(
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
+            .testTag(FRIEND_REQUEST_CARD_TAG)
             .fillMaxWidth()
             .clip(shape)
             .border(1.dp, SportsOutlineVariant, shape)

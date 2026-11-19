@@ -1,0 +1,97 @@
+# Runs the back-end interface tests (tests with mocks, without mocks, then both together)
+# with scripts/run-backend-interface-tests.sh, against a fresh MySQL database, and keeps the
+# coverage reports. Runs on pushes to main and on pull requests that change the back end,
+# and by hand from the Actions tab ("Run workflow").
+#
+# The front-end E2E tests aren't run here: they need an emulator signed in with a Google
+# account and a manual tester acting as User B (see Testing.md section 4).
+
+name: Backend tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'mysql/**'
+      - 'scripts/run-backend-interface-tests.sh'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'mysql/**'
+      - 'scripts/run-backend-interface-tests.sh'
+      - '.github/workflows/backend-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a newer push to the same branch replaces a run that's still going
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interface-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # a fresh, empty database for every run, the same MySQL as docker-compose.yml
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    # test-only values, not real secrets. There's no root .env here, so
+    # backend/tests/setupEnv.ts leaves these as they are
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: '3306'
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
+      MYSQL_DATABASE: test_db
+      JWT_SECRET: ci-test-jwt-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # a service container starts before the checkout, so it can't run mysql/init itself
+      - name: Create the tables
+        run: |
+          for file in mysql/init/*.sql; do
+            echo "Running $file"
+            mysql -h 127.0.0.1 -P 3306 -u root -proot test_db < "$file"
+          done
+
+      - name: Install back-end packages
+        run: npm ci
+        working-directory: backend
+
+      - name: Run mock, no-mock and combined interface tests
+        run: bash scripts/run-backend-interface-tests.sh
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          if-no-files-found: ignore
