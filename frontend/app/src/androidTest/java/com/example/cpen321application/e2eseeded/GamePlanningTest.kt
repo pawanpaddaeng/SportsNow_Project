@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.e2eseeded
 
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -59,7 +59,7 @@ private const val NO_REQUESTS = "No join requests right now. You'll get a notifi
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
-      - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
+      - backend/tests/e2e/seedGameDiscovery.ts was run (Testing.md section 4.2), which saved
         the games above for User A, with only User A in them and room for 10 players, except:
         "E2E Accept" and "E2E Reject" have a pending join request from Alex Asker and Blake
         Asker, and Riley Player is in "E2E Remove". It also made Fiona Friend and Finn Friend

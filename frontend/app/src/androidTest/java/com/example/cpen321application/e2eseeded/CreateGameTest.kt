@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.e2eseeded
 
 import android.Manifest
 import android.net.ConnectivityManager
@@ -61,7 +61,7 @@ private val DATE_INPUT_FORMAT = DateTimeFormatter.ofPattern("MMddyyyy")
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
-      - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
+      - backend/tests/e2e/seedGameDiscovery.ts was run (Testing.md section 4.2), which saved
         "E2E Organized" for User A. The tests only use it to know Home has loaded. Each game
         they make gets a new title starting with "E2E ", which the next seed removes.
       - The emulator is a Google Play or Google APIs image, which can look up addresses, with

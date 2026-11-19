@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.e2eseeded
 
 import android.net.ConnectivityManager
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -45,9 +45,9 @@ private const val RECONNECT_TIMEOUT_MILLIS = 30_000L
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
-      - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
+      - backend/tests/e2e/seedGameDiscovery.ts was run (Testing.md section 4.2), which saved
         a game by a test organizer around GAMES_SPOT for each test, none of which User A has
-        asked to join. It passed the organizer's token in, which TestOrganizer uses to cancel
+        asked to join. The organizer's token it printed is passed in as organizerToken, which TestOrganizer uses to cancel
         or start a game while User A has the join request form open (4a and 4b).
       - Each test sets the phone's location with TestLocation and opens its game from Discover,
         so the Player is viewing the details of a game they have not joined (the precondition).

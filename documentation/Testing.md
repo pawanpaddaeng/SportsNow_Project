@@ -843,16 +843,16 @@ _To be added at CP2._
 
 ### 4.1. Location in Git of Front-end Test Suite:
 
-`frontend/app/src/androidTest/java/com/example/cpen321application/e2e/`
+`frontend/app/src/androidTest/java/com/example/cpen321application/e2e/` holds the tests `scripts/run-frontend-e2e-tests` runs. The game tests, which need test data saved first, are in `frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/` and are run by hand, see [Running the seeded game tests](#running-the-seeded-game-tests).
 
 | **Feature** | **Test file** |
 | ----------- | ------------- |
 | Friend System | [`FriendSystemTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/FriendSystemTest.kt) |
-| Game Discovery | [`DiscoverGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/DiscoverGameTest.kt), [`JoinGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/JoinGameTest.kt), [`MyGamesTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/MyGamesTest.kt) |
-| Game Planning | [`CreateGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/CreateGameTest.kt), [`GamePlanningTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/GamePlanningTest.kt) |
-| Chat (game chat) | [`GameChatTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2e/GameChatTest.kt) |
+| Game Discovery | [`DiscoverGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/DiscoverGameTest.kt), [`JoinGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/JoinGameTest.kt), [`MyGamesTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/MyGamesTest.kt) |
+| Game Planning | [`CreateGameTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/CreateGameTest.kt), [`GamePlanningTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/GamePlanningTest.kt) |
+| Chat (game chat) | [`GameChatTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/e2eseeded/GameChatTest.kt) |
 
-The game discovery and game chat tests share helpers in [`androidTest/.../testutil/`](../frontend/app/src/androidTest/java/com/example/cpen321application/testutil/): `TestLocation.kt` sets the phone's location, `TestOrganizer.kt` acts as the test games' organizer through the back end, `UserB.kt` waits for User B's steps, and `ComposeWaits.kt` waits for the screen. Their test data comes from [`backend/tests/e2e/seedGameDiscovery.ts`](../backend/tests/e2e/seedGameDiscovery.ts), see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests). The game planning tests also use `ComposeWaits.kt`, and `ToastWaits.kt` checks the app's toasts. The same seed script saves their test data, see [Test data for the game planning tests](#test-data-for-the-game-planning-tests). The helpers are kept out of the `e2e/` folder because `scripts/run-frontend-e2e-tests` runs every file in that folder as a test class.
+The game discovery and game chat tests share helpers in [`androidTest/.../testutil/`](../frontend/app/src/androidTest/java/com/example/cpen321application/testutil/): `TestLocation.kt` sets the phone's location, `TestOrganizer.kt` acts as the test games' organizer through the back end, `UserB.kt` waits for User B's steps, and `ComposeWaits.kt` waits for the screen. Their test data comes from [`backend/tests/e2e/seedGameDiscovery.ts`](../backend/tests/e2e/seedGameDiscovery.ts), see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests). The game planning tests also use `ComposeWaits.kt`, and `ToastWaits.kt` checks the app's toasts. The same seed script saves their test data, see [Test data for the game planning tests](#test-data-for-the-game-planning-tests). The helpers are kept out of the `e2e/` folder because `scripts/run-frontend-e2e-tests` runs every file in that folder as a test class. For the same reason the game tests are in `e2eseeded/`: they need the seed and the organizer's token, which the script doesn't provide, so with them out of `e2e/` every test the script runs can pass.
 
 ### 4.2. Tests
 
@@ -969,12 +969,43 @@ When a test needs User B, it pauses until the manual tester has done the step on
 
 A test fails if Enter isn't pressed within 10 minutes of a step being shown, or if User B's change doesn't show on User A's screen within 30 seconds of pressing Enter.
 
+#### Running the seeded game tests
+
+The game tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest`, `GameChatTest`, `CreateGameTest` and `GamePlanningTest`) need test data saved in the database before they run, and `JoinGameTest` and `GameChatTest` also need the test organizer's token. `scripts/run-frontend-e2e-tests` does neither, so these tests are kept in the `e2eseeded/` folder, which the script doesn't run, and are run by hand:
+
+1. Start the back end (`.\scripts\run-backend.ps1` or `./scripts/run-backend.sh`), and sign in to the app on User A's emulator. User B ("Bea Tester") must have signed up before step 3, see [Setting up User B's emulator](#setting-up-user-bs-emulator).
+2. Set `ANDROID_SERIAL` to User A's emulator, see [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only), and start the User B helper for `GameChatTest`, see [Doing User B's steps](#doing-user-bs-steps).
+3. Save the test data and keep the organizer's token, from the root folder, with the email of User A's Google account. Do this before every run, since `JoinGameTest` and `GamePlanningTest` change their games:
+
+   PowerShell:
+   ```powershell
+   $seed = docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts "<User A's email>"
+   $token = (($seed | Select-String '^E2E_ORGANIZER_TOKEN=') -replace '^E2E_ORGANIZER_TOKEN=', '').Trim()
+   ```
+   Bash:
+   ```bash
+   seed="$(docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts "<User A's email>")"
+   token="$(printf '%s\n' "$seed" | sed -n 's/^E2E_ORGANIZER_TOKEN=//p' | tr -d '\r')"
+   ```
+   If the token is empty, the seed failed, and the seed's output says why.
+4. Run the tests from the `frontend` folder:
+
+   PowerShell:
+   ```powershell
+   .\gradlew.bat :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.package=com.example.cpen321application.e2eseeded" "-Pandroid.testInstrumentationRunnerArguments.organizerToken=$token"
+   ```
+   Bash:
+   ```bash
+   ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.package=com.example.cpen321application.e2eseeded "-Pandroid.testInstrumentationRunnerArguments.organizerToken=$token"
+   ```
+   To run one test class, replace the `package=...` argument with `class=com.example.cpen321application.e2eseeded.DiscoverGameTest`, for example.
+
 #### Test data for the game discovery and game chat tests
 
-`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest` need games that User A didn't organize, since Discover never shows a user their own games. So `scripts/run-frontend-e2e-tests` saves them before the tests:
+`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest` need games that User A didn't organize, since Discover never shows a user their own games. Step 3 of [Running the seeded game tests](#running-the-seeded-game-tests) saves them:
 
-1. Once you have signed in to the app and pressed Enter, the script asks for the email of the Google account you signed in with. To skip the question, set it first: `$env:E2E_USER_EMAIL = "you@example.com"` (PowerShell) or `export E2E_USER_EMAIL=you@example.com` (Bash).
-2. It runs `backend/tests/e2e/seedGameDiscovery.ts` inside the backend container (`docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts <email>`). The script first removes what an earlier run saved, so every run starts from the same games. It then saves a test organizer, "Olive Organizer", and these games:
+1. It runs `backend/tests/e2e/seedGameDiscovery.ts` inside the backend container, for the user with User A's email.
+2. The seed script first removes what an earlier run saved, so every run starts from the same games. It then saves a test organizer, "Olive Organizer", and these games:
 
    | **Game** | **Sport** | **Where** | **Used by** |
    | -------- | --------- | --------- | ----------- |
@@ -987,7 +1018,7 @@ A test fails if Enter isn't pressed within 10 minutes of a step being shown, or 
    | "E2E Organized" | tennis | organized by User A | `MyGamesTest` (View Upcoming Games) |
 
    There are no volleyball games near the Discover spot. The Discover spot (45° N, 135° W) and the games spot (46° N, 135° W) are in the Pacific Ocean, about 111 km apart, so no real game is within Discover's 50 km of either, and the games near one don't show at the other. User B is added to "E2E Chat" only if the account "Bea Tester" exists (see [Doing User B's steps](#doing-user-bs-steps)); otherwise the script says so and only Receive Message fails.
-3. The seed script prints a token that signs in as the test organizer. The runner passes it to the tests as the `organizerToken` instrumentation argument, and `TestOrganizer` uses it to cancel or start a game while User A has its join request form open (Join Game 4a and 4b), and to read the game chat.
+3. The seed script prints a token that signs in as the test organizer. Step 4 passes it to the tests as the `organizerToken` instrumentation argument, and `TestOrganizer` uses it to cancel or start a game while User A has its join request form open (Join Game 4a and 4b), and to read the game chat.
 
 Every game starts on a different day, 1 to 10 days after the seed runs, so the lists are always in the same order. The tests also need:
 
@@ -1008,7 +1039,7 @@ Every game starts on a different day, 1 to 10 days after the seed runs, so the l
 | "E2E Reject", with a pending join request from "Blake Asker": Beginner, plays rarely, "First time playing, hope that is okay." | `GamePlanningTest.rejectJoinRequest_declinesTheRequest` |
 | "E2E Remove", with "Riley Player" in it | `GamePlanningTest.removePlayer_removesThePlayer` |
 
-Every game is organized by User A, has room for 10 players and starts 11 to 16 days after the seed runs, after "E2E Organized". The friendships and join requests are saved by the back end's own functions (`sendFriendRequest`, `decideFriendRequest` and `createJoinRequest`), as the app saves them. The test users' Google ids start with `e2e-test-`, which no real account has. `CreateGameTest` only uses "E2E Organized", to know Home has loaded. The tests change these games, so they need a fresh seed for each run, which `scripts/run-frontend-e2e-tests` always does.
+Every game is organized by User A, has room for 10 players and starts 11 to 16 days after the seed runs, after "E2E Organized". The friendships and join requests are saved by the back end's own functions (`sendFriendRequest`, `decideFriendRequest` and `createJoinRequest`), as the app saves them. The test users' Google ids start with `e2e-test-`, which no real account has. `CreateGameTest` only uses "E2E Organized", to know Home has loaded. The tests change these games, so run the seed again before each run, see [Running the seeded game tests](#running-the-seeded-game-tests).
 
 The game planning tests also need:
 

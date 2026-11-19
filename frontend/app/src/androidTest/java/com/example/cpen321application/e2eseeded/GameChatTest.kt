@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.e2eseeded
 
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -49,7 +49,7 @@ private const val USER_B_SYNC_TIMEOUT_MILLIS = 30_000L
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
-      - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
+      - backend/tests/e2e/seedGameDiscovery.ts was run (Testing.md section 4.2), which saved
         "E2E Chat", organized by a test organizer and joined by User A and User B, with two
         earlier messages from the organizer.
       - Receive Message only: User B (manual tester) is signed in as "Bea Tester" on another
