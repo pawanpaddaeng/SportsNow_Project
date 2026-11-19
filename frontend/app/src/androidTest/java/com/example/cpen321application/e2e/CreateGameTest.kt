@@ -23,6 +23,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.example.cpen321application.MainActivity
+import com.example.cpen321application.testutil.expectToast
+import com.example.cpen321application.testutil.openTab
+import com.example.cpen321application.testutil.scrollTo
+import com.example.cpen321application.testutil.waitAndScrollTo
+import com.example.cpen321application.testutil.waitForNode
+import com.example.cpen321application.testutil.waitForText
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule

@@ -13,6 +13,7 @@
 | Nov 18, 2026 | 2.2 | Added the GitHub Actions workflow that runs the back-end interface tests on pushes to `main`, on pull requests, and by hand. |
 | Nov 18, 2026 | 2, 2.1 | The back-end tests for the Message component are written (issue #63): `GET /api/chats/{chatId}/messages` and the WebSocket `send_message` request, each with a test file without mocks and one with mocks, plus unit tests for how a `send_message` request is checked. New edge cases cover paging with `before`, chats of games that ended, players removed and friendships ended while a chat is open, a chat deleted while open, sending to a different chat than the connection is for, the 1000 character limit, the friend message notification and its 100 character preview, database and notification failures, and dropping connections that stop answering pings. Section 2.1.3 adds the command to run the Message tests. |
 | Nov 18, 2026 | 3 | The tests of the non-functional requirements are written, a back-end test and a front-end test for each. Performance: a Jest test that times Discover with 1,000 nearby games, and an Android instrumented test that times Discover on the phone, from selecting the compass to the list being shown. Chat Responsiveness: a Jest test that times 20 messages between two members over the chat WebSocket, and an Android instrumented test that times 20 messages on the phone, from tapping Send to the server's copy being shown. Section 3 gives where they are, what they check and how to run them. |
+| Nov 18, 2026 | 3 | The Performance requirement is replaced by Security (see Requirements and Design 3.7), so its tests are replaced. Four Jest tests check that every route is in the list the tests check, that every protected route turns down 6 kinds of bad token without changing anything, that a signed in user can't read the chat of, or change, a game they aren't in, and that the chat WebSocket turns down bad tokens and users who aren't in the chat. An Android instrumented test checks that the app goes back to sign in and clears its token when the server turns the token down. The Chat Responsiveness back-end test moved to port 18104, because 18103 is also used by a chat test with mocks that runs at the same time. |
 | Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for Game Discovery and game chat (issue #80): Discover Game (formal Use Case 4) with its failures 2a, 3a and 5a, Join Game (formal Use Case 5) with 3a, 4a, 4b and 4c, View Upcoming Games, Leave Game, and Send, View and Receive Message in a game chat, where User B sends the live message. The planned Discover Game test from CP1 is replaced by the one that was written. Section 4.2 explains the test games that `scripts/run-frontend-e2e-tests` now saves before the tests with `backend/tests/e2e/seedGameDiscovery.ts`, and how the tests set the phone's location and act as the games' organizer. Logs will be added once the tests pass. |
 | Nov 18, 2026 | 2.1, 4.2 | Added the back-end tests for `DELETE /api/friends/{userId}` (issue #75), a test file without mocks and one with mocks. They cover signing in, bad ids, removing yourself, removing someone who isn't a friend, a successful removal deleting the chat and its messages, removing twice, a removed friend who has the chat open being disconnected, and becoming friends again with a new, empty chat. In section 4.2, the Friend System tests no longer need the tester to remove the friendship by hand: they use Remove friend in the app, and a new chat starts empty, so old messages can't mix with a new run's. |
 | Nov 18, 2026 | 4.1, 4.2 | Added the front-end tests for Game Planning: Create Game (formal Use Case 3) with its failures 6a, 7a, 7b and 8a in `CreateGameTest.kt`, and Edit Game, Cancel Game, Invite Friends, Accept Join Request, Reject Join Request and Remove Player in `GamePlanningTest.kt`. 6a and 7a follow the updated Use Case 3 in Requirements and Design. 4a and 8b can't be tested end to end, and section 4.2 says why. `backend/tests/e2e/seedGameDiscovery.ts` now also saves User A's games, friends, join requests and player for these tests. `scripts/run-frontend-e2e-tests` now runs only the files with a `@Test`, so helper files like `ComposeWaits.kt` aren't run as test classes. Logs will be added once the tests pass. |
@@ -693,6 +694,21 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
 2. **Add the environment files:** copy `.env.example` to `.env` in the root folder and fill it in, and add `backend/.env` with `JWT_SECRET`.
 3. **Start Docker Desktop.** The first time MySQL starts, it creates the tables from `mysql/init/`.
 
+**Cleaning up Docker before and after the tests (both ways)**
+
+The database is kept in the Docker volume `mysql_data` between runs. Start and end each test run with an empty database, so a run that stopped early can't leave users behind (for example a "Duplicate entry ... uq_users_google_id" error), and the tables always match `mysql/init/`. `docker compose down -v` stops the containers and deletes the volume, so the next start creates the tables again.
+
+- **Before the tests**, from the root folder:
+  ```
+  docker compose down -v
+  ```
+- **After the tests**, from the root folder, instead of a plain `docker compose down`:
+  ```
+  docker compose down -v
+  ```
+
+This deletes everything in the database, including accounts made with the app. After it, User A and User B sign up in the app again before the front-end tests (section 4.2).
+
 **Running the tests on your computer with npm**
 
 `docker-compose.yml` makes MySQL reachable from your own computer, on `127.0.0.1:3307` (only from that computer). Before the tests run, `backend/tests/setupEnv.ts` reads the database login from the root `.env` and connects to that port.
@@ -703,8 +719,9 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
    npm install
    cd ..
    ```
-2. **Start the test database** from the root folder:
+2. **Start a fresh test database** from the root folder, see "Cleaning up Docker" above:
    ```
+   docker compose down -v
    docker compose up -d mysql-db
    ```
 3. **Run all the tests** from the root folder. The script runs the tests with mocks, then without mocks, then both together. Each run saves a coverage report in `backend/coverage/mock`, `backend/coverage/no-mock` and `backend/coverage/interface`.
@@ -719,17 +736,18 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
    - The Review component's tests: `npx jest tests/mock/review tests/no-mock/review tests/unit/review`
    - The Message component's tests: `npx jest tests/mock/chat tests/no-mock/chat tests/unit/chat`
    - One interface: `npx jest tests/no-mock/friend/searchUsers.test.ts`
-4. **Stop the database** from the root folder when you're done:
+4. **Stop and empty the database** from the root folder when you're done:
    ```
-   docker compose down
+   docker compose down -v
    ```
 
 **Running the tests inside Docker**
 
 The back-end container reaches MySQL directly, so it doesn't need npm on your computer.
 
-1. **Start MySQL and the back end** from the root folder. The container copies the code when it is built, so run this again after changing a test.
+1. **Start a fresh MySQL and the back end** from the root folder. The container copies the code when it is built, so run the second command again after changing a test.
    ```
+   docker compose down -v
    docker compose up -d --build mysql-db backend
    ```
 2. **Run the tests** from the root folder:
@@ -739,9 +757,9 @@ The back-end container reaches MySQL directly, so it doesn't need npm on your co
    - One component or interface: `docker compose exec backend npx jest tests/no-mock/game` or `docker compose exec backend npx jest tests/no-mock/friend/searchUsers.test.ts`
 
    The coverage reports are saved inside the container, in `/app/coverage/`.
-3. **Stop the containers** when you're done:
+3. **Stop the containers and empty the database** when you're done:
    ```
-   docker compose down
+   docker compose down -v
    ```
 
 ### 2.2. GitHub Actions Configuration Location
@@ -770,24 +788,40 @@ _To be added at CP2._
 
 | **Non-Functional Requirement** | **Location in Git** |
 | ------------------------------ | ------------------- |
-| **Performance (Discover in under 5 seconds)** | Back-end: [`backend/tests/nfr/discoverPerformance.test.ts`](../backend/tests/nfr/discoverPerformance.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/DiscoverPerformanceTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/DiscoverPerformanceTest.kt) |
+| **Security (only signed in users, only their own data)** | Back-end: [`backend/tests/nfr/security/everyRouteIsChecked.test.ts`](../backend/tests/nfr/security/everyRouteIsChecked.test.ts)<br>[`backend/tests/nfr/security/badSignInsAreRejected.test.ts`](../backend/tests/nfr/security/badSignInsAreRejected.test.ts)<br>[`backend/tests/nfr/security/othersGameIsProtected.test.ts`](../backend/tests/nfr/security/othersGameIsProtected.test.ts)<br>[`backend/tests/nfr/security/chatSocketIsProtected.test.ts`](../backend/tests/nfr/security/chatSocketIsProtected.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/SecurityTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/SecurityTest.kt) |
 | **Chat Responsiveness (message delivered within 1 second)** | Back-end: [`backend/tests/nfr/chatResponsiveness.test.ts`](../backend/tests/nfr/chatResponsiveness.test.ts)<br>Front-end: [`frontend/app/src/androidTest/java/com/example/cpen321application/nfr/ChatResponsivenessTest.kt`](../frontend/app/src/androidTest/java/com/example/cpen321application/nfr/ChatResponsivenessTest.kt) |
 
 ### 3.2. Test Verification
 
-- **Performance (Discover in under 5 seconds)**
+- **Security (only signed in users, only their own data)**
 
-  - **Back-end test:** checks the server's share of the 5 seconds.
-    - **Before the test:** The test adds a user who searches, and a second user who organizes 1,000 upcoming games. The games are added in one database insert, spread from the search point to 45 km north of it. They are added in a shuffled order, so the closest-first order can't come from the order they were saved in. The search point is at a latitude no other Discover test uses, because all test files share one database.
-    - **The test:** It calls `GET /api/games/discover` at the search point 10 times and times each call. Every call must return `200` with exactly 50 games (the most Discover returns), sorted closest first, all within 50 km. The slowest call must take under 1 second. A 1-second limit for the server leaves most of the 5 seconds for the network and the phone.
-    - **After the test:** Deleting the organizer also deletes the 1,000 games.
+  - **Back-end test 1, every route is checked:** makes sure the other tests miss no endpoint.
+    - **The test:** It reads every route registered on the Express app, including the routers `app.ts` mounts, and compares them with the public routes (sign up, login and health) plus the list of protected routes the next test calls. They must match exactly, so a new route added without being added to the list fails this test.
     - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
 
-  - **Front-end test:** checks the whole 5 seconds on the phone, as the user sees it.
-    - **Before the test:** The user must be signed in, because Google Sign-In can't be automated. `scripts/run-frontend-nfr-tests` starts the back-end and the app, then waits while you sign in on the emulator. The test gives the app location permission with `pm grant`, so the permission pop-up doesn't appear. It allows test locations with `appops set ... android:mock_location allow`, then replaces the phone's location providers (fused, network and GPS) with test ones at a fixed test location at UBC.
-    - **The test:** It waits for the Home screen, then clicks the "Discover" tab (the compass) and starts the clock. It waits until Discover shows its result: "N games nearby" with the game cards, or "No games nearby right now...". Both are only shown once the games have loaded. If neither appears within 5 seconds, the test fails. The time is written to the log with the tag `NFR1`.
-    - **After the test:** The test location providers are removed.
-    - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks.
+  - **Back-end test 2, bad sign ins are turned down:** checks every protected route turns down every kind of bad token and changes nothing.
+    - **Before the test:** The test adds a victim with a game, a player in it, a chat message, a pending join request, a pending friend request, a notification and a registered device, so every route has something it could read or change. It also adds a user, makes a token for them, then deletes them.
+    - **The test:** It calls every protected route (29 of them) on the victim's game, chat, requests and account, each with 6 bad sign ins. All but the last claim to be the victim, as an attacker would: no token (`400 invalid_request`), a token that isn't a JWT, a token signed with a secret that isn't the server's, and a token with no signature (`"alg": "none"`) (each `401 invalid_token`), a token the server signed that expired a minute ago (`401 expired_token`), and a token for the deleted user (`401 no_user`). Requests that change data send a real body, such as a new name or a game edit, so one that got through would change something. Every request must get the expected status and `msg`. Afterwards everything saved about the victim, their games, players, join and friend requests, chat messages, notifications and devices, must be exactly as before.
+    - **After the test:** Deleting the users also deletes their game, chat and requests.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Back-end test 3, someone else's game is protected:** checks a signed in user can't use a game or chat they aren't in.
+    - **Before the test:** The test adds an organizer with a game, a player in it, a chat message and a pending join request, and an outsider who isn't in the game.
+    - **The test:** With the outsider's own valid token, it reads the game's chat messages, edits, cancels and completes the game, removes its player, lists and approves its join request, and invites to it. Each must be turned down with `403 forbidden`, and everything saved about the organizer, their game and its chat must be exactly as before.
+    - **After the test:** Deleting the users also deletes the game, chat and request.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Back-end test 4, the chat WebSocket is protected:** checks only members can open a chat.
+    - **Before the test:** The test starts the chat WebSocket server on its own port, and adds a game with a player and an outsider who isn't in it.
+    - **The test:** It tries to connect to the game's chat with no token (`400`), a token that isn't a JWT, a forged token, a token with no signature and an expired token for the player (each `401`), and the outsider's valid token (`403`). Each must be turned down with that status. The player's own valid token must then connect, which shows the others were turned down for their token and not for another reason.
+    - **After the test:** The connections are closed and the server is stopped.
+    - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
+
+  - **Front-end test:** checks what the app does when the server turns its token down.
+    - **Before the test:** The test keeps the token the app saved, if there is one, and saves a forged token instead: a JWT in the server's format with a made-up signature, as an attacker without the server's secret would make. This test doesn't need you to sign in.
+    - **The test:** It opens the app, which starts on Home with the saved token and asks the server for its data. The server answers `401 invalid_token`. The test waits until the sign in screen shows "Your session ended. Please sign in again.", checks the bottom bar with the "Home" tab is gone, and checks the app cleared the forged token so it isn't used again.
+    - **After the test:** The token kept before the test is saved again, so the user stays signed in for the Chat Responsiveness test.
+    - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks (the Chat Responsiveness test needs it).
 
 - **Chat Responsiveness (message delivered within 1 second)**
 
@@ -798,7 +832,7 @@ _To be added at CP2._
     - **How to run:** start the test database (see section 2.1.3), then run `npx jest tests/nfr` in `backend/`, or `scripts/run-backend-nfr-tests`.
 
   - **Front-end test:** checks the same time on the phone, including sending the message and showing it.
-    - **Before the test:** The user must be signed in, as for the Performance test. The test creates a game organized by the user through the app's own `createGame`, starting in 1 hour, so the user is in its chat. It then opens the app.
+    - **Before the test:** The user must be signed in, because Google Sign-In can't be automated. `scripts/run-frontend-nfr-tests` starts the back-end and the app, then waits while you sign in on the emulator. The test creates a game organized by the user through the app's own `createGame`, starting in 1 hour, so the user is in its chat. It then opens the app.
     - **The test:** It finds the game "NFR Chat Test" on the Home screen, opens it, and taps "Open Chat". It waits until the chat is connected, when "Connecting..." and the loading bar are gone. Then it sends 20 messages one after another. The app shows each message as "Sending..." until the server sends it back, which the server does to every member with the chat open at the same time. So for each message the test types it, taps Send and starts the clock, then waits until the message is shown and "Sending..." is gone. If that takes over 1 second, the test fails. The times are written to the log with the tag `NFR2`.
     - **After the test:** The test cancels the game, so it doesn't stay on the user's Home screen.
     - **How to run:** start an emulator, then run `scripts/run-frontend-nfr-tests` and sign in when it asks. This runs both front-end NFR tests.
@@ -821,6 +855,65 @@ _To be added at CP2._
 The game discovery and game chat tests share helpers in the same folder: `TestLocation.kt` sets the phone's location, `TestOrganizer.kt` acts as the test games' organizer through the back end, `UserB.kt` waits for User B's steps, and `ComposeWaits.kt` waits for the screen. Their test data comes from [`backend/tests/e2e/seedGameDiscovery.ts`](../backend/tests/e2e/seedGameDiscovery.ts), see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests). The game planning tests also use `ComposeWaits.kt`, and `ToastWaits.kt` checks the app's toasts. The same seed script saves their test data, see [Test data for the game planning tests](#test-data-for-the-game-planning-tests). `scripts/run-frontend-e2e-tests` only runs the files in the folder that have a `@Test`, so the helper files aren't run as tests.
 
 ### 4.2. Tests
+
+#### Setting up User B's emulator
+
+The tests that involve two users need the manual tester's User B account, "Bea Tester", on a second device. A real phone works. These steps set up a second emulator on the same computer as User A's emulator. Steps 1 to 5 are needed only once, since the emulator keeps its Google account, the app and its sign-in between runs.
+
+1. **Create the emulator.** In Android Studio, open **Device Manager** and click **+** > **Create Virtual Device**. Pick a phone (for example Pixel 9) and a system image whose name includes **Google Play**, API 33 or newer, since the app needs Google sign-in and push notifications. Name it so it's easy to tell apart, for example `User_B`. It must be a different virtual device from User A's, since one virtual device can only run once at a time.
+2. **Start both emulators.** Click ▶ next to User A's emulator and then next to `User_B` in Device Manager. Check that both are connected:
+
+   PowerShell:
+   ```powershell
+   adb devices
+   ```
+   Bash:
+   ```bash
+   adb devices
+   ```
+   Each emulator is listed with its serial, for example `emulator-5554` and `emulator-5556`. To tell which is which, see [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only).
+3. **Add a Google account.** On `User_B`, open **Settings** > **Google** (or **Passwords & accounts**) and sign in with a Google account that isn't User A's.
+4. **Install the app on `User_B`.** Build the app from the `frontend` folder, then install it with User B's serial. The app's back-end address (`API_BASE_URL` in `frontend/local.properties`, for example `http://10.0.2.2:3000`) is the same for every emulator, so both use the same back end.
+
+   PowerShell:
+   ```powershell
+   cd frontend
+   .\gradlew.bat :app:assembleDebug
+   adb -s emulator-5556 install -r app\build\outputs\apk\debug\app-debug.apk
+   ```
+   Bash:
+   ```bash
+   cd frontend
+   ./gradlew :app:assembleDebug
+   adb -s emulator-5556 install -r app/build/outputs/apk/debug/app-debug.apk
+   ```
+5. **Sign up as User B.** Open the app on `User_B`, sign in with the Google account from step 3, and sign up with the first name **Bea** and the last name **Tester**. No other user may have this name. When Android asks whether the app may send notifications, click **Allow**, since some User B steps check a notification arrived.
+6. **Before each run:**
+   - Start both emulators, and keep the app open on `User_B`'s main screen.
+   - Check that User A and User B aren't friends and have no pending friend requests. `FriendSystemTest` leaves them that way, but a failed run may not: on either device, remove Bea Tester or User A from **Friends**, and decline any request under **Notifications** > **Friend requests**.
+   - For `GameChatTest`, User B must have signed up before the test data is saved, so the seed script can add them to "E2E Chat", see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
+   - Set `ANDROID_SERIAL` to User A's emulator, see the next section, and start the User B helper, see [Doing User B's steps](#doing-user-bs-steps).
+
+#### Cleaning up Docker before and after the tests
+
+The front-end tests use the same Docker database as the app, which keeps its data in the `mysql_data` volume between runs. `scripts/run-frontend-e2e-tests` starts the back end and its database itself.
+
+- **Before the tests**, from the root folder, start from an empty database, so no earlier run's friendships, requests or test games are left:
+  ```
+  docker compose down -v
+  ```
+  This deletes every account too, so the run script's sign-in step is done as a new user: User A signs up again on their emulator, and User B signs up again as **Bea** **Tester** on theirs (step 5 of [Setting up User B's emulator](#setting-up-user-bs-emulator)) before the tests start. To keep the accounts between runs instead, skip this step and only remove the test data, as below.
+- **After the tests**, from the root folder, remove the test games and the test organizer that `backend/tests/e2e/seedGameDiscovery.ts` saved. Deleting the organizer also deletes their games' players, chats, messages, join requests and notifications. The command reads the database login from the MySQL container, so no password is typed:
+
+  PowerShell:
+  ```powershell
+  "DELETE FROM users WHERE google_id = 'e2e-test-organizer'; DELETE FROM games WHERE title LIKE 'E2E %';" | docker compose exec -T mysql-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
+  ```
+  Bash:
+  ```bash
+  echo "DELETE FROM users WHERE google_id = 'e2e-test-organizer'; DELETE FROM games WHERE title LIKE 'E2E %';" | docker compose exec -T mysql-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
+  ```
+  Then stop the containers with `docker compose down`, or with `docker compose down -v` to empty the database completely.
 
 #### Running the tests on User A's device only
 
@@ -927,7 +1020,7 @@ The game planning tests also need:
 
 #### Use cases
 
-The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests with Remove friend on the Friends tab.
+The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). Each one leaves User A and User B with no friendship and no requests: `test3AcceptFriendRequestAndChat` makes them friends and ends by removing the friend again.
 
 The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest`) can run in any order: each test has its own game, or only reads games no other test changes. So can the game planning tests (`CreateGameTest` and `GamePlanningTest`): each `GamePlanningTest` test has its own game, and each `CreateGameTest` test makes a game with a new title.
 
@@ -1302,8 +1395,8 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
-    | 1. Another member sends a message while the user has the game's chat open. | Open the "E2E Chat" chat and keep it open.<br>**(manual, User B)** On Home, open "E2E Chat", click "Open Chat" and send the message "Hi from User B". Press Enter in the User B helper. |
-    | 2. System shows the new message right away, from that member. | Without leaving the chat, wait up to 30 seconds until "Hi from User B" is on the screen.<br>Check that the sender name "Bea Tester" is on the screen.<br>Check that "Hi from User B" is below "E2E bring a ball please". |
+    | 1. Another member sends a message while the user has the game's chat open. | Open the "E2E Chat" chat and keep it open.<br>**(manual, User B)** On Home, open "E2E Chat", click "Open Chat" and send any message. Press Enter in the User B helper. |
+    | 2. System shows the new message right away, from that member. | Without leaving the chat, wait up to 30 seconds until a message showing the sender name "Bea Tester" is on the screen below "E2E bring a ball please". User B's message can say anything, so only its sender name is checked. |
 
     A game chat's push notification, when the chat isn't open, works the same way as a friend chat's, which `FriendSystemTest` checks.
 
@@ -1387,9 +1480,9 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
 
   - **Test Logs:** the logs of `FriendSystemTest.test2SendFriendRequest` above.
 
-- **Use Cases: Accept Friend Request (6), Send Friend Message (9, formal Use Case 1), Receive Friend Message (11) and View Friend Messages (10), test `FriendSystemTest.test3AcceptFriendRequestAndChat`**
+- **Use Cases: Accept Friend Request (6), Send Friend Message (9, formal Use Case 1), Receive Friend Message (11), View Friend Messages (10) and Remove Friend (12), test `FriendSystemTest.test3AcceptFriendRequestAndChat`**
 
-  One test covers these four use cases in this order, since the two users can only chat once they are friends. Send Friend Message's scenario steps come from its formal specification (Requirements and Design section 3.5, Use Case 1). The other three have none, so their scenario steps describe what the app does.
+  One test covers these five use cases in this order, since the two users can only chat, or stop being friends, once they are friends. Send Friend Message's scenario steps come from its formal specification (Requirements and Design section 3.5, Use Case 1). The other three have none, so their scenario steps describe what the app does.
 
   - **Before the tests:**
     - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
@@ -1399,7 +1492,7 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
     - **User A's messages:** each run sends messages with the time in them (`E2E hello <time>`, `E2E offline <time>`). Removing a friend deletes their chat, so each run starts with an empty chat, and the time keeps the messages apart even if an old chat was left behind.
     - **Notifications:** the test allows the app's notifications with `pm grant ... android.permission.POST_NOTIFICATIONS`, and uses UI Automator to clear old notifications and look for new ones in the notification shade. Push notifications must be set up for User A's emulator (the app's `google-services.json`).
     - **No connection (6a):** the 6a test turns the phone's Wi-Fi and mobile data off with UI Automator (`svc wifi disable`, `svc data disable`), and back on before trying again, waiting for the phone and the chat to reconnect. They are also turned back on after the test if it fails.
-    - **After the test:** User A and User B are friends. The tester removes the friendship with Remove friend on the Friends tab, which also deletes their chat, so the next run starts again with no friendship.
+    - **After the test:** User A and User B are not friends again, and their chat is deleted. If the test fails before Remove Friend, the tester removes the friendship with Remove friend on the Friends tab.
 
   - **Expected Behaviors, Accept Friend Request (Use Case 6):**
 
@@ -1430,17 +1523,26 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
-    | 1. The friend sends the user a message while the user has their chat open. | Keep the chat with "Bea Tester" open.<br>**(manual, User B)** In the chat with User A, send any message. Press Enter in the User B helper. |
-    | 2. System shows the new message right away, from the friend. | Without leaving the chat, wait until a message showing the sender name "Bea Tester" is on the screen below "E2E offline &lt;time&gt;". |
-    | 3. The friend sends a message while the user doesn't have the chat open. | Click the button "Back".<br>Open the notification shade and click "Clear all" (UI Automator), so an older notification can't count.<br>**(manual, User B)** Send User A any message. Press Enter in the User B helper. |
-    | 4. System notifies the user with a push notification. | Open the notification shade (UI Automator).<br>Wait until a notification titled "Bea" is shown.<br>Close the notification shade. |
+    | 1. The friend sends the user a message while the user doesn't have the chat open. | Click the button "Back".<br>Open the notification shade and click "Clear all" (UI Automator), so an older notification can't count.<br>**(manual, User B)** In the chat with User A, send any message. Press Enter in the User B helper. |
+    | 2. System notifies the user with a push notification. | Open the notification shade (UI Automator).<br>Wait until a notification titled "Bea" is shown.<br>Close the notification shade. |
+
+    User B sends only this one message. View Friend Messages then checks it is in the chat, and `GameChatTest` checks a message arriving live in an open chat.
 
   - **Expected Behaviors, View Friend Messages (Use Case 10):**
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
     | 1. User opens the chat with a friend. | Click the "Bea Tester" card on the Friends screen. |
-    | 2. System shows the earlier messages, oldest at the top and newest at the bottom, each with who sent it. | Wait until "E2E offline &lt;time&gt;" is on the screen.<br>Check that "E2E hello &lt;time&gt;" is above "E2E offline &lt;time&gt;".<br>Wait until at least two messages showing the sender name "Bea Tester" are on the screen below "E2E offline &lt;time&gt;". |
+    | 2. System shows the earlier messages, oldest at the top and newest at the bottom, each with who sent it. | Wait until "E2E offline &lt;time&gt;" is on the screen.<br>Check that "E2E hello &lt;time&gt;" is above "E2E offline &lt;time&gt;".<br>Wait until a message showing the sender name "Bea Tester" (User B's message from Receive Friend Message) is on the screen below "E2E offline &lt;time&gt;". |
+
+  - **Expected Behaviors, Remove Friend (Use Case 12):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User opens a friend's options and selects "Remove friend". | Click the button "Back" to return to the Friends screen.<br>Click the button "More options for Bea Tester", then "Remove friend". |
+    | 2. System asks the user to confirm. | Check that the text "Remove Bea Tester?" is on the screen. |
+    | 3. User confirms. | Click the button "Remove". |
+    | 4. System ends the friendship and removes the friend from the list. | Wait until the "Bea Tester" card is no longer on the screen.<br>Search for "Bea Tester" and check that the card shows the button "Add". |
 
   - **Test Logs:**
     ```

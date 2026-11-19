@@ -12,6 +12,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.example.cpen321application.MainActivity
+import com.example.cpen321application.testutil.DISCOVER_SPOT
+import com.example.cpen321application.testutil.NO_GAMES_SPOT
+import com.example.cpen321application.testutil.TestLocation
+import com.example.cpen321application.testutil.openTab
+import com.example.cpen321application.testutil.scrollTo
+import com.example.cpen321application.testutil.waitForText
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before

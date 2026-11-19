@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.testutil
 
 import android.view.accessibility.AccessibilityEvent
 import androidx.test.platform.app.InstrumentationRegistry

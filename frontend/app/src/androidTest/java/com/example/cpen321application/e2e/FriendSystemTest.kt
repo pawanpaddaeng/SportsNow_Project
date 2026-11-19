@@ -87,8 +87,8 @@ private const val USER_B_DONE = "done"
         sign up on another device. User A and User B are not friends and have no pending
         friend requests.
 
-    The tests run in the order of their names (test1, test2, test3). The first two leave the
-    users as they found them, the third leaves them friends, so it has to run last
+    The tests run in the order of their names (test1, test2, test3). Each one leaves the users
+    as it found them: not friends, with no pending requests
  */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -213,8 +213,8 @@ class FriendSystemTest {
         use case 10: View Friend Messages, in that order, since chatting needs the two users to
         be friends. User B is the manual tester, who follows the steps scripts/run-e2e-user-b
         shows. Only User A's own messages are checked by their text, User B can send anything.
-        The test ends with the two users friends: until Remove Friend is built, the tester
-        removes the friendship after the test
+        It ends with use case 12: Remove Friend, which also leaves the two users not friends
+        for the next run
      */
     @Test
     fun test3AcceptFriendRequestAndChat() {
@@ -226,8 +226,9 @@ class FriendSystemTest {
 
         acceptFriendRequest()
         sendFriendMessage(helloText, offlineText)
-        receiveFriendMessage(offlineText)
+        receiveFriendMessage()
         viewFriendMessages(helloText, offlineText)
+        removeFriend()
     }
 
     // Use case 6: Accept Friend Request, ends on the Friends screen with User B as a friend
@@ -308,20 +309,17 @@ class FriendSystemTest {
         composeRule.onAllNodes(hasText(NOT_SENT_TEXT)).assertCountEquals(0)
     }
 
-    // Use case 11: Receive Friend Message, live in the open chat and then as a notification
-    private fun receiveFriendMessage(offlineText: String) {
-        // 1. The friend sends the user a message while the user has their chat open
-        askUserB("In the chat with User A, send any message")
-
-        // 2. System shows the new message right away, from the friend
-        composeRule.waitUntil(MESSAGE_TIMEOUT_MILLIS) { messagesFromUserBBelow(offlineText) >= 1 }
-
-        // 3. The friend sends a message while the user doesn't have the chat open
+    /*  Use case 11: Receive Friend Message, as a notification since the user doesn't have the
+        chat open. User B sends one message, which viewFriendMessages then finds in the chat.
+        GameChatTest covers a message arriving live in an open chat
+     */
+    private fun receiveFriendMessage() {
+        // 1. The friend sends the user a message while the user doesn't have the chat open
         composeRule.onNodeWithContentDescription("Back").performClick()
         clearNotifications()
-        askUserB("Send User A any message")
+        askUserB("In the chat with User A, send any message")
 
-        // 4. System notifies the user with a push notification
+        // 2. System notifies the user with a push notification
         device.openNotification()
         val notified = device.wait(Until.hasObject(By.text(USER_B_FIRST_NAME)), MESSAGE_TIMEOUT_MILLIS)
         device.pressBack()
@@ -334,12 +332,32 @@ class FriendSystemTest {
         composeRule.onNode(personCard(USER_B_NAME)).performClick()
 
         // 2. System shows the earlier messages, oldest at the top and newest at the bottom,
-        //    each with who sent it
+        //    each with who sent it, User B's message from receiveFriendMessage newest
         waitForText(offlineText, MESSAGE_TIMEOUT_MILLIS)
         if (topOf(hasText(helloText)) >= topOf(hasText(offlineText))) {
             throw AssertionError("\"$helloText\" isn't above \"$offlineText\"")
         }
-        composeRule.waitUntil(MESSAGE_TIMEOUT_MILLIS) { messagesFromUserBBelow(offlineText) >= 2 }
+        composeRule.waitUntil(MESSAGE_TIMEOUT_MILLIS) { messagesFromUserBBelow(offlineText) >= 1 }
+    }
+
+    // Use case 12: Remove Friend, starting in the chat with User B
+    private fun removeFriend() {
+        // 1. User opens a friend's options on the Friends screen and selects "Remove friend"
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        waitForPersonCard(USER_B_NAME)
+        composeRule.onNodeWithContentDescription("More options for $USER_B_NAME").performClick()
+        composeRule.onNodeWithText("Remove friend").performClick()
+
+        // 2. System asks the user to confirm   3. User confirms
+        composeRule.onNodeWithText("Remove $USER_B_NAME?").assertIsDisplayed()
+        composeRule.onNode(hasText("Remove") and hasClickAction()).performClick()
+
+        // 4. System ends the friendship and removes the friend from the list
+        composeRule.waitUntil(SEARCH_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(personCard(USER_B_NAME)).fetchSemanticsNodes().isEmpty()
+        }
+        search(USER_B_NAME)
+        composeRule.onNode(addButton(USER_B_NAME)).assertIsDisplayed()
     }
 
     // the Friends screen's search field, the only text field on it

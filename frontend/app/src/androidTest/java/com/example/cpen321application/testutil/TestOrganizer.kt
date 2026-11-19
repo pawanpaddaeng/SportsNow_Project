@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.testutil
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.cpen321application.BuildConfig

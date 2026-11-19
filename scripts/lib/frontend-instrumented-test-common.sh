@@ -61,7 +61,7 @@ discover_test_files() {
   TEST_FILES=()
   while IFS= read -r file; do
     [[ -n "$file" ]] && TEST_FILES+=("$file")
-    done < <(find "$TEST_ROOT" -path "*/${subdir}/*" -name '*.kt' -exec grep -l '@Test' {} + 2>/dev/null | sort)
+  done < <(find "$TEST_ROOT" -path "*/${subdir}/*" -name '*.kt' 2>/dev/null | sort)
 }
 
 ensure_backend() {
@@ -83,24 +83,6 @@ wait_for_app_sign_in() {
   warn "  If you see a sign-in button in the app, tap it and pick your Google account."
   warn "  When the main app screen is visible, press Enter here to run tests ..."
   read -r
-}
-
-# saves the games the E2E tests need (backend/tests/e2e/seedGameDiscovery.ts) for the signed in
-# user, found by E2E_USER_EMAIL or the email typed in. Sets SEED_ARGS to the instrumentation
-# arguments that pass the seed's output to the tests
-seed_e2e_games() {
-  local email="${E2E_USER_EMAIL:-}" output token
-  if [[ -z "$email" ]]; then
-    read -r -p "Email of the Google account signed in to the app: " email
-  fi
-  [[ -n "$email" ]] || die "No email given."
-
-  info "Saving the E2E test games ..."
-  output="$(cd "$ROOT" && docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts "$email")" \
-    || die "Could not save the E2E test games."
-  token="$(printf '%s\n' "$output" | sed -n 's/^E2E_ORGANIZER_TOKEN=//p' | tr -d '\r')"
-  [[ -n "$token" ]] || die "The seed script gave no E2E_ORGANIZER_TOKEN."
-  SEED_ARGS=("-Pandroid.testInstrumentationRunnerArguments.organizerToken=$token")
 }
 
 run_instrumented_tests() {
@@ -130,10 +112,6 @@ run_instrumented_tests() {
   command -v adb >/dev/null 2>&1 || die "adb not found."
 
   wait_for_app_sign_in
-  SEED_ARGS=()
-  if [[ "$suite" == e2e ]]; then
-    seed_e2e_games
-  fi
   adb shell am force-stop "$app_id" >/dev/null 2>&1 || true
 
   for file in "${TEST_FILES[@]}"; do
@@ -145,8 +123,7 @@ run_instrumented_tests() {
   (
     cd "$FRONTEND_DIR"
     ./gradlew "$GRADLE_TASK" \
-      -Pandroid.testInstrumentationRunnerArguments.class="$class_arg" \
-      ${SEED_ARGS[@]+"${SEED_ARGS[@]}"}
+      -Pandroid.testInstrumentationRunnerArguments.class="$class_arg"
   )
   info "Frontend ${label} tests finished."
 }

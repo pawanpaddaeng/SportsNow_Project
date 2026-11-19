@@ -14,7 +14,7 @@ import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../no-mock/helpe
  */
 
 // this file's own port, test files run at the same time
-const PORT = 18103;
+const PORT = 18104;
 const MESSAGE_COUNT = 20;
 const LIMIT_MS = 1000;
 
