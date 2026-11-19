@@ -7,6 +7,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
@@ -34,11 +35,15 @@ fun rememberUnexpectedErrorHandler(): CoroutineExceptionHandler {
     }
 }
 
-// like rememberCoroutineScope, but its coroutines show a message instead of crashing on unexpected errors
+/*  like rememberCoroutineScope, but its coroutines show a message instead of crashing on
+    unexpected errors. They carry on on the main thread after waiting for the server, so they
+    can show toasts and change screens. The app's screens already do, but Compose tests run
+    them on a dispatcher that carries on on the network thread, where changing screens crashes
+ */
 @Composable
 fun rememberSafeCoroutineScope(): CoroutineScope {
     val handler = rememberUnexpectedErrorHandler()
-    return rememberCoroutineScope { handler }
+    return rememberCoroutineScope { handler + Dispatchers.Main }
 }
 
 /*  runs a LaunchedEffect's work so an unexpected error goes to handler instead of
