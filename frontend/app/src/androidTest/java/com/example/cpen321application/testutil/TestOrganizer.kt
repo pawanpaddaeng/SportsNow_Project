@@ -15,13 +15,14 @@ private const val STARTED_SECONDS_AGO = 30L
 
 /*  the test organizer saved by backend/tests/e2e/seedGameDiscovery.ts, which owns the test
     games. The E2E tests act as them through the server's interface, e.g. to cancel a game
-    while User A is asking to join it, or to read the game chat. scripts/run-frontend-e2e-tests passes their token in
-    as the organizerToken instrumentation argument.
+    while User A is asking to join it, or to read the game chat. The seed script prints their
+    token, which is passed to the tests as the organizerToken instrumentation argument (see
+    Testing.md section 4.2).
  */
 object TestOrganizer {
     private val token: String
         get() = InstrumentationRegistry.getArguments().getString("organizerToken")
-            ?: error("No organizerToken argument, run the tests with scripts/run-frontend-e2e-tests")
+            ?: error("No organizerToken argument, pass the seed script's token, see Testing.md section 4.2")
 
     // cancels the organizer's game called title
     fun cancelGame(title: String) {

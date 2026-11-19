@@ -4,6 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
+| Nov 18, 2026 | 3.5 (Use Case 3) | Failure scenarios 6a and 7a of Create Game now match the app. When no address is found (6a), the location is shown as "Dropped pin" with its coordinates, and the Game Organiser can confirm it or move the pin. When a compulsory field or the location is missing (7a), the fields are marked with \* and "Create game" stays disabled until they are filled in, so no error message is needed. |
 | Nov 18, 2026 | 3.4, 4.1 | Remove Friend is built (issue #75). Added `DELETE /api/friends/{userId}` to Friend and `deleteFriendChat` to Chat. Removing a friend ends the friendship for both users and deletes the chat they shared with all its messages, so if they become friends again `createFriendChat` opens a new, empty chat instead of reusing the old one. The other user isn't notified. In the app, each friend on the Friends tab has a Remove friend option that asks the user to confirm first. |
 | Nov 18, 2026 | 3.5 (Use Case 5) | Failure scenario 3a of Join Game now matches the app: the skill level is marked as required and "Send request" stays disabled until it's selected, so no error message is needed. |
 | Nov 18, 2026 | 3.7, 4.7 | The Performance requirement (Discover in under 5 seconds) is replaced by Security (only signed in users can use SportsNow, and only with data they are allowed to see), so the two requirements cover different qualities instead of both being response times. Section 4.7 describes how the back-end and the app meet it and how it is tested: Jest tests that send bad tokens to every endpoint and the chat WebSocket, and try to use another user's game and chat, and an Android instrumented test that checks the app returns to sign in when its token is turned down. |
@@ -186,9 +187,9 @@ To keep the community made up of accurately skilled players, SportsNow builds a 
 - 4a. System cannot connect to the Map API.
     - 4a1. System displays an error message and lets the Game Organiser try again.
 - 6a. The Map API cannot determine an address for the selected location.
-    - 6a1. System displays an error message and asks the Game Organiser to select another location.
+    - 6a1. System shows the location as "Dropped pin", with its coordinates in place of the address. The Game Organiser can confirm it or move the pin to another spot.
 - 7a. Game Organiser left a compulsory field empty or did not select a location.
-    - 7a1. System displays an error message identifying the missing fields.
+    - 7a1. System keeps the "Create game" button disabled until every compulsory field, marked with \*, is filled in and a location is selected.
 - 7b. Game Organiser entered an invalid value in any field.
     - 7b1. System displays an error message identifying the invalid field and the reason.
 - 8a. The phone cannot reach the server (e.g. no internet connection).

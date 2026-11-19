@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.e2eseeded
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
@@ -34,7 +34,7 @@ private const val SOCCER_GAME = "E2E Soccer"
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
-      - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
+      - backend/tests/e2e/seedGameDiscovery.ts was run (Testing.md section 4.2), which saved
         three games by a test organizer around DISCOVER_SPOT: two basketball games 200 m and
         1 km away and a soccer game 2 km away, with no volleyball games.
       - Each test sets the phone's location with TestLocation.

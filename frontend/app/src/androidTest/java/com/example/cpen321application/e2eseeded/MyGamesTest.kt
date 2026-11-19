@@ -1,4 +1,4 @@
-package com.example.cpen321application.e2e
+package com.example.cpen321application.e2eseeded
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -31,7 +31,7 @@ private const val LEAVE_GAME = "E2E Leave"
 
     Before the tests:
       - User A is signed in and the app shows its main screen.
-      - scripts/run-frontend-e2e-tests ran backend/tests/e2e/seedGameDiscovery.ts, which saved
+      - backend/tests/e2e/seedGameDiscovery.ts was run (Testing.md section 4.2), which saved
         "E2E Organized", organized by User A, and "E2E Chat" and "E2E Leave", organized by a test
         organizer and already joined by User A. Only the Leave Game test changes them. User B is
         also in "E2E Chat" when their account exists, so its player count isn't checked.

@@ -1,12 +1,15 @@
 import { executeWrite, pool, selectRows } from '../../src/core/db/mysql';
 import { logError, logInfo } from '../../src/core/logger';
 import { createChatMessage, getGameChatId } from '../../src/chat/db/chats';
+import { decideFriendRequest, sendFriendRequest } from '../../src/friend/db/friends';
 import { createGame, type NewGame } from '../../src/game/db/games';
+import { createJoinRequest, type NewJoinRequest } from '../../src/game/db/joinRequests';
 import { createAuthToken } from '../../src/user/auth/jwt';
 import { createUser } from '../../src/user/db/users';
 
 /*  Saves the games the frontend E2E tests for game discovery need (DiscoverGameTest,
-    JoinGameTest, MyGamesTest and GameChatTest, see Testing.md section 4). Run by
+    JoinGameTest, MyGamesTest and GameChatTest), and the games, friends and players the game
+    planning tests need (GamePlanningTest), see Testing.md section 4. Run by
     scripts/run-frontend-e2e-tests inside the backend container, once User A has signed in:
 
       docker compose exec -T backend npx tsx tests/e2e/seedGameDiscovery.ts <User A's email>
@@ -16,6 +19,8 @@ import { createUser } from '../../src/user/db/users';
     never shows a user their own games. User B (the manual tester's "Bea Tester" account) is
     added to the chat game when that account exists. Prints E2E_ORGANIZER_TOKEN=<token>: the tests sign in
     as the test organizer with it to cancel or start a game while User A is joining it.
+    For the game planning tests it saves User A a game per test, two friends to invite, a
+    pending join request in two of the games and a player in another.
  */
 
 // the test organizer's Google id, which no real account has
@@ -72,6 +77,42 @@ const CHAT_MESSAGES = ['E2E hello from the organizer', 'E2E bring a ball please'
 // User B, the manual tester's account (see Testing.md), who sends a live message in the chat game
 const USER_B = { firstName: 'Bea', lastName: 'Tester' };
 
+// a test user for the game planning tests, found again by their Google id, which no real account has
+interface SeedUser {
+  googleId: string;
+  firstName: string;
+  lastName: string;
+}
+
+// User A's friends, who GamePlanningTest invites to a game
+const FRIENDS: SeedUser[] = [
+  { googleId: 'e2e-test-fiona', firstName: 'Fiona', lastName: 'Friend' },
+  { googleId: 'e2e-test-finn', firstName: 'Finn', lastName: 'Friend' },
+];
+
+// players asking to join User A's games, one is accepted and one rejected, and a player User A removes
+const ACCEPTED_ASKER: SeedUser = { googleId: 'e2e-test-alex', firstName: 'Alex', lastName: 'Asker' };
+const REJECTED_ASKER: SeedUser = { googleId: 'e2e-test-blake', firstName: 'Blake', lastName: 'Asker' };
+const REMOVED_PLAYER: SeedUser = { googleId: 'e2e-test-riley', firstName: 'Riley', lastName: 'Player' };
+
+const PLANNING_USERS = [...FRIENDS, ACCEPTED_ASKER, REJECTED_ASKER, REMOVED_PLAYER];
+
+// User A's games for the game planning tests, one per test. Titles must match GamePlanningTest
+const EDIT_GAME: SeedGame = { title: 'E2E Edit', sport: 'basketball', spot: GAMES_SPOT, metresNorth: 800 };
+const CANCEL_GAME: SeedGame = { title: 'E2E Cancel', sport: 'soccer', spot: GAMES_SPOT, metresNorth: 900 };
+const INVITE_GAME: SeedGame = { title: 'E2E Invite', sport: 'volleyball', spot: GAMES_SPOT, metresNorth: 1000 };
+const ACCEPT_GAME: SeedGame = { title: 'E2E Accept', sport: 'basketball', spot: GAMES_SPOT, metresNorth: 1100 };
+const REJECT_GAME: SeedGame = { title: 'E2E Reject', sport: 'basketball', spot: GAMES_SPOT, metresNorth: 1200 };
+const REMOVE_GAME: SeedGame = { title: 'E2E Remove', sport: 'tennis', spot: GAMES_SPOT, metresNorth: 1300 };
+
+// the join requests' answers, which the tests check are shown to User A
+const ACCEPTED_REQUEST: NewJoinRequest = {
+  skillLevel: 'intermediate', playFrequency: 'weekly', message: 'Happy to play any position!',
+};
+const REJECTED_REQUEST: NewJoinRequest = {
+  skillLevel: 'beginner', playFrequency: 'rarely', message: 'First time playing, hope that is okay.',
+};
+
 // the user who signed in to the app on the emulator. email isn't unique, so a match must be one user
 async function findUserA(email: string): Promise<number> {
   const rows = await selectRows<{ user_id: number }>('SELECT user_id FROM users WHERE email = ?', [email]);
@@ -82,11 +123,16 @@ async function findUserA(email: string): Promise<number> {
 }
 
 /*  removes what an earlier run saved. Deleting the test organizer also deletes their games,
-    the games' players, chats, join requests and notifications (ON DELETE CASCADE)
+    the games' players, chats, join requests and notifications (ON DELETE CASCADE), and
+    deleting the game planning users also deletes their friendships with User A. User A's
+    games include the ones CreateGameTest made, whose titles also start with "E2E "
  */
 async function removeEarlierRun(userAId: number): Promise<void> {
   await executeWrite('DELETE FROM users WHERE google_id = ?', [ORGANIZER_GOOGLE_ID]);
   await executeWrite('DELETE FROM games WHERE organizer_id = ? AND title LIKE ?', [userAId, `${TITLE_PREFIX}%`]);
+  for (const user of PLANNING_USERS) {
+    await executeWrite('DELETE FROM users WHERE google_id = ?', [user.googleId]);
+  }
 }
 
 /*  saves the game, the nth one starting n days from now so the lists the tests read are always
@@ -121,6 +167,52 @@ async function findUserB(): Promise<number | null> {
 // puts a user in the game, as if the organizer had approved their join request
 async function addPlayer(gameId: number, userId: number): Promise<void> {
   await executeWrite('INSERT INTO game_players (game_id, user_id) VALUES (?, ?)', [gameId, userId]);
+}
+
+// saves a game planning test user. Returns their id
+function addUser(user: SeedUser): Promise<number> {
+  return createUser({
+    googleId: user.googleId,
+    email: `${user.googleId}@example.com`,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    birthYear: 1995,
+  });
+}
+
+// makes the two users friends, as the app does when one accepts the other's friend request
+async function addFriendship(userAId: number, friendId: number): Promise<void> {
+  const request = await sendFriendRequest(friendId, userAId);
+  if (!request.ok) throw new Error(`Could not send the friend request: ${request.problem}`);
+  const decision = await decideFriendRequest(request.requestId, userAId, true);
+  if (!decision.ok) throw new Error(`Could not accept the friend request: ${decision.problem}`);
+}
+
+// the user asks to join the game, as the app's join request form does
+async function addJoinRequest(gameId: number, userId: number, answers: NewJoinRequest): Promise<void> {
+  const result = await createJoinRequest(gameId, userId, answers);
+  if (!result.ok) throw new Error(`Could not save the join request: ${result.problem}`);
+}
+
+/*  saves what GamePlanningTest needs, starting with day n: User A's game for each test, their
+    two friends, a pending join request in the accept and reject games, and a player in the
+    remove game. Every game has only User A in it otherwise
+ */
+async function seedGamePlanning(userAId: number, n: number): Promise<void> {
+  for (const friend of FRIENDS) {
+    await addFriendship(userAId, await addUser(friend));
+  }
+
+  await addGame(userAId, EDIT_GAME, n);
+  await addGame(userAId, CANCEL_GAME, n + 1);
+  await addGame(userAId, INVITE_GAME, n + 2);
+  const acceptGameId = await addGame(userAId, ACCEPT_GAME, n + 3);
+  const rejectGameId = await addGame(userAId, REJECT_GAME, n + 4);
+  const removeGameId = await addGame(userAId, REMOVE_GAME, n + 5);
+
+  await addJoinRequest(acceptGameId, await addUser(ACCEPTED_ASKER), ACCEPTED_REQUEST);
+  await addJoinRequest(rejectGameId, await addUser(REJECTED_ASKER), REJECTED_REQUEST);
+  await addPlayer(removeGameId, await addUser(REMOVED_PLAYER));
 }
 
 async function seed(email: string): Promise<void> {
@@ -158,8 +250,9 @@ async function seed(email: string): Promise<void> {
   }
 
   await addGame(userAId, ORGANIZED_GAME, organizerGames.length + 2);
+  await seedGamePlanning(userAId, organizerGames.length + 3);
 
-  logInfo(`Seeded the game discovery E2E games for user ${userAId}`);
+  logInfo(`Seeded the game discovery and game planning E2E games for user ${userAId}`);
   logInfo(`E2E_ORGANIZER_TOKEN=${createAuthToken(organizerId)}`);
 }
 

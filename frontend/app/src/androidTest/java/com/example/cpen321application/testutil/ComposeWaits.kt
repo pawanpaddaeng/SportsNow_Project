@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 
 // how long the E2E tests wait for the server's answer or the phone's location
@@ -34,4 +35,17 @@ fun ComposeTestRule.openTab(label: String) {
 // scrolls the screen's list until a node matching matcher is shown
 fun ComposeTestRule.scrollTo(matcher: SemanticsMatcher) {
     onNode(screenList).performScrollToNode(matcher)
+}
+
+/*  waits until the screen's list has a node matching matcher, searching it from the top. For
+    a list still loading from the server, whose node may be off the screen where waitForNode
+    can't see it
+ */
+fun ComposeTestRule.waitAndScrollTo(matcher: SemanticsMatcher, timeoutMillis: Long = LOAD_TIMEOUT_MILLIS) {
+    waitUntil(timeoutMillis) {
+        runCatching {
+            onNode(screenList).performScrollToIndex(0)
+            scrollTo(matcher)
+        }.isSuccess
+    }
 }
