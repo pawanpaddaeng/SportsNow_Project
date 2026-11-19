@@ -696,6 +696,21 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
 2. **Add the environment files:** copy `.env.example` to `.env` in the root folder and fill it in, and add `backend/.env` with `JWT_SECRET`.
 3. **Start Docker Desktop.** The first time MySQL starts, it creates the tables from `mysql/init/`.
 
+**Cleaning up Docker before and after the tests (both ways)**
+
+The database is kept in the Docker volume `mysql_data` between runs. Start and end each test run with an empty database, so a run that stopped early can't leave users behind (for example a "Duplicate entry ... uq_users_google_id" error), and the tables always match `mysql/init/`. `docker compose down -v` stops the containers and deletes the volume, so the next start creates the tables again.
+
+- **Before the tests**, from the root folder:
+  ```
+  docker compose down -v
+  ```
+- **After the tests**, from the root folder, instead of a plain `docker compose down`:
+  ```
+  docker compose down -v
+  ```
+
+This deletes everything in the database, including accounts made with the app. After it, User A and User B sign up in the app again before the front-end tests (section 4.2).
+
 **Running the tests on your computer with npm**
 
 `docker-compose.yml` makes MySQL reachable from your own computer, on `127.0.0.1:3307` (only from that computer). Before the tests run, `backend/tests/setupEnv.ts` reads the database login from the root `.env` and connects to that port.
@@ -706,8 +721,9 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
    npm install
    cd ..
    ```
-2. **Start the test database** from the root folder:
+2. **Start a fresh test database** from the root folder, see "Cleaning up Docker" above:
    ```
+   docker compose down -v
    docker compose up -d mysql-db
    ```
 3. **Run all the tests** from the root folder. The script runs the tests with mocks, then without mocks, then both together. Each run saves a coverage report in `backend/coverage/mock`, `backend/coverage/no-mock` and `backend/coverage/interface`.
@@ -722,17 +738,18 @@ The tests without mocks need MySQL, which runs in Docker. The tests with mocks d
    - The Review component's tests: `npx jest tests/mock/review tests/no-mock/review tests/unit/review`
    - The Message component's tests: `npx jest tests/mock/chat tests/no-mock/chat tests/unit/chat`
    - One interface: `npx jest tests/no-mock/friend/searchUsers.test.ts`
-4. **Stop the database** from the root folder when you're done:
+4. **Stop and empty the database** from the root folder when you're done:
    ```
-   docker compose down
+   docker compose down -v
    ```
 
 **Running the tests inside Docker**
 
 The back-end container reaches MySQL directly, so it doesn't need npm on your computer.
 
-1. **Start MySQL and the back end** from the root folder. The container copies the code when it is built, so run this again after changing a test.
+1. **Start a fresh MySQL and the back end** from the root folder. The container copies the code when it is built, so run the second command again after changing a test.
    ```
+   docker compose down -v
    docker compose up -d --build mysql-db backend
    ```
 2. **Run the tests** from the root folder:
@@ -742,9 +759,9 @@ The back-end container reaches MySQL directly, so it doesn't need npm on your co
    - One component or interface: `docker compose exec backend npx jest tests/no-mock/game` or `docker compose exec backend npx jest tests/no-mock/friend/searchUsers.test.ts`
 
    The coverage reports are saved inside the container, in `/app/coverage/`.
-3. **Stop the containers** when you're done:
+3. **Stop the containers and empty the database** when you're done:
    ```
-   docker compose down
+   docker compose down -v
    ```
 
 ### 2.2. GitHub Actions Configuration Location
@@ -840,6 +857,65 @@ The game discovery and game chat tests share helpers in the same folder: `TestLo
 
 ### 4.2. Tests
 
+#### Setting up User B's emulator
+
+The tests that involve two users need the manual tester's User B account, "Bea Tester", on a second device. A real phone works. These steps set up a second emulator on the same computer as User A's emulator. Steps 1 to 5 are needed only once, since the emulator keeps its Google account, the app and its sign-in between runs.
+
+1. **Create the emulator.** In Android Studio, open **Device Manager** and click **+** > **Create Virtual Device**. Pick a phone (for example Pixel 9) and a system image whose name includes **Google Play**, API 33 or newer, since the app needs Google sign-in and push notifications. Name it so it's easy to tell apart, for example `User_B`. It must be a different virtual device from User A's, since one virtual device can only run once at a time.
+2. **Start both emulators.** Click ▶ next to User A's emulator and then next to `User_B` in Device Manager. Check that both are connected:
+
+   PowerShell:
+   ```powershell
+   adb devices
+   ```
+   Bash:
+   ```bash
+   adb devices
+   ```
+   Each emulator is listed with its serial, for example `emulator-5554` and `emulator-5556`. To tell which is which, see [Running the tests on User A's device only](#running-the-tests-on-user-as-device-only).
+3. **Add a Google account.** On `User_B`, open **Settings** > **Google** (or **Passwords & accounts**) and sign in with a Google account that isn't User A's.
+4. **Install the app on `User_B`.** Build the app from the `frontend` folder, then install it with User B's serial. The app's back-end address (`API_BASE_URL` in `frontend/local.properties`, for example `http://10.0.2.2:3000`) is the same for every emulator, so both use the same back end.
+
+   PowerShell:
+   ```powershell
+   cd frontend
+   .\gradlew.bat :app:assembleDebug
+   adb -s emulator-5556 install -r app\build\outputs\apk\debug\app-debug.apk
+   ```
+   Bash:
+   ```bash
+   cd frontend
+   ./gradlew :app:assembleDebug
+   adb -s emulator-5556 install -r app/build/outputs/apk/debug/app-debug.apk
+   ```
+5. **Sign up as User B.** Open the app on `User_B`, sign in with the Google account from step 3, and sign up with the first name **Bea** and the last name **Tester**. No other user may have this name. When Android asks whether the app may send notifications, click **Allow**, since some User B steps check a notification arrived.
+6. **Before each run:**
+   - Start both emulators, and keep the app open on `User_B`'s main screen.
+   - Check that User A and User B aren't friends and have no pending friend requests. `FriendSystemTest` leaves them that way, but a failed run may not: on either device, remove Bea Tester or User A from **Friends**, and decline any request under **Notifications** > **Friend requests**.
+   - For `GameChatTest`, User B must have signed up before the test data is saved, so the seed script can add them to "E2E Chat", see [Test data for the game discovery and game chat tests](#test-data-for-the-game-discovery-and-game-chat-tests).
+   - Set `ANDROID_SERIAL` to User A's emulator, see the next section, and start the User B helper, see [Doing User B's steps](#doing-user-bs-steps).
+
+#### Cleaning up Docker before and after the tests
+
+The front-end tests use the same Docker database as the app, which keeps its data in the `mysql_data` volume between runs. `scripts/run-frontend-e2e-tests` starts the back end and its database itself.
+
+- **Before the tests**, from the root folder, start from an empty database, so no earlier run's friendships, requests or test games are left:
+  ```
+  docker compose down -v
+  ```
+  This deletes every account too, so the run script's sign-in step is done as a new user: User A signs up again on their emulator, and User B signs up again as **Bea** **Tester** on theirs (step 5 of [Setting up User B's emulator](#setting-up-user-bs-emulator)) before the tests start. To keep the accounts between runs instead, skip this step and only remove the test data, as below.
+- **After the tests**, from the root folder, remove the test games and the test organizer that `backend/tests/e2e/seedGameDiscovery.ts` saved. Deleting the organizer also deletes their games' players, chats, messages, join requests and notifications. The command reads the database login from the MySQL container, so no password is typed:
+
+  PowerShell:
+  ```powershell
+  "DELETE FROM users WHERE google_id = 'e2e-test-organizer'; DELETE FROM games WHERE title LIKE 'E2E %';" | docker compose exec -T mysql-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
+  ```
+  Bash:
+  ```bash
+  echo "DELETE FROM users WHERE google_id = 'e2e-test-organizer'; DELETE FROM games WHERE title LIKE 'E2E %';" | docker compose exec -T mysql-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
+  ```
+  Then stop the containers with `docker compose down`, or with `docker compose down -v` to empty the database completely.
+
 #### Running the tests on User A's device only
 
 Some tests involve two users: User A is tested automatically on the emulator that runs the tests, and the manual tester acts as User B on another device. The tests run on every device connected to `adb`, so if User B uses an emulator on the same computer, the tests would also run as User B and fail. To prevent this, set `ANDROID_SERIAL` to User A's emulator, in the same terminal, before running the tests. An emulator's serial (such as `emulator-5556`) depends on which emulator was started first, so check it each time:
@@ -922,7 +998,7 @@ Every game starts on a different day, 1 to 10 days after the seed runs, so the l
 
 #### Use cases
 
-The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). The first two leave User A and User B with no friendship and no requests. `test3AcceptFriendRequestAndChat` makes them friends, so it runs last, and the tester removes the friendship after the tests with Remove friend on the Friends tab.
+The tests in `FriendSystemTest` run in a fixed order, by their names (`test1…`, `test2…`, `test3…`). Each one leaves User A and User B with no friendship and no requests: `test3AcceptFriendRequestAndChat` makes them friends and ends by removing the friend again.
 
 The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyGamesTest` and `GameChatTest`) can run in any order: each test has its own game, or only reads games no other test changes.
 
@@ -1093,8 +1169,8 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
-    | 1. Another member sends a message while the user has the game's chat open. | Open the "E2E Chat" chat and keep it open.<br>**(manual, User B)** On Home, open "E2E Chat", click "Open Chat" and send the message "Hi from User B". Press Enter in the User B helper. |
-    | 2. System shows the new message right away, from that member. | Without leaving the chat, wait up to 30 seconds until "Hi from User B" is on the screen.<br>Check that the sender name "Bea Tester" is on the screen.<br>Check that "Hi from User B" is below "E2E bring a ball please". |
+    | 1. Another member sends a message while the user has the game's chat open. | Open the "E2E Chat" chat and keep it open.<br>**(manual, User B)** On Home, open "E2E Chat", click "Open Chat" and send any message. Press Enter in the User B helper. |
+    | 2. System shows the new message right away, from that member. | Without leaving the chat, wait up to 30 seconds until a message showing the sender name "Bea Tester" is on the screen below "E2E bring a ball please". User B's message can say anything, so only its sender name is checked. |
 
     A game chat's push notification, when the chat isn't open, works the same way as a friend chat's, which `FriendSystemTest` checks.
 
@@ -1178,9 +1254,9 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
 
   - **Test Logs:** the logs of `FriendSystemTest.test2SendFriendRequest` above.
 
-- **Use Cases: Accept Friend Request (6), Send Friend Message (9, formal Use Case 1), Receive Friend Message (11) and View Friend Messages (10), test `FriendSystemTest.test3AcceptFriendRequestAndChat`**
+- **Use Cases: Accept Friend Request (6), Send Friend Message (9, formal Use Case 1), Receive Friend Message (11), View Friend Messages (10) and Remove Friend (12), test `FriendSystemTest.test3AcceptFriendRequestAndChat`**
 
-  One test covers these four use cases in this order, since the two users can only chat once they are friends. Send Friend Message's scenario steps come from its formal specification (Requirements and Design section 3.5, Use Case 1). The other three have none, so their scenario steps describe what the app does.
+  One test covers these five use cases in this order, since the two users can only chat, or stop being friends, once they are friends. Send Friend Message's scenario steps come from its formal specification (Requirements and Design section 3.5, Use Case 1). The other three have none, so their scenario steps describe what the app does.
 
   - **Before the tests:**
     - **User A (automated):** signed in on the emulator that runs the test, on the main screen.
@@ -1190,7 +1266,7 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
     - **User A's messages:** each run sends messages with the time in them (`E2E hello <time>`, `E2E offline <time>`). Removing a friend deletes their chat, so each run starts with an empty chat, and the time keeps the messages apart even if an old chat was left behind.
     - **Notifications:** the test allows the app's notifications with `pm grant ... android.permission.POST_NOTIFICATIONS`, and uses UI Automator to clear old notifications and look for new ones in the notification shade. Push notifications must be set up for User A's emulator (the app's `google-services.json`).
     - **No connection (6a):** the 6a test turns the phone's Wi-Fi and mobile data off with UI Automator (`svc wifi disable`, `svc data disable`), and back on before trying again, waiting for the phone and the chat to reconnect. They are also turned back on after the test if it fails.
-    - **After the test:** User A and User B are friends. The tester removes the friendship with Remove friend on the Friends tab, which also deletes their chat, so the next run starts again with no friendship.
+    - **After the test:** User A and User B are not friends again, and their chat is deleted. If the test fails before Remove Friend, the tester removes the friendship with Remove friend on the Friends tab.
 
   - **Expected Behaviors, Accept Friend Request (Use Case 6):**
 
@@ -1221,17 +1297,26 @@ The game discovery and game chat tests (`DiscoverGameTest`, `JoinGameTest`, `MyG
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
-    | 1. The friend sends the user a message while the user has their chat open. | Keep the chat with "Bea Tester" open.<br>**(manual, User B)** In the chat with User A, send any message. Press Enter in the User B helper. |
-    | 2. System shows the new message right away, from the friend. | Without leaving the chat, wait until a message showing the sender name "Bea Tester" is on the screen below "E2E offline &lt;time&gt;". |
-    | 3. The friend sends a message while the user doesn't have the chat open. | Click the button "Back".<br>Open the notification shade and click "Clear all" (UI Automator), so an older notification can't count.<br>**(manual, User B)** Send User A any message. Press Enter in the User B helper. |
-    | 4. System notifies the user with a push notification. | Open the notification shade (UI Automator).<br>Wait until a notification titled "Bea" is shown.<br>Close the notification shade. |
+    | 1. The friend sends the user a message while the user doesn't have the chat open. | Click the button "Back".<br>Open the notification shade and click "Clear all" (UI Automator), so an older notification can't count.<br>**(manual, User B)** In the chat with User A, send any message. Press Enter in the User B helper. |
+    | 2. System notifies the user with a push notification. | Open the notification shade (UI Automator).<br>Wait until a notification titled "Bea" is shown.<br>Close the notification shade. |
+
+    User B sends only this one message. View Friend Messages then checks it is in the chat, and `GameChatTest` checks a message arriving live in an open chat.
 
   - **Expected Behaviors, View Friend Messages (Use Case 10):**
 
     | **Scenario Steps** | **Test Case Steps** |
     | ------------------ | ------------------- |
     | 1. User opens the chat with a friend. | Click the "Bea Tester" card on the Friends screen. |
-    | 2. System shows the earlier messages, oldest at the top and newest at the bottom, each with who sent it. | Wait until "E2E offline &lt;time&gt;" is on the screen.<br>Check that "E2E hello &lt;time&gt;" is above "E2E offline &lt;time&gt;".<br>Wait until at least two messages showing the sender name "Bea Tester" are on the screen below "E2E offline &lt;time&gt;". |
+    | 2. System shows the earlier messages, oldest at the top and newest at the bottom, each with who sent it. | Wait until "E2E offline &lt;time&gt;" is on the screen.<br>Check that "E2E hello &lt;time&gt;" is above "E2E offline &lt;time&gt;".<br>Wait until a message showing the sender name "Bea Tester" (User B's message from Receive Friend Message) is on the screen below "E2E offline &lt;time&gt;". |
+
+  - **Expected Behaviors, Remove Friend (Use Case 12):**
+
+    | **Scenario Steps** | **Test Case Steps** |
+    | ------------------ | ------------------- |
+    | 1. User opens a friend's options and selects "Remove friend". | Click the button "Back" to return to the Friends screen.<br>Click the button "More options for Bea Tester", then "Remove friend". |
+    | 2. System asks the user to confirm. | Check that the text "Remove Bea Tester?" is on the screen. |
+    | 3. User confirms. | Click the button "Remove". |
+    | 4. System ends the friendship and removes the friend from the list. | Wait until the "Bea Tester" card is no longer on the screen.<br>Search for "Bea Tester" and check that the card shows the button "Add". |
 
   - **Test Logs:**
     ```
