@@ -48,16 +48,15 @@ data class BadgeLayer(
     val index: Int = 0
 )
 
-/*  everything needed to draw a badge. clip is the badge's outline, which the shine and the
-    gloss stay inside. outline is drawn in as the first step of building a milestone shield
+/*  everything needed to draw a badge. clip is the badge's outline: the shine and the gloss
+    stay inside it, and a milestone shield's build starts by drawing it in
  */
 data class BadgeArt(
     val tier: BadgeTier,
     val palette: BadgePalette,
     val layers: List<BadgeLayer>,
     val clip: Path,
-    val iconScale: Float,
-    val outline: Path? = null
+    val iconScale: Float
 )
 
 private const val SHIELD = "M60 4 L104 18 V54 C104 84 86 102 60 112 C34 102 16 84 16 54 V18 Z"
@@ -87,8 +86,7 @@ fun badgeArt(badge: Badge): BadgeArt {
             palette = palette,
             layers = shieldLayers(palette) + icon + glossLayer(),
             clip = svgPath(SHIELD),
-            iconScale = MILESTONE_ICON_SCALE,
-            outline = svgPath(SHIELD)
+            iconScale = MILESTONE_ICON_SCALE
         )
         BadgeTier.Reputation -> BadgeArt(
             tier = badge.tier,

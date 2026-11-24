@@ -95,8 +95,15 @@ fun BadgeGrid(
     }
 }
 
+// how a badge's name reads under it, and what a screen reader says about it
+private class CellLook(val nameColor: Color, val nameWeight: FontWeight, val status: String)
+
+private val EarnedLook = CellLook(SportsOnSurface, FontWeight.Medium, status = "earned")
+private val LockedLook = CellLook(SportsOnSurfaceVariant, FontWeight.Normal, status = "not earned yet")
+
 @Composable
 private fun BadgeCell(badge: Badge, earned: Boolean, onOpen: ((Badge) -> Unit)?, modifier: Modifier) {
+    val look = if (earned) EarnedLook else LockedLook
     val canOpen = earned && onOpen != null
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -111,16 +118,16 @@ private fun BadgeCell(badge: Badge, earned: Boolean, onOpen: ((Badge) -> Unit)?,
                 }
             )
             .semantics(mergeDescendants = true) {
-                contentDescription = "${badge.title} badge, " + if (earned) "earned" else "not earned yet"
+                contentDescription = "${badge.title} badge, ${look.status}"
             }
             .padding(vertical = 4.dp)
     ) {
         BadgeImage(badge = badge, earned = earned, modifier = Modifier.fillMaxWidth(BADGE_WIDTH_IN_CELL))
         Text(
             text = badge.title,
-            color = if (earned) SportsOnSurface else SportsOnSurfaceVariant,
+            color = look.nameColor,
             fontSize = 12.sp,
-            fontWeight = if (earned) FontWeight.Medium else FontWeight.Normal,
+            fontWeight = look.nameWeight,
             textAlign = TextAlign.Center,
             maxLines = 2
         )

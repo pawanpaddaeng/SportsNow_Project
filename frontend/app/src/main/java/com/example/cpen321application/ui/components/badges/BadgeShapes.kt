@@ -36,10 +36,8 @@ fun roundRectPath(x: Float, y: Float, width: Float, height: Float, radius: Float
 
 // an ellipse centred on (cx, cy), turned clockwise by rotation degrees
 fun ellipsePath(cx: Float, cy: Float, rx: Float, ry: Float, rotation: Float = 0f): Path =
-    Path().apply {
-        addOval(Rect(left = cx - rx, top = cy - ry, right = cx + rx, bottom = cy + ry))
-        transform(Matrix().apply { aroundPoint(cx, cy) { rotateZ(rotation) } })
-    }
+    Path().apply { addOval(Rect(left = cx - rx, top = cy - ry, right = cx + rx, bottom = cy + ry)) }
+        .rotated(degrees = rotation, pivotX = cx, pivotY = cy)
 
 // a star with points tips, its tips at outer and the dips between them at inner, first tip straight up
 fun starPath(cx: Float, cy: Float, outer: Float, inner: Float, points: Int = 5): Path {
@@ -64,8 +62,14 @@ fun pointOnCircle(radius: Float, angle: Float): Pair<Float, Float> {
 }
 
 // this path turned clockwise by degrees around (pivotX, pivotY)
-fun Path.rotated(degrees: Float, pivotX: Float, pivotY: Float): Path =
-    apply { transform(Matrix().apply { aroundPoint(pivotX, pivotY) { rotateZ(degrees) } }) }
+fun Path.rotated(degrees: Float, pivotX: Float, pivotY: Float): Path {
+    val turn = Matrix()
+    turn.translate(pivotX, pivotY)
+    turn.rotateZ(degrees)
+    turn.translate(-pivotX, -pivotY)
+    transform(turn)
+    return this
+}
 
 // this path shrunk or grown by scale around (pivotX, pivotY), then moved by (dx, dy)
 fun Path.scaled(
@@ -74,20 +78,13 @@ fun Path.scaled(
     pivotY: Float = CENTER_Y,
     dx: Float = 0f,
     dy: Float = 0f
-): Path =
-    apply {
-        transform(Matrix().apply {
-            translate(x = dx)
-            translate(y = dy)
-            aroundPoint(pivotX, pivotY) { scale(x = scale, y = scale) }
-        })
-    }
-
-// applies change around (x, y) instead of around the grid's corner
-private fun Matrix.aroundPoint(x: Float, y: Float, change: Matrix.() -> Unit) {
-    translate(x, y)
-    change()
-    translate(-x, -y)
+): Path {
+    val resize = Matrix()
+    resize.translate(pivotX + dx, pivotY + dy)
+    resize.scale(x = scale, y = scale)
+    resize.translate(-pivotX, -pivotY)
+    transform(resize)
+    return this
 }
 
 // numbers written in a string, e.g. "212 189 166", for lists of angles or keyframes

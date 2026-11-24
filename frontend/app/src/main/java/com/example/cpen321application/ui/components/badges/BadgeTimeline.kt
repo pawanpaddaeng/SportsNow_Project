@@ -48,7 +48,7 @@ data class BadgeFrame(
 ) {
     // how this layer moves at this frame
     fun motionOf(layer: BadgeLayer): PartMotion =
-        if (layer.part == BadgePart.Leaf) leaf(layer.index) else parts[layer.part] ?: Still
+        if (layer.part == BadgePart.Leaf) leaf(layer.index) else parts.getOrDefault(layer.part, Still)
 
     companion object {
         // the badge sitting still, as on the profile

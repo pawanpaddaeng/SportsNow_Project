@@ -47,14 +47,15 @@ private const val OUTLINE_WIDTH = 3f
 fun BadgeDrawing(badge: Badge, earned: Boolean, frame: BadgeFrame, modifier: Modifier = Modifier) {
     val art = remember(badge) { badgeArt(badge) }
     val textMeasurer = rememberTextMeasurer()
-    val saturation = if (earned) frame.saturation else 0f
+    // a badge that isn't earned is drawn with no colour, faded
+    val (saturation, alpha) = if (earned) frame.saturation to frame.bodyAlpha else 0f to LOCKED_ALPHA
     Canvas(
         modifier = modifier
             .aspectRatio(BADGE_WIDTH / BADGE_HEIGHT)
             .graphicsLayer {
                 rotationY = frame.rotationY
                 cameraDistance = CAMERA_DISTANCE * density
-                alpha = if (earned) frame.bodyAlpha else LOCKED_ALPHA
+                this.alpha = alpha
             }
     ) {
         val scale = size.width / BADGE_WIDTH
@@ -116,7 +117,7 @@ private class BadgePainter(
 
     private fun DrawScope.drawParts(layer: BadgeLayer, alpha: Float) {
         layer.shapes.forEach { shape ->
-            val style = shape.strokeWidth?.let { width -> roundStroke(width) } ?: Fill
+            val style = shape.strokeWidth?.let(::roundStroke) ?: Fill
             drawPath(shape.path, brushFor(shape), alpha = shape.alpha * alpha, style = style)
         }
         layer.labels.forEach { label -> drawLabel(label, alpha) }
@@ -154,11 +155,13 @@ private class BadgePainter(
 
     private fun roundStroke(width: Float) = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
-    // a milestone's outline drawing itself in, the first step of building the shield
+    /*  a milestone's outline drawing itself in, the first step of building the shield. Only the
+        build animation makes the outline visible, so other badges never draw it
+     */
     fun DrawScope.drawShieldOutline() {
-        val outline = art.outline
-        if (outline == null || frame.outlineAlpha <= 0f) return
-        val measure = PathMeasure().apply { setPath(outline, false) }
+        if (frame.outlineAlpha <= 0f) return
+        val measure = PathMeasure()
+        measure.setPath(art.clip, false)
         val drawn = Path()
         measure.getSegment(0f, measure.length * frame.outlineDrawn, drawn, true)
         drawPath(
