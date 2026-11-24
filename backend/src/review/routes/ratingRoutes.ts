@@ -2,10 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
-import { getGameById } from '../../game/db/games';
 import {
   type ErrorResponse,
-  gameChangeError,
+  requireGame,
   requireGameId,
   responseFor,
   sendError,
@@ -59,11 +58,9 @@ export function ratingsRouter(): Router {
   router.get('/api/games/:gameId/ratings', requireAuth, asyncRoute('Could not load the players, try again later',
     async (req: Request<{ gameId: string }>, res: Response) => {
       const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
-
-      const game = await getGameById(gameId);
-      if (!game) return sendError(res, gameChangeError('not_found'));
+      const game = await requireGame(req.params.gameId, res);
+      if (!game) return;
+      const { gameId } = game;
       const result = await getPlayersToRate(gameId, user.userId);
       if (!result.ok) return sendError(res, result.problem === 'rating_closed' ? RATING_CLOSED : NOT_ALLOWED);
 

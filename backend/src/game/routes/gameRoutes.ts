@@ -35,6 +35,7 @@ import {
   readBackGame,
   readGameId,
   REMOVE_PLAYER_ERRORS,
+  requireGame,
   requireGameId,
   responseFor,
   sendError,
@@ -167,11 +168,9 @@ export function gamesRouter(): Router {
   router.get('/api/games/:gameId', requireAuth, asyncRoute('Could not load the game, try again later',
     async (req: Request<{ gameId: string }>, res: Response) => {
       const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
-
-      const game = await getGameById(gameId);
-      if (!game) return sendError(res, gameChangeError('not_found'));
+      const game = await requireGame(req.params.gameId, res);
+      if (!game) return;
+      const { gameId } = game;
 
       const players = await getGamePlayers(gameId);
       const organizer = await findOrganizer(game, players);

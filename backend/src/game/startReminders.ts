@@ -1,5 +1,6 @@
-import { logError, logInfo } from '../core/logger';
+import { logInfo } from '../core/logger';
 import { notifyUsers } from '../core/notifications/notify';
+import { repeatEvery } from '../core/repeatEvery';
 import { claimDueStartReminders, getGamePlayerIds, type StartingGame } from './db/startReminders';
 
 // how often the server looks for games whose reminder is due
@@ -37,12 +38,5 @@ export async function sendDueStartReminders(): Promise<number> {
     that stops it
  */
 export function startGameStartReminders(): () => void {
-  const timer = setInterval(() => {
-    sendDueStartReminders().catch((error: unknown) => {
-      logError('Sending game start reminders failed:', error);
-    });
-  }, CHECK_EVERY_MS);
-  return () => {
-    clearInterval(timer);
-  };
+  return repeatEvery(CHECK_EVERY_MS, sendDueStartReminders, 'Sending game start reminders failed:');
 }

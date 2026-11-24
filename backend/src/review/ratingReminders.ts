@@ -1,5 +1,6 @@
-import { logError, logInfo } from '../core/logger';
+import { logInfo } from '../core/logger';
 import { sendPushToUsers } from '../core/notifications/push';
+import { repeatEvery } from '../core/repeatEvery';
 import { claimDueRatingReminders, getPlayersWithRatingsLeft, type ReminderGame } from './db/ratingReminders';
 import { REMINDER_BEFORE_CLOSE_HOURS } from './ratingWindow';
 
@@ -31,12 +32,5 @@ export async function sendDueRatingReminders(): Promise<number> {
     that stops it
  */
 export function startRatingReminders(): () => void {
-  const timer = setInterval(() => {
-    sendDueRatingReminders().catch((error: unknown) => {
-      logError('Sending rating reminders failed:', error);
-    });
-  }, CHECK_EVERY_MS);
-  return () => {
-    clearInterval(timer);
-  };
+  return repeatEvery(CHECK_EVERY_MS, sendDueRatingReminders, 'Sending rating reminders failed:');
 }

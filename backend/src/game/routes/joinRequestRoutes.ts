@@ -5,7 +5,6 @@ import { logInfo } from '../../core/logger';
 import { notifyUser } from '../../core/notifications/notify';
 import { getReputationScore } from '../../review/db/reputation';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
-import { getGameById } from '../db/games';
 import {
   createJoinRequest,
   decideJoinRequest,
@@ -18,10 +17,10 @@ import { gameJson, pendingJoinRequestJson } from './gameJson';
 import {
   type ErrorResponse,
   GAME_CHANGE_ERRORS,
-  gameChangeError,
   logNotificationError,
   readBackGame,
   readGameId,
+  requireGame,
   requireGameId,
   responseFor,
   sendError,
@@ -92,11 +91,9 @@ export function joinRequestsRouter(): Router {
   router.get('/api/games/:gameId/join-requests', requireAuth, asyncRoute('Could not load join requests, try again later',
     async (req: Request<{ gameId: string }>, res: Response) => {
       const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
-
-      const game = await getGameById(gameId);
-      if (!game) return sendError(res, gameChangeError('not_found'));
+      const game = await requireGame(req.params.gameId, res);
+      if (!game) return;
+      const { gameId } = game;
       if (game.organizerId !== user.userId) {
         return res.status(403).json({ msg: 'forbidden', error: 'Only the organizer can see join requests' });
       }

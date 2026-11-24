@@ -5,20 +5,24 @@ import type { JoinRequestStatus } from './joinRequests';
 
 export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
 
-// fields needed to create a game, matching the games table
-export interface NewGame {
+// what the organizer sets for a game, shared by a new game and one read back
+interface GameFields {
   organizerId: number;
   title: string;
   sport: string;
   description: string | null;
-  startsAt: Date;
-  endsAt: Date | null;
   locationName: string;
   address: string;
   latitude: number;
   longitude: number;
   maxPlayers: number;
   skillLevel: SkillLevel;
+}
+
+// fields needed to create a game, matching the games table
+export interface NewGame extends GameFields {
+  startsAt: Date;
+  endsAt: Date | null;
 }
 
 // games stores times as UTC DATETIME values ("YYYY-MM-DD HH:MM:SS")
@@ -56,22 +60,12 @@ export async function createGame(game: NewGame): Promise<number> {
 export type GameStatus = 'scheduled' | 'cancelled' | 'completed';
 
 // a game as read back from the database, with how many players are in it
-export interface Game {
+export interface Game extends GameFields {
   gameId: number;
-  organizerId: number;
-  title: string;
-  sport: string;
-  description: string | null;
   // UTC times as ISO 8601 strings, e.g. "2026-10-18T02:00:00Z"
   startsAt: string;
   endsAt: string | null;
-  locationName: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  maxPlayers: number;
   playerCount: number;
-  skillLevel: SkillLevel;
   status: GameStatus;
   // starts_at has passed by the database's clock. A started game stays 'scheduled'
   // (shown as in progress) until the organizer marks it completed

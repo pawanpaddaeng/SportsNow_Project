@@ -1,4 +1,5 @@
-import { executeWrite, inTransaction, placeholders, selectRows } from '../../core/db/mysql';
+import { selectRows } from '../../core/db/mysql';
+import { claimDueGames } from './claimDueGames';
 
 // how long before a game starts its organizer and players are reminded
 export const START_REMINDER_BEFORE_MINUTES = 60;
@@ -19,30 +20,20 @@ export interface StartingGame {
     hour before it starts is returned on the next check
  */
 export async function claimDueStartReminders(): Promise<StartingGame[]> {
-  return inTransaction(async (connection) => {
-    const due = await selectRows<{ game_id: number; title: string; minutes_left: number }>(
-      `SELECT game_id, title, TIMESTAMPDIFF(MINUTE, UTC_TIMESTAMP(), starts_at) AS minutes_left
-       FROM games
-       WHERE status = 'scheduled' AND start_reminder_sent = FALSE
-         AND starts_at > UTC_TIMESTAMP()
-         AND starts_at <= UTC_TIMESTAMP() + INTERVAL ${START_REMINDER_BEFORE_MINUTES} MINUTE
-       FOR UPDATE SKIP LOCKED`,
-      [],
-      connection,
-    );
-    if (due.length > 0) {
-      await executeWrite(
-        `UPDATE games SET start_reminder_sent = TRUE WHERE game_id IN (${placeholders(due.length)})`,
-        due.map((game) => game.game_id),
-        connection,
-      );
-    }
-    return due.map((game) => ({
-      gameId: game.game_id,
-      title: game.title,
-      minutesLeft: Math.max(1, Number(game.minutes_left)),
-    }));
-  });
+  const due = await claimDueGames<{ game_id: number; title: string; minutes_left: number }>(
+    `SELECT game_id, title, TIMESTAMPDIFF(MINUTE, UTC_TIMESTAMP(), starts_at) AS minutes_left
+     FROM games
+     WHERE status = 'scheduled' AND start_reminder_sent = FALSE
+       AND starts_at > UTC_TIMESTAMP()
+       AND starts_at <= UTC_TIMESTAMP() + INTERVAL ${START_REMINDER_BEFORE_MINUTES} MINUTE
+     FOR UPDATE SKIP LOCKED`,
+    'start_reminder_sent',
+  );
+  return due.map((game) => ({
+    gameId: game.game_id,
+    title: game.title,
+    minutesLeft: Math.max(1, Number(game.minutes_left)),
+  }));
 }
 
 // everyone in the game, the organizer included
