@@ -54,7 +54,8 @@ const RULES: [BadgeId, (progress: BadgeProgress) => boolean][] = [
   ['games_10', (p) => p.gamesPlayed >= REGULAR_GAMES],
   ['games_50', (p) => p.gamesPlayed >= VETERAN_GAMES],
   ['friends_10', (p) => p.friends >= SOCIAL_FRIENDS],
-  ['mvp', (p) => p.ratingsReceived >= MVP_RATINGS && p.score !== null && p.score >= MVP_SCORE],
+  // not rated yet counts as 0, below MVP_SCORE
+  ['mvp', (p) => p.ratingsReceived >= MVP_RATINGS && (p.score ?? 0) >= MVP_SCORE],
   ['mega_mvp', (p) => p.perfectRatings >= MEGA_MVP_PERFECT_RATINGS],
 ];
 

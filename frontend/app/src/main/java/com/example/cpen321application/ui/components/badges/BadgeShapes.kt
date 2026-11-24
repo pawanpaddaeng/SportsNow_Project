@@ -1,5 +1,6 @@
 package com.example.cpen321application.ui.components.badges
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
@@ -42,16 +43,18 @@ fun ellipsePath(cx: Float, cy: Float, rx: Float, ry: Float, rotation: Float = 0f
 
 // a star with points tips, its tips at outer and the dips between them at inner, first tip straight up
 fun starPath(cx: Float, cy: Float, outer: Float, inner: Float, points: Int = 5): Path {
-    val path = Path()
-    for (corner in 0 until points * 2) {
-        val radius = if (corner % 2 == 0) outer else inner
+    // tips and dips take turns going round
+    val radii = listOf(outer, inner)
+    val corners = (0 until points * 2).map { corner ->
         val angle = -PI / 2 + corner * PI / points
-        val x = cx + radius * cos(angle).toFloat()
-        val y = cy + radius * sin(angle).toFloat()
-        if (corner == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        val radius = radii[corner % 2]
+        Offset(cx + radius * cos(angle).toFloat(), cy + radius * sin(angle).toFloat())
     }
-    path.close()
-    return path
+    return Path().apply {
+        moveTo(corners.first().x, corners.first().y)
+        corners.drop(1).forEach { corner -> lineTo(corner.x, corner.y) }
+        close()
+    }
 }
 
 // the point radius away from the badge's centre at angle degrees (0 is right, 90 is down)

@@ -45,29 +45,30 @@ private const val MIRROR_DEGREES = 180f
 private const val MEGA_TROPHY_SCALE = 0.82f
 private const val FINGER_SHIFT = 3f
 
-fun paletteOf(badge: Badge): BadgePalette = when (badge) {
-    Badge.FirstWhistle -> BadgePalette(GreenLight, GreenDark, GreenRing)
-    Badge.GameMaker -> BadgePalette(OrangeLight, OrangeDark, OrangeRing)
-    Badge.SquadUp -> BadgePalette(BlueLight, BlueDark, BlueRing)
-    Badge.FairJudge -> BadgePalette(PurpleLight, PurpleDark, PurpleRing)
-    Badge.Regular -> BadgePalette(TealLight, TealDark, TealRing)
-    Badge.Veteran -> BadgePalette(RedLight, RedDark, RedRing)
-    Badge.SocialButterfly -> BadgePalette(PinkLight, PinkDark, PinkRing)
-    Badge.Mvp -> BadgePalette(NavyLight, NavyDark, GoldDark)
-    Badge.MegaMvp -> BadgePalette(VioletLight, VioletDark, GoldDark)
-}
+// a badge's colours, and its icon drawn in them
+private class BadgeDesign(val palette: BadgePalette, val icon: (BadgePalette) -> List<BadgeLayer>)
 
-fun iconLayers(badge: Badge, palette: BadgePalette): List<BadgeLayer> = when (badge) {
-    Badge.FirstWhistle -> listOf(foamFinger(palette.dark))
-    Badge.GameMaker -> listOf(calendar(palette.dark))
-    Badge.SquadUp -> listOf(people())
-    Badge.FairJudge -> listOf(award())
-    Badge.Regular -> listOf(ball(palette.dark), banner("10", palette.dark))
-    Badge.Veteran -> laurels() + listOf(ball(palette.dark), banner("50", palette.dark))
-    Badge.SocialButterfly -> listOf(butterfly(palette))
-    Badge.Mvp -> listOf(BadgeLayer(BadgePart.Plain, trophy(White, palette.dark), inIcon = true))
-    Badge.MegaMvp -> megaTrophy(palette.dark)
-}
+private val Designs = mapOf(
+    Badge.FirstWhistle to BadgeDesign(BadgePalette(GreenLight, GreenDark, GreenRing)) { listOf(foamFinger(it.dark)) },
+    Badge.GameMaker to BadgeDesign(BadgePalette(OrangeLight, OrangeDark, OrangeRing)) { listOf(calendar(it.dark)) },
+    Badge.SquadUp to BadgeDesign(BadgePalette(BlueLight, BlueDark, BlueRing)) { listOf(people()) },
+    Badge.FairJudge to BadgeDesign(BadgePalette(PurpleLight, PurpleDark, PurpleRing)) { listOf(award()) },
+    Badge.Regular to BadgeDesign(BadgePalette(TealLight, TealDark, TealRing)) {
+        listOf(ball(it.dark), banner("10", it.dark))
+    },
+    Badge.Veteran to BadgeDesign(BadgePalette(RedLight, RedDark, RedRing)) {
+        laurels() + listOf(ball(it.dark), banner("50", it.dark))
+    },
+    Badge.SocialButterfly to BadgeDesign(BadgePalette(PinkLight, PinkDark, PinkRing)) { listOf(butterfly(it)) },
+    Badge.Mvp to BadgeDesign(BadgePalette(NavyLight, NavyDark, GoldDark)) {
+        listOf(BadgeLayer(BadgePart.Plain, trophy(White, it.dark), inIcon = true))
+    },
+    Badge.MegaMvp to BadgeDesign(BadgePalette(VioletLight, VioletDark, GoldDark)) { megaTrophy(it.dark) }
+)
+
+fun paletteOf(badge: Badge): BadgePalette = Designs.getValue(badge).palette
+
+fun iconLayers(badge: Badge, palette: BadgePalette): List<BadgeLayer> = Designs.getValue(badge).icon(palette)
 
 private fun solid(color: Color) = BadgeFill.Solid(color)
 
