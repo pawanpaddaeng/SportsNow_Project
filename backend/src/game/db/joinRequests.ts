@@ -1,5 +1,6 @@
 import { executeWrite, inTransaction, selectRows } from '../../core/db/mysql';
-import { type GameChangeProblem, lockGame, lockGameForChange, PENDING_REQUESTS_COUNT } from './games';
+import { type GameChangeProblem, lockGame, lockGameForChange } from './gameChanges';
+import { PENDING_REQUESTS_COUNT } from './games';
 
 export type JoinRequestStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 

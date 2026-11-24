@@ -1,4 +1,5 @@
 import * as push from '../../../src/core/notifications/push';
+import * as gameChangesDb from '../../../src/game/db/gameChanges';
 import * as gamesDb from '../../../src/game/db/games';
 import type * as MockEnv from '../mockEnv';
 import {
@@ -32,7 +33,7 @@ describe('Mocked: POST /api/games/{gameId}/cancel', () => {
 
     // 2. a game that cancels successfully
     const game = testGame({ status: 'cancelled' });
-    jest.spyOn(gamesDb, 'cancelGame').mockResolvedValue({ ok: true });
+    jest.spyOn(gameChangesDb, 'cancelGame').mockResolvedValue({ ok: true });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
     const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
@@ -68,7 +69,7 @@ describe('Mocked: POST /api/games/{gameId}/cancel', () => {
     const token = signIn(organizer);
 
     // 2. make cancelling fail
-    const cancelGame = jest.spyOn(gamesDb, 'cancelGame').mockRejectedValue(new Error('database down'));
+    const cancelGame = jest.spyOn(gameChangesDb, 'cancelGame').mockRejectedValue(new Error('database down'));
 
     // 3. cancel it through the interface
     const response = await api.post(`/api/games/${GAME_ID}/cancel`).set(withToken(token));

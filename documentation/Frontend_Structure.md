@@ -143,7 +143,7 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), form fields, chips, map preview, cards, and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
+| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), back-button title bar, form fields and submit button, chips, map preview, cards, avatar circles (`AvatarCircle.kt`), request cards with their Decline/Accept buttons (`RequestCard.kt`), and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |

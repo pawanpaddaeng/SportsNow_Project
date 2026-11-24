@@ -1,12 +1,12 @@
 import type { Response } from 'express';
-import {
-  type CompleteGameProblem,
-  type Game,
-  type GameChangeProblem,
-  getGameById,
-  type LeaveGameProblem,
-  type RemovePlayerProblem,
-} from '../db/games';
+import type {
+  CompleteGameProblem,
+  GameChangeProblem,
+  LeaveGameProblem,
+  RemovePlayerProblem,
+  UpdateGameResult,
+} from '../db/gameChanges';
+import { type Game, getGameById } from '../db/games';
 import { invalidRequest } from '../../core/http/responses';
 import { logError } from '../../core/logger';
 import { readId } from '../../core/validation';
@@ -66,6 +66,20 @@ export const GAME_CHANGE_ERRORS: Record<GameChangeProblem, ErrorResponse> = {
 
 export function gameChangeError(problem: GameChangeProblem): ErrorResponse {
   return responseFor(GAME_CHANGE_ERRORS, problem);
+}
+
+/*  answers an edit updateGame refused: 400 invalid_request when max_players is below the
+    players already in the game or the new start isn't before the game's end, otherwise
+    as for any change to a game
+ */
+export function sendUpdateGameError(res: Response, result: Exclude<UpdateGameResult, { ok: true }>): Response {
+  if (result.problem === 'too_few_players') {
+    return invalidRequest(res, `max_players can't be below the ${result.playerCount} players already in the game`);
+  }
+  if (result.problem === 'ends_before_start') {
+    return invalidRequest(res, 'starts_at must be before the game ends');
+  }
+  return sendError(res, gameChangeError(result.problem));
 }
 
 /*  the route's game, or null after answering 400 invalid_request for a malformed id

@@ -1,5 +1,5 @@
 import { selectRows } from '../../core/db/mysql';
-import { claimDueGames } from './claimDueGames';
+import { claimDueGames } from '../../core/db/claimDueGames';
 
 // how long before a game starts its organizer and players are reminded
 export const START_REMINDER_BEFORE_MINUTES = 60;

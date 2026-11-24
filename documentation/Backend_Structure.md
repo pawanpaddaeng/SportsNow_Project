@@ -24,7 +24,7 @@ backend/src/
 - `notification/` may import from `user/` (for `requireAuth` and `getAuthUser`) and `getIncomingFriendRequests` from `friend/db/friends.ts` for the Friend requests count. Only `app.ts` and `core/notifications/notify.ts` import from it.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
 - `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
-- `user/routes/publicProfileRoutes.ts` imports `getReputation` and `getBadges` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
+- `user/routes/publicProfileRoutes.ts` imports `getReputation` and `getBadges` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports from `core/`, plus `game/routes/gameErrors.ts` for game ids and the error helpers, and reads the game tables with SQL.
 - `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id, and `friend/` imports it to open and find two friends' chat. `chat/` never imports from `game/` or `friend/`, it reads their tables with SQL.
 
 ## core/
@@ -33,6 +33,7 @@ backend/src/
 | --- | --- |
 | `config/env.ts` | Reads the environment variables (`PORT`, `WS_PORT`, `JWT_SECRET`, MySQL credentials) and fails at start if a required one is missing |
 | `db/mysql.ts` | The MySQL connection pool, `selectRows` (SELECT), `executeWrite` (INSERT/UPDATE/DELETE) and `inTransaction` |
+| `db/claimDueGames.ts` | `claimDueGames`: in one transaction, reads the games a reminder is due for (the caller's `SELECT … FOR UPDATE`) and marks them reminded, so two checks at once can't both send it. Used by the game start and rating reminders |
 | `http/asyncRoute.ts` | Wraps async route handlers. Anything they throw becomes a `500 server_error` reply with a friendly message, and the real error is logged |
 | `http/responses.ts` | `invalidRequest(res, error)`, the shared `400 invalid_request` reply |
 | `notifications/push.ts` | Sends Firebase push notifications to every device a user is signed into, and deletes tokens Firebase reports as dead |
@@ -40,6 +41,7 @@ backend/src/
 | `notifications/notify.ts` | `notifyUser` / `notifyUsers`: saves a notification for the Notifications screen and sends it as a push, whose data carries its type and game id. A failed save is only logged, the push still goes out |
 | `validation.ts` | `ParseResult`, the result type every body parser returns, and `readId` for ids in a request |
 | `logger.ts` | `logInfo` and `logError`. Messages are kept on one line so a value can't fake a log line |
+| `repeatEvery.ts` | `repeatEvery`: runs a task on an interval while the server runs, logging a failed run without stopping the next. Used by the game start and rating reminders |
 
 ## user/
 
@@ -57,12 +59,14 @@ backend/src/
 
 | File | What it does |
 | --- | --- |
-| `routes/gameRoutes.ts` | Create, my games, discover, game details, edit and cancel (endpoints below) |
+| `routes/gameRoutes.ts` | Create, my games, discover and game details |
+| `routes/gameChangeRoutes.ts` | Changes to a game: edit, cancel, complete, leave and remove a player, and notifying the players about each |
 | `routes/joinRequestRoutes.ts` | Send a join request, list pending requests, approve or decline |
 | `routes/inviteRoutes.ts` | `POST /api/games/:gameId/invites`: the organiser invites friends, each gets a `game_invite` notification |
 | `routes/gameJson.ts` | The JSON shapes sent to the app for games, players, Discover results and join requests |
-| `routes/gameErrors.ts` | Game id parsing, `readBackGame`, and the error tables that map problems like `game_full` to a status and message |
-| `db/games.ts` | Game queries: create, read, my games, discover (distance search), update, cancel, players, and `lockGameForChange` |
+| `routes/gameErrors.ts` | Game id parsing, `requireGame` (the route's game, or a 400/404 reply), `readBackGame`, and the error tables that map problems like `game_full` to a status and message (`sendUpdateGameError` for an edit) |
+| `db/games.ts` | Game queries: create, read, my games, discover (distance search), players, who to notify about a change, and a user's active games |
+| `db/gameChanges.ts` | Changes to a game, each in a transaction that locks its row first (`lockGame`, `lockGameForChange`): update, cancel, complete, leave and remove a player |
 | `db/joinRequests.ts` | Join request queries: create, list pending, approve/decline, pending count and the user's request status |
 | `db/invites.ts` | `checkInvites`: the game is the organiser's and not cancelled, started or full, and everyone invited is their friend and not in it yet. Invites aren't stored, only their notifications are |
 | `db/startReminders.ts` | `claimDueStartReminders`: scheduled games starting within the hour that haven't been reminded, marked reminded in the same transaction. `getGamePlayerIds` for who to remind |
@@ -150,7 +154,7 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 - **Times:** stored as UTC in MySQL and sent to the app as ISO 8601 strings, e.g. `"2026-10-18T02:00:00Z"`.
 - **Notifications are best effort:** sending never blocks or fails a reply. The database is the source of truth, and the app reloads when it next opens a screen.
 - **Database tables:** created from `mysql/init/*.sql` (users, device tokens, games, game players, join requests, chats, friend requests, friendships, game attendance, player ratings) the first time the MySQL container starts. They don't run again on an existing database: a change to a table needs its own script or `ALTER TABLE` run by hand (see the README).
-- **Route order:** `/api/games/mine` and `/api/games/discover` are registered before `/api/games/:gameId`, so `mine` and `discover` aren't read as game ids.
+- **Route order:** `/api/games/mine` and `/api/games/discover` are registered before `/api/games/:gameId` (all in `gameRoutes.ts`), so `mine` and `discover` aren't read as game ids.
 
 ## Adding a new endpoint
 

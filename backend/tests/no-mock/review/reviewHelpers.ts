@@ -1,5 +1,5 @@
 import { executeWrite, selectRows } from '../../../src/core/db/mysql';
-import { completeGame } from '../../../src/game/db/games';
+import { completeGame } from '../../../src/game/db/gameChanges';
 import { addPlayer, addStartedGame } from '../helpers';
 
 // setup and checks shared by the unmocked review tests, straight on the database

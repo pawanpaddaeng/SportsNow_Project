@@ -1,4 +1,5 @@
 import * as push from '../../../src/core/notifications/push';
+import * as gameChangesDb from '../../../src/game/db/gameChanges';
 import * as gamesDb from '../../../src/game/db/games';
 import type * as MockEnv from '../mockEnv';
 import {
@@ -36,7 +37,7 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     const before = testGame({ title: 'Old Title' });
     const after = testGame({ title: 'New Title' });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
-    jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: true });
+    jest.spyOn(gameChangesDb, 'updateGame').mockResolvedValue({ ok: true, changed: true });
     const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
@@ -74,7 +75,7 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     // 2. a game the edit doesn't change
     const game = testGame();
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
-    jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: false });
+    jest.spyOn(gameChangesDb, 'updateGame').mockResolvedValue({ ok: true, changed: false });
     jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
@@ -114,7 +115,7 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
 
     // 2. make saving fail
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame());
-    const updateGame = jest.spyOn(gamesDb, 'updateGame').mockRejectedValue(new Error('database down'));
+    const updateGame = jest.spyOn(gameChangesDb, 'updateGame').mockRejectedValue(new Error('database down'));
 
     // 3. edit it through the interface
     const response = await api.put(`/api/games/${GAME_ID}`).set(withToken(token))

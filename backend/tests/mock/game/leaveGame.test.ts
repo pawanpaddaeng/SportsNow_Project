@@ -1,4 +1,4 @@
-import * as gamesDb from '../../../src/game/db/games';
+import * as gameChangesDb from '../../../src/game/db/gameChanges';
 import type * as MockEnv from '../mockEnv';
 import { api, cleanUpAfterTests, GAME_ID, signIn, testPlayer, withToken } from '../helpers';
 
@@ -20,7 +20,7 @@ describe('Mocked: POST /api/games/{gameId}/leave', () => {
     const token = signIn(player);
 
     // 2. make leaving fail
-    const leaveGame = jest.spyOn(gamesDb, 'leaveGame').mockRejectedValue(new Error('database down'));
+    const leaveGame = jest.spyOn(gameChangesDb, 'leaveGame').mockRejectedValue(new Error('database down'));
 
     // 3. leave it through the interface
     const response = await api.post(`/api/games/${GAME_ID}/leave`).set(withToken(token));

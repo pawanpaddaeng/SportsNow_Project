@@ -1,4 +1,4 @@
-import { executeWrite, inTransaction, placeholders, selectRows } from '../../core/db/mysql';
+import { executeWrite, inTransaction, placeholders, selectRows } from './mysql';
 
 // the games columns that record a reminder was sent
 export type ReminderSentColumn = 'start_reminder_sent' | 'rating_reminder_sent';

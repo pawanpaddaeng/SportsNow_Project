@@ -1,5 +1,5 @@
 import { selectRows } from '../../core/db/mysql';
-import { claimDueGames } from '../../game/db/claimDueGames';
+import { claimDueGames } from '../../core/db/claimDueGames';
 import { RATING_WINDOW_HOURS, REMINDER_BEFORE_CLOSE_HOURS } from '../ratingWindow';
 
 // a completed game whose rating closes within REMINDER_BEFORE_CLOSE_HOURS

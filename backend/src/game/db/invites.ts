@@ -1,5 +1,6 @@
 import { areFriends } from '../../friend/db/friends';
-import { type GameChangeProblem, getGameById, getGamePlayers } from './games';
+import type { GameChangeProblem } from './gameChanges';
+import { getGameById, getGamePlayers } from './games';
 
 /*  why the organizer can't invite these users: the game can't be changed (it's gone,
     someone else's, cancelled or started), it's full, or one of them isn't their friend

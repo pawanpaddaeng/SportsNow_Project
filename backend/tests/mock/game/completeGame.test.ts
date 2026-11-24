@@ -1,3 +1,4 @@
+import * as gameChangesDb from '../../../src/game/db/gameChanges';
 import * as gamesDb from '../../../src/game/db/games';
 import type * as MockEnv from '../mockEnv';
 import { api, cleanUpAfterTests, GAME_ID, signIn, testGame, testOrganizer, withToken } from '../helpers';
@@ -20,7 +21,7 @@ describe('Mocked: POST /api/games/{gameId}/complete', () => {
     jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([]);
     const game = testGame({ hasStarted: true, status: 'completed' });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(game);
-    const completeGame = jest.spyOn(gamesDb, 'completeGame').mockResolvedValue({ ok: true });
+    const completeGame = jest.spyOn(gameChangesDb, 'completeGame').mockResolvedValue({ ok: true });
 
     const response = await api.post(`/api/games/${GAME_ID}/complete`).set(withToken(token))
       .send({ no_show_user_ids: [7, 8, 7] });
