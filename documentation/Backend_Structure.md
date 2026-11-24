@@ -15,7 +15,7 @@ backend/src/
 ├── game/             Game component: games, discover, join requests
 ├── friend/           Friend component: user search, friend requests, friends list
 ├── chat/             Chat component: game chats, message history, WebSocket
-├── review/           Review component: ratings and reputation scores
+├── review/           Review component: ratings, reputation scores and badges
 └── notification/     the saved notifications listed on the app's Notifications screen
 ```
 
@@ -24,7 +24,7 @@ backend/src/
 - `notification/` may import from `user/` (for `requireAuth` and `getAuthUser`) and `getIncomingFriendRequests` from `friend/db/friends.ts` for the Friend requests count. Only `app.ts` and `core/notifications/notify.ts` import from it.
 - `game/` may import from `user/` (for `requireAuth` and `getAuthUser`). `user/` never imports from `game/`.
 - `friend/` may import from `user/` (for `requireAuth` and `getAuthUser`) and from `game/routes/gameErrors.ts` (for id parsing and the error helpers). Nothing imports from `friend/` except `app.ts`, and `game/db/invites.ts` for `areFriends`.
-- `user/routes/publicProfileRoutes.ts` imports `getReputation` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
+- `user/routes/publicProfileRoutes.ts` imports `getReputation` and `getBadges` from `review/` and `getFriendshipStatus` from `friend/db/friends.ts` to build a player's public profile. `review/` imports only from `core/` and reads the game tables with SQL.
 - `chat/` may import from `user/` (to check the JWT). `game/` imports `chat/db/chats.ts` to open a new game's chat and read its id, and `friend/` imports it to open and find two friends' chat. `chat/` never imports from `game/` or `friend/`, it reads their tables with SQL.
 
 ## core/
@@ -84,11 +84,13 @@ backend/src/
 
 | File | What it does |
 | --- | --- |
-| `routes/ratingRoutes.ts` | The players a user can rate, submitting a rating, and the user's own score (`GET /api/users/me/stats`) |
+| `routes/ratingRoutes.ts` | The players a user can rate, submitting a rating, the user's own score (`GET /api/users/me/stats`) and their badges (`GET /api/users/me/badges`) |
 | `db/ratings.ts` | Rating queries, and `getReputationScore`, which `game/` uses to show organizers a requester's score |
-| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for) and reputation score, for the public profile. Its badges are empty for now |
+| `db/reputation.ts` | `getReputation`: a player's games played (completed games they organized, are in, or were approved for) and reputation score, for the public profile |
+| `db/badges.ts` | `getBadges`: the badges a user earned. Works out what they qualify for now from their games, friends and ratings, and saves new ones in `user_badges`. A saved badge is never removed |
 | `validation/rating.ts` | Checks a rating body: who is rated and the stars in every category |
 | `reputation.ts` | The score rules, with no database so they can be tested on their own |
+| `badges.ts` | The badge ids in the order the app shows them, and what earns each one, with no database |
 
 A completed game's players and no-shows are copied to `game_attendance`, because leaving a completed game deletes its `game_players` row and the last player leaving deletes the game. A player's score mustn't change when that happens. Players are sent their own overall score, but never what they were rated in a game.
 
@@ -160,4 +162,4 @@ If anything throws along the way (e.g. the database is down), `asyncRoute` catch
 
 ## Not built yet
 
-Review's stats endpoint and badges aren't built yet, and Friend doesn't have friend profiles yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.
+Friend doesn't have friend profiles yet. New components should follow the same layout: a folder with `routes/`, `db/` and `validation/`, using `core/` and `requireAuth` from `user/`.

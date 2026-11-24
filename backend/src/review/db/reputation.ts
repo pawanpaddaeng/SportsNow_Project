@@ -1,12 +1,9 @@
 import { placeholders, selectRows } from '../../core/db/mysql';
 import { type PlayedGame, type RatingScores, reputationScore } from '../reputation';
 
-/*  a player's record as other players see it. score is null if they aren't rated yet.
-    Badges aren't built yet, so badges is empty
- */
+// a player's record as other players see it. score is null if they aren't rated yet
 export interface Reputation {
   score: number | null;
-  badges: string[];
   gamesPlayed: number;
 }
 
@@ -67,7 +64,7 @@ async function getGamesPlayed(userId: number): Promise<number> {
   return Number(row?.games_played);
 }
 
-// the user's reputation score, badges and games played, used by the public profile
+// the user's reputation score and games played, used by the public profile
 export async function getReputation(userId: number): Promise<Reputation> {
-  return { score: await getReputationScore(userId), badges: [], gamesPlayed: await getGamesPlayed(userId) };
+  return { score: await getReputationScore(userId), gamesPlayed: await getGamesPlayed(userId) };
 }

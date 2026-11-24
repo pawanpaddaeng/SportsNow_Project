@@ -26,6 +26,7 @@ import com.example.cpen321application.notification.dto.NotificationsResponse
 import com.example.cpen321application.review.dto.PlayersToRateResponse
 import com.example.cpen321application.review.dto.RatingBody
 import com.example.cpen321application.review.dto.RatingResponse
+import com.example.cpen321application.review.dto.BadgesResponse
 import com.example.cpen321application.review.dto.UserStatsResponse
 import com.example.cpen321application.user.dto.AuthTokenResponse
 import com.example.cpen321application.user.dto.LoginRequest
@@ -241,6 +242,11 @@ interface ReviewApi {
     suspend fun getMyStats(
         @Header("Authorization") authorization: String
     ) : Response<UserStatsResponse>
+
+    @GET("api/users/me/badges")
+    suspend fun getMyBadges(
+        @Header("Authorization") authorization: String
+    ) : Response<BadgesResponse>
 }
 
 // the Notifications screen's endpoints

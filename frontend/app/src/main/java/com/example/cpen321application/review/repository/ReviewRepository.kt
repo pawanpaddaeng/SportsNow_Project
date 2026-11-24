@@ -9,8 +9,10 @@ import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.review.dto.PlayersToRateResponse
 import com.example.cpen321application.review.dto.RatingBody
 import com.example.cpen321application.review.dto.RatingResponse
+import com.example.cpen321application.review.model.Badge
 import com.example.cpen321application.review.model.PlayersToRate
 import com.example.cpen321application.review.model.RatingCategory
+import com.example.cpen321application.review.model.badgesOf
 import com.example.cpen321application.review.model.toPlayersToRate
 import com.google.gson.JsonParseException
 import java.io.IOException
@@ -18,6 +20,7 @@ import java.io.IOException
 private const val COULD_NOT_LOAD_PLAYERS = "Couldn't load the players, try again"
 private const val COULD_NOT_SUBMIT_RATING = "Couldn't submit your rating, try again"
 private const val COULD_NOT_LOAD_SCORE = "Couldn't load your rating, try again"
+private const val COULD_NOT_LOAD_BADGES = "Couldn't load your badges, try again"
 private const val CANNOT_RATE = "You can't rate players in this game."
 // ratings close a day after the game is marked completed
 private const val RATING_CLOSED = "Rating for this game has closed."
@@ -73,6 +76,30 @@ suspend fun fetchMyReputationScore(context: Context): ReputationScoreResult {
         ReputationScoreResult.Failed(NETWORK_MESSAGE)
     } catch (e: JsonParseException) {
         ReputationScoreResult.Failed(COULD_NOT_LOAD_SCORE)
+    }
+}
+
+sealed interface BadgesResult {
+    // the badges the user earned, in profile order
+    data class Loaded(val badges: List<Badge>) : BadgesResult
+    data class Failed(val message: String) : BadgesResult
+}
+
+suspend fun fetchMyBadges(context: Context): BadgesResult {
+    return try {
+        val response = Session.call(context) { authorization ->
+            ServerApi.reviewService.getMyBadges(authorization = authorization)
+        } ?: return BadgesResult.Failed(SESSION_ENDED_MESSAGE)
+        val body = response.body()
+        if (response.isSuccessful && body?.msg == "success") {
+            BadgesResult.Loaded(badgesOf(body.badges))
+        } else {
+            BadgesResult.Failed(COULD_NOT_LOAD_BADGES)
+        }
+    } catch (e: IOException) {
+        BadgesResult.Failed(NETWORK_MESSAGE)
+    } catch (e: JsonParseException) {
+        BadgesResult.Failed(COULD_NOT_LOAD_BADGES)
     }
 }
 

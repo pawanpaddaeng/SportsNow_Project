@@ -2,7 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { type FriendshipStatus, getFriendshipStatus } from '../../friend/db/friends';
+import { getBadges } from '../../review/db/badges';
 import { getReputation, type Reputation } from '../../review/db/reputation';
+import { type BadgeId } from '../../review/badges';
 import { getAuthUser, requireAuth } from '../auth/middleware';
 import { findUserById, type User } from '../db/users';
 import { MIN_AGE } from '../validation/profile';
@@ -40,7 +42,7 @@ type ProfileConnection = FriendshipStatus | 'self';
 /*  the only details of a user other players see. Email and birth year are private, so
     they're never part of it
  */
-function publicProfileJson(user: User, reputation: Reputation, connection: ProfileConnection) {
+function publicProfileJson(user: User, reputation: Reputation, badges: BadgeId[], connection: ProfileConnection) {
   return {
     user_id: user.userId,
     first_name: user.firstName,
@@ -48,7 +50,7 @@ function publicProfileJson(user: User, reputation: Reputation, connection: Profi
     age_range: ageRange(user.birthYear, new Date().getUTCFullYear()),
     games_played: reputation.gamesPlayed,
     reputation_score: reputation.score,
-    badges: reputation.badges,
+    badges,
     friendship_status: connection,
   };
 }
@@ -57,7 +59,7 @@ function publicProfileJson(user: User, reputation: Reputation, connection: Profi
 export function publicProfileRouter(): Router {
   const router = Router();
 
-  /*  public profile: name, age range, games played, reputation score and badges, and how
+  /*  public profile: name, age range, games played, reputation score and earned badge ids, and how
       the signed in user is connected to them (friendship_status, "self" for their own).
       Errors: 400 invalid_request, 404 user_not_found.
       Mounted after the routers for /api/users/me and /api/users/search, so those aren't read as ids
@@ -75,7 +77,8 @@ export function publicProfileRouter(): Router {
         ? 'self'
         : await getFriendshipStatus(viewer.userId, userId);
       const reputation = await getReputation(userId);
-      return res.status(200).json({ msg: 'success', profile: publicProfileJson(user, reputation, connection) });
+      const badges = await getBadges(userId);
+      return res.status(200).json({ msg: 'success', profile: publicProfileJson(user, reputation, badges, connection) });
     }));
 
   return router;

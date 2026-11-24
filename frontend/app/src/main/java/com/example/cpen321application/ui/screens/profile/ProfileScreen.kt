@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.review.model.Badge
 import com.example.cpen321application.review.model.MAX_STARS
 import com.example.cpen321application.review.model.formatReputationScore
 import com.example.cpen321application.ui.components.AppBottomBar
@@ -50,6 +51,8 @@ import com.example.cpen321application.ui.components.ConfirmText
 import com.example.cpen321application.ui.components.LabelValueRow
 import com.example.cpen321application.ui.components.OutlinedActionButton
 import com.example.cpen321application.ui.components.SurfaceCard
+import com.example.cpen321application.ui.components.badges.BadgeGrid
+import com.example.cpen321application.ui.components.badges.BadgePopup
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
@@ -74,6 +77,8 @@ data class ProfileUiState(
     val profile: UserProfile?,
     val reputationScore: Double? = null,
     val isScoreLoaded: Boolean = false,
+    // the badges the user earned, null until they load
+    val badges: List<Badge>? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val busyAction: ProfileAction? = null
@@ -153,7 +158,34 @@ private fun ProfileContent(profile: UserProfile, state: ProfileUiState, onProfil
     ProfileIdentity(profile)
     if (state.isScoreLoaded) ReputationCard(state.reputationScore)
     ProfileDetailsCard(profile)
+    state.badges?.let { BadgesCard(earned = it) }
     AccountButtons(busyAction = state.busyAction, onProfileAction = onProfileAction)
+}
+
+/*  every badge three to a row under the user's details: earned ones in colour, the rest grey.
+    Tapping an earned badge opens its popup, which plays the badge's animation and closes by itself
+ */
+@Composable
+private fun BadgesCard(earned: List<Badge>) {
+    var openBadge by remember { mutableStateOf<Badge?>(null) }
+    SurfaceCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Badges",
+                color = SportsOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${earned.size} of ${Badge.entries.size} earned",
+                color = SportsOnSurfaceVariant,
+                fontSize = 14.sp
+            )
+        }
+        BadgeGrid(badges = Badge.entries, earned = earned.toSet(), onOpen = { badge -> openBadge = badge })
+    }
+    openBadge?.let { badge -> BadgePopup(badge = badge, onDismiss = { openBadge = null }) }
 }
 
 private fun confirmText(action: ProfileAction): ConfirmText = when (action) {

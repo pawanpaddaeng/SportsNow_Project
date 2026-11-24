@@ -2,6 +2,8 @@ package com.example.cpen321application.user.model
 
 import com.example.cpen321application.friend.model.FriendshipStatus
 import com.example.cpen321application.friend.model.friendshipStatusOf
+import com.example.cpen321application.review.model.Badge
+import com.example.cpen321application.review.model.badgesOf
 import com.example.cpen321application.user.dto.PublicProfileDto
 import java.util.Locale
 
@@ -11,7 +13,8 @@ data class PlayerProfile(
     val ageRange: String,
     val gamesPlayed: Int,
     val reputationScore: Double?,
-    val badges: List<String>,
+    // the badges they earned, in profile order
+    val badges: List<Badge>,
     val isSelf: Boolean,
     val friendship: FriendshipStatus
 ) {
@@ -24,7 +27,7 @@ fun PublicProfileDto.toPlayerProfile() = PlayerProfile(
     ageRange = ageRange,
     gamesPlayed = gamesPlayed,
     reputationScore = reputationScore,
-    badges = badges.orEmpty(),
+    badges = badgesOf(badges),
     isSelf = friendshipStatus == "self",
     friendship = friendshipStatusOf(friendshipStatus)
 )

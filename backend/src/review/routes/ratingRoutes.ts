@@ -17,6 +17,7 @@ import {
   getPlayersToRate,
   type PlayerToRate,
 } from '../db/ratings';
+import { getBadges } from '../db/badges';
 import { getReputationScore } from '../db/reputation';
 import { parseRating, type RatingBody } from '../validation/rating';
 
@@ -99,6 +100,15 @@ export function ratingsRouter(): Router {
     async (_req: Request, res: Response) => {
       const user = getAuthUser(res);
       return res.status(200).json({ msg: 'success', reputation_score: await getReputationScore(user.userId) });
+    }));
+
+  /*  the ids of the badges the signed in user earned, in the order the app shows them, for
+      their profile. Any they now qualify for are saved first, and saved badges are never removed
+   */
+  router.get('/api/users/me/badges', requireAuth, asyncRoute('Could not load your badges, try again later',
+    async (_req: Request, res: Response) => {
+      const user = getAuthUser(res);
+      return res.status(200).json({ msg: 'success', badges: await getBadges(user.userId) });
     }));
 
   return router;

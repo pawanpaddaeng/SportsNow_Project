@@ -5,7 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.cpen321application.core.showToast
+import com.example.cpen321application.review.model.Badge
+import com.example.cpen321application.review.repository.BadgesResult
 import com.example.cpen321application.review.repository.ReputationScoreResult
+import com.example.cpen321application.review.repository.fetchMyBadges
 import com.example.cpen321application.review.repository.fetchMyReputationScore
 import com.example.cpen321application.user.repository.DeleteAccountResult
 import com.example.cpen321application.user.repository.ProfileForm
@@ -18,7 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-// the signed in user's profile and reputation score, for the Profile and Edit Profile screens
+// the signed in user's profile, reputation score and badges, for the Profile and Edit Profile screens
 class ProfileState(private val context: Context, private val scope: CoroutineScope) {
     var profile by mutableStateOf<UserProfile?>(null)
         private set
@@ -26,6 +29,9 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
     var reputationScore by mutableStateOf<Double?>(null)
         private set
     var isScoreLoaded by mutableStateOf(false)
+        private set
+    // the badges the user earned, null until they first load
+    var badges by mutableStateOf<List<Badge>?>(null)
         private set
     var isLoading by mutableStateOf(false)
         private set
@@ -59,6 +65,11 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
                         isScoreLoaded = true
                     }
                     is ReputationScoreResult.Failed -> error = error ?: result.message
+                }
+                // new badges can be earned after any game, friend or rating. The last ones stay on failure
+                when (val result = fetchMyBadges(context)) {
+                    is BadgesResult.Loaded -> badges = result.badges
+                    is BadgesResult.Failed -> error = error ?: result.message
                 }
             } finally {
                 isLoading = false
@@ -117,6 +128,7 @@ class ProfileState(private val context: Context, private val scope: CoroutineSco
         profile = null
         reputationScore = null
         isScoreLoaded = false
+        badges = null
         error = null
         saveError = null
     }

@@ -1,4 +1,5 @@
 import * as friendsDb from '../../../src/friend/db/friends';
+import * as badgesDb from '../../../src/review/db/badges';
 import * as reputationDb from '../../../src/review/db/reputation';
 import * as usersDb from '../../../src/user/db/users';
 import { type User } from '../../../src/user/db/users';
@@ -10,19 +11,22 @@ jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEn
 
 cleanUpAfterTests();
 
-/*  replaces the users table with the given users and reputation with 4 games played and no
-    ratings. signIn already mocked findUserById, so this replaces it with a lookup by id
+/*  replaces the users table with the given users, reputation with 4 games played and a 4.2
+    score, and badges with First Whistle. signIn already mocked findUserById, so this replaces
+    it with a lookup by id
  */
 function mockUsers(users: User[]) {
   jest.spyOn(usersDb, 'findUserById').mockImplementation((userId) =>
     Promise.resolve(users.find((user) => user.userId === userId) ?? null));
-  return jest.spyOn(reputationDb, 'getReputation').mockResolvedValue({ score: 4.2, badges: [], gamesPlayed: 4 });
+  jest.spyOn(badgesDb, 'getBadges').mockResolvedValue(['first_game']);
+  return jest.spyOn(reputationDb, 'getReputation').mockResolvedValue({ score: 4.2, gamesPlayed: 4 });
 }
 
 // Interface GET /api/users/{userId}
 describe('Mocked: GET /api/users/{userId}', () => {
   // Mocked behavior: the users table holds the organizer (signed in) and player 2, who have
   //   a pending friend request from the organizer to the player. Reputation is 4 games played
+  //   and the player earned First Whistle
   // Input: the organizer opens player 2's profile
   // Expected status code: 200
   // Expected behavior: only public details are sent, never the email or birth year
@@ -46,7 +50,7 @@ describe('Mocked: GET /api/users/{userId}', () => {
         age_range: ageRange(player.birthYear, new Date().getUTCFullYear()),
         games_played: 4,
         reputation_score: 4.2,
-        badges: [],
+        badges: ['first_game'],
         friendship_status: 'request_sent',
       },
     });

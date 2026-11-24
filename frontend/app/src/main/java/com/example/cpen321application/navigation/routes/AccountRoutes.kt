@@ -59,6 +59,7 @@ fun ProfileRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mod
             profile = profileState.profile,
             reputationScore = profileState.reputationScore,
             isScoreLoaded = profileState.isScoreLoaded,
+            badges = profileState.badges,
             isLoading = profileState.isLoading,
             errorMessage = profileState.error,
             busyAction = when {

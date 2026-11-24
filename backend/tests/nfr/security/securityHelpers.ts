@@ -56,6 +56,7 @@ export const PROTECTED_ROUTES: Route[] = [
   { method: 'get', path: '/api/games/:gameId/ratings' },
   { method: 'post', path: '/api/games/:gameId/ratings', body: { rated_user_id: 1, punctuality: 1, sportsmanship: 1, skill: 1, reliability: 1 } },
   { method: 'get', path: '/api/users/me/stats' },
+  { method: 'get', path: '/api/users/me/badges' },
   { method: 'get', path: '/api/users/:userId' },
   { method: 'get', path: '/api/notifications' },
   { method: 'patch', path: '/api/notifications/read' },
