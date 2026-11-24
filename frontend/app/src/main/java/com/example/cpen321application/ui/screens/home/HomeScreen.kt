@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -31,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameSummary
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.GameStateTag
+import com.example.cpen321application.ui.components.InitialAvatar
 import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.Pill
 import com.example.cpen321application.ui.components.cardBackground
@@ -203,20 +203,7 @@ private fun GameCard(game: GameSummary, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         // sport initial as the avatar
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(SportsPrimaryContainer)
-        ) {
-            Text(
-                text = game.sport.take(1),
-                color = SportsOnPrimaryContainer,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        InitialAvatar(game.sport.take(1))
 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = game.title, color = SportsOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)

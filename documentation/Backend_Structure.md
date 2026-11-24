@@ -38,7 +38,7 @@ backend/src/
 | `notifications/push.ts` | Sends Firebase push notifications to every device a user is signed into, and deletes tokens Firebase reports as dead |
 | `notifications/deviceTokens.ts` | Saves, reads and deletes the phones' Firebase tokens |
 | `notifications/notify.ts` | `notifyUser` / `notifyUsers`: saves a notification for the Notifications screen and sends it as a push, whose data carries its type and game id. A failed save is only logged, the push still goes out |
-| `validation.ts` | `ParseResult`, the result type every body parser returns, and `readId` for ids in a request |
+| `validation.ts` | `ParseResult`, the result type every body parser returns, `readId` for ids in a request, and `readDecision` for a `{ decision }` answer (accept/approve or decline) |
 | `logger.ts` | `logInfo` and `logError`. Messages are kept on one line so a value can't fake a log line |
 
 ## user/
@@ -52,6 +52,7 @@ backend/src/
 | `auth/middleware.ts` | `requireAuth` checks the JWT on every protected route and loads the user. `getAuthUser(res)` gives the route that user. `checkToken` is the check itself, also used by the chat WebSocket |
 | `db/users.ts` | User queries: create, find by id or Google id, update profile, and `userJson` |
 | `validation/profile.ts` | Checks first name, last name and birth year |
+| `validation/names.ts` | The name rules `profile.ts` uses: at most 100 characters, and only letters, spaces, apostrophes, dots and hyphens |
 
 ## game/
 
@@ -76,9 +77,12 @@ backend/src/
 
 | File | What it does |
 | --- | --- |
-| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
+| `routes/friendRoutes.ts` | `GET /api/users/search`, `GET /api/friends`, `DELETE /api/friends/:userId` |
+| `routes/friendRequestRoutes.ts` | `GET` and `POST /api/friends/requests`, `PATCH /api/friends/requests/:requestId` |
+| `routes/friendJson.ts` | The JSON shape of a user in the friends endpoints |
 | `db/friends.ts` | Friend queries: search, friends list (with each friend's chat id), `areFriends`, `getFriendshipStatus`, incoming requests, send a request, accept or decline (accepting also opens the two friends' chat) |
 | `search/nameMatch.ts` | Decides how well a name matches what was typed: same name, starts with it, contains it, or only similar (counting letter changes, so typos still match) |
+| `search/editDistance.ts` | `editDistance`: how many single letter changes turn one word into another, a swap of two neighbouring letters counting as one |
 
 ## review/
 

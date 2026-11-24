@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
+import { readDecision } from '../../core/validation';
 import { logInfo } from '../../core/logger';
 import { notifyUser } from '../../core/notifications/notify';
 import { getReputationScore } from '../../review/db/reputation';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
-import { getGameById } from '../db/games';
 import {
   createJoinRequest,
   decideJoinRequest,
@@ -18,10 +18,10 @@ import { gameJson, pendingJoinRequestJson } from './gameJson';
 import {
   type ErrorResponse,
   GAME_CHANGE_ERRORS,
-  gameChangeError,
   logNotificationError,
   readBackGame,
   readGameId,
+  requireGame,
   requireGameId,
   responseFor,
   sendError,
@@ -48,6 +48,21 @@ const DECISION_ERRORS: Record<JoinRequestDecisionProblem, ErrorResponse> = {
   already_responded: { status: 409, body: { msg: 'already_responded', error: 'This request was already answered or withdrawn' } },
   game_full: { status: 409, body: { msg: 'game_full', error: 'This game is full, add spots before approving more players' } },
 };
+
+// what approving or declining a request stores and tells the requester
+const APPROVED = {
+  status: 'approved',
+  type: 'join_request_approved',
+  title: 'Request approved',
+  // followed by the game's title
+  body: "You're in! You joined ",
+} as const;
+const DECLINED = {
+  status: 'declined',
+  type: 'join_request_declined',
+  title: 'Request declined',
+  body: 'The organizer declined your request to join ',
+} as const;
 
 // asking to join a game, and the organizer listing and answering those requests
 export function joinRequestsRouter(): Router {
@@ -92,11 +107,9 @@ export function joinRequestsRouter(): Router {
   router.get('/api/games/:gameId/join-requests', requireAuth, asyncRoute('Could not load join requests, try again later',
     async (req: Request<{ gameId: string }>, res: Response) => {
       const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
-
-      const game = await getGameById(gameId);
-      if (!game) return sendError(res, gameChangeError('not_found'));
+      const game = await requireGame(req.params.gameId, res);
+      if (!game) return;
+      const { gameId } = game;
       if (game.organizerId !== user.userId) {
         return res.status(403).json({ msg: 'forbidden', error: 'Only the organizer can see join requests' });
       }
@@ -124,37 +137,28 @@ export function joinRequestsRouter(): Router {
       if (gameId === null || requestId === null) {
         return invalidRequest(res, 'gameId and requestId must be positive whole numbers');
       }
-      const decision = req.body?.decision;
-      if (decision !== 'approve' && decision !== 'decline') {
-        return invalidRequest(res, 'decision must be "approve" or "decline"');
-      }
-      const approve = decision === 'approve';
+      const approve = readDecision(req.body?.decision, 'approve');
+      if (approve === null) return invalidRequest(res, 'decision must be "approve" or "decline"');
+      const answer = approve ? APPROVED : DECLINED;
 
       const result = await decideJoinRequest(gameId, requestId, user.userId, approve);
       if (!result.ok) return sendError(res, responseFor(DECISION_ERRORS, result.problem));
 
       const game = await readBackGame(gameId, `answering request ${requestId}`);
-      logInfo(`Join request ${requestId} ${approve ? 'approved' : 'declined'} for game id: ${gameId}`);
+      logInfo(`Join request ${requestId} ${answer.status} for game id: ${gameId}`);
 
       // best effort, the app gets its reply without waiting for the notification
-      notifyUser(result.requesterId, approve
-        ? {
-          type: 'join_request_approved',
-          title: 'Request approved',
-          body: `You're in! You joined ${result.title}`,
-          gameId,
-        }
-        : {
-          type: 'join_request_declined',
-          title: 'Request declined',
-          body: `The organizer declined your request to join ${result.title}`,
-          gameId,
-        }).then((devices) => { logInfo(`Join request answer sent to ${devices} device(s)`); })
+      notifyUser(result.requesterId, {
+        type: answer.type,
+        title: answer.title,
+        body: `${answer.body}${result.title}`,
+        gameId,
+      }).then((devices) => { logInfo(`Join request answer sent to ${devices} device(s)`); })
         .catch(logNotificationError);
 
       return res.status(200).json({
         msg: 'success',
-        request: { request_id: requestId, status: approve ? 'approved' : 'declined' },
+        request: { request_id: requestId, status: answer.status },
         game: gameJson(game),
       });
     }));

@@ -4,15 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.DiscoverGame
 import com.example.cpen321application.game.spotsLeftLabel
+import com.example.cpen321application.ui.components.InitialAvatar
 import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
 import com.example.cpen321application.ui.theme.SportsOnSurface
@@ -56,20 +54,7 @@ internal fun GameCard(rank: Int, game: DiscoverGame, onClick: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // sport initial as the avatar
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(SportsPrimaryContainer)
-            ) {
-                Text(
-                    text = game.sport.take(1).uppercase(Locale.getDefault()),
-                    color = SportsOnPrimaryContainer,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+            InitialAvatar(game.sport.take(1).uppercase(Locale.getDefault()))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(text = "$rank. ${game.title}", color = SportsOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text(text = game.whenText, color = SportsOnSurfaceVariant, fontSize = 14.sp)

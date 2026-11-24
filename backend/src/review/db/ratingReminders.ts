@@ -1,4 +1,5 @@
-import { executeWrite, inTransaction, placeholders, selectRows } from '../../core/db/mysql';
+import { selectRows } from '../../core/db/mysql';
+import { claimDueGames } from '../../game/db/claimDueGames';
 import { RATING_WINDOW_HOURS, REMINDER_BEFORE_CLOSE_HOURS } from '../ratingWindow';
 
 // a completed game whose rating closes within REMINDER_BEFORE_CLOSE_HOURS
@@ -12,25 +13,15 @@ export interface ReminderGame {
     they're marked, so a second check running at the same time can't return them too
  */
 export async function claimDueRatingReminders(): Promise<ReminderGame[]> {
-  return inTransaction(async (connection) => {
-    const due = await selectRows<{ game_id: number; title: string }>(
-      `SELECT game_id, title FROM games
-       WHERE status = 'completed' AND rating_reminder_sent = FALSE
-         AND completed_at <= UTC_TIMESTAMP() - INTERVAL ${RATING_WINDOW_HOURS - REMINDER_BEFORE_CLOSE_HOURS} HOUR
-         AND completed_at > UTC_TIMESTAMP() - INTERVAL ${RATING_WINDOW_HOURS} HOUR
-       FOR UPDATE`,
-      [],
-      connection,
-    );
-    if (due.length > 0) {
-      await executeWrite(
-        `UPDATE games SET rating_reminder_sent = TRUE WHERE game_id IN (${placeholders(due.length)})`,
-        due.map((game) => game.game_id),
-        connection,
-      );
-    }
-    return due.map((game) => ({ gameId: game.game_id, title: game.title }));
-  });
+  const due = await claimDueGames<{ game_id: number; title: string }>(
+    `SELECT game_id, title FROM games
+     WHERE status = 'completed' AND rating_reminder_sent = FALSE
+       AND completed_at <= UTC_TIMESTAMP() - INTERVAL ${RATING_WINDOW_HOURS - REMINDER_BEFORE_CLOSE_HOURS} HOUR
+       AND completed_at > UTC_TIMESTAMP() - INTERVAL ${RATING_WINDOW_HOURS} HOUR
+     FOR UPDATE`,
+    'rating_reminder_sent',
+  );
+  return due.map((game) => ({ gameId: game.game_id, title: game.title }));
 }
 
 // the players who showed up to the game and still haven't rated someone else who did

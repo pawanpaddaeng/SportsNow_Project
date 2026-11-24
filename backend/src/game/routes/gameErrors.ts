@@ -68,6 +68,17 @@ export function gameChangeError(problem: GameChangeProblem): ErrorResponse {
   return responseFor(GAME_CHANGE_ERRORS, problem);
 }
 
+/*  the route's game, or null after answering 400 invalid_request for a malformed id
+    or 404 not_found when no game has it
+ */
+export async function requireGame(raw: string, res: Response): Promise<Game | null> {
+  const gameId = requireGameId(raw, res);
+  if (gameId === null) return null;
+  const game = await getGameById(gameId);
+  if (!game) sendError(res, gameChangeError('not_found'));
+  return game;
+}
+
 // responses for a game the organizer can't mark completed, the rest as for edits
 export const COMPLETE_GAME_ERRORS: Record<CompleteGameProblem, ErrorResponse> = {
   not_found: GAME_CHANGE_ERRORS.not_found,

@@ -3,17 +3,13 @@ package com.example.cpen321application.ui.screens.games
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,7 +17,9 @@ import com.example.cpen321application.game.SKILL_LEVELS
 import com.example.cpen321application.game.SPORTS
 import com.example.cpen321application.game.model.GameInfoForm
 import com.example.cpen321application.game.model.GameLocation
+import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.ChipGroup
+import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.PickerField
 import com.example.cpen321application.ui.theme.*
@@ -160,11 +158,15 @@ fun InputGameInfoScreen(state: InputGameInfoUiState, actions: InputGameInfoActio
         )
         LocationField(location = state.location, onClick = actions.onPickLocation)
         SettingsFields(draft = draft, onChange = { draft = it }, lowestMaxPlayers = lowestMaxPlayers)
-        SubmitButton(
-            label = state.submitLabel,
-            enabled = canSubmit,
-            isSubmitting = state.isSubmitting,
-            onClick = { form?.let(actions.onSubmit) }
+        // "Create Game" / "Save Changes", a spinner while the form is being sent
+        FormSubmitButton(
+            text = state.submitLabel,
+            isSending = state.isSubmitting,
+            onClick = { form?.let(actions.onSubmit) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            enabled = canSubmit
         )
     }
 
@@ -281,51 +283,7 @@ private fun SettingsFields(draft: GameInfoDraft, onChange: (GameInfoDraft) -> Un
     )
 }
 
-// "Create Game" / "Save Changes" button, a spinner while the form is being sent
-@Composable
-private fun SubmitButton(label: String, enabled: Boolean, isSubmitting: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 24.dp)
-            .height(48.dp)
-    ) {
-        if (isSubmitting) {
-            CircularProgressIndicator(
-                color = Color.White,
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(20.dp)
-            )
-        } else {
-            Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
 @Composable
 private fun TopBar(title: String, onBack: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp)
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = SportsOnSurface
-            )
-        }
-        Text(
-            text = title,
-            color = SportsOnSurface,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
+    BackTitleBar(title = title, onBack = onBack, modifier = Modifier.padding(top = 8.dp))
 }

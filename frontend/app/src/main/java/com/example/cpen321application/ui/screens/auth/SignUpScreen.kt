@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.ui.components.BirthYearField
 import com.example.cpen321application.ui.components.CardRow
+import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.theme.*
@@ -159,25 +159,13 @@ private fun CreateAccountFooter(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
     ) {
-        Button(
+        FormSubmitButton(
+            text = "Create Account",
+            isSending = isSubmitting,
             onClick = onCreate,
-            enabled = enabled,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            if (isSubmitting) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp)
-                )
-            } else {
-                Text(text = "Create Account", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        }
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled
+        )
         Row {
             Text(
                 text = "Already have an account? ",

@@ -14,13 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -37,7 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BirthYearField
+import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
@@ -135,26 +132,7 @@ private fun ProfileFormFields(values: ProfileFieldValues, onChange: (ProfileFiel
 
 @Composable
 private fun EditProfileTopBar(onBack: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp)
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = SportsOnSurface
-            )
-        }
-        Text(
-            text = "Edit profile",
-            color = SportsOnSurface,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
+    BackTitleBar(title = "Edit profile", onBack = onBack, modifier = Modifier.padding(top = 8.dp), fontSize = 22.sp)
 }
 
 @Composable
@@ -201,21 +179,13 @@ private fun EditProfileButtons(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
     ) {
-        Button(
+        FormSubmitButton(
+            text = "Save changes",
+            isSending = isSaving,
             onClick = onSave,
-            enabled = canSave,
-            shape = RoundedCornerShape(percent = 50),
-            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            if (isSaving) {
-                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-            } else {
-                Text(text = "Save changes", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        }
+            modifier = Modifier.fillMaxWidth(),
+            enabled = canSave
+        )
         OutlinedButton(
             onClick = onCancel,
             enabled = !isSaving,
