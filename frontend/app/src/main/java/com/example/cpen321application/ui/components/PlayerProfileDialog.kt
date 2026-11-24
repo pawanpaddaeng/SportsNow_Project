@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.friend.model.FriendshipStatus
+import com.example.cpen321application.review.model.Badge
+import com.example.cpen321application.ui.components.badges.BadgeGrid
 import com.example.cpen321application.user.model.PlayerProfile
 import com.example.cpen321application.review.model.formatReputationScore
 import com.example.cpen321application.ui.theme.SportsOnPrimaryContainer
@@ -161,28 +161,15 @@ private fun Stat(value: String, label: String, modifier: Modifier) {
     }
 }
 
-// the badges the player earned, as pills
-@OptIn(ExperimentalLayoutApi::class)
+// only the badges the player earned, three to a row, without their animation
 @Composable
-private fun Badges(badges: List<String>) {
+private fun Badges(badges: List<Badge>) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         Text(text = "Badges", color = SportsOnSurface, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         if (badges.isEmpty()) {
             Text(text = "No badges yet", color = SportsOnSurfaceVariant, fontSize = 14.sp)
         } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                badges.forEach { badge ->
-                    Text(
-                        text = badge,
-                        color = SportsOnPrimaryContainer,
-                        fontSize = 12.sp,
-                        modifier = Modifier.pillBackground(SportsPrimaryContainer, borderColor = null)
-                    )
-                }
-            }
+            BadgeGrid(badges = badges, earned = badges.toSet())
         }
     }
 }

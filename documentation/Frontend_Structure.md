@@ -66,9 +66,10 @@ cpen321application/
 
 | File | What it does |
 | --- | --- |
-| `repository/ReviewRepository.kt` | Loads the players to rate, submits a rating, and loads the user's own score |
+| `repository/ReviewRepository.kt` | Loads the players to rate, submits a rating, and loads the user's own score and badges |
 | `dto/ReviewDtos.kt` | Request and reply classes for the ratings endpoints |
 | `model/PlayerRating.kt` | The rating categories, a Rate Players row, its converter, and how a score reads |
+| `model/Badge.kt` | The nine badges in profile order, with each one's server id, name, goal and tier |
 
 ## friend/
 
@@ -142,7 +143,7 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), form fields, chips, map preview, cards, and the player profile popup |
+| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), form fields, chips, map preview, cards, and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
@@ -227,4 +228,4 @@ If loading fails after the game was already shown, the old details stay on scree
 
 ## Not built yet
 
-Review's badges have no frontend code yet apart from the profile popup, and Friend doesn't have friend profiles yet. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.
+Friend doesn't have friend profiles yet. New components should follow the same layout: a folder with `repository/`, `dto/` and `model/`, routes in `navigation/routes/`, and screens in `ui/screens/`.

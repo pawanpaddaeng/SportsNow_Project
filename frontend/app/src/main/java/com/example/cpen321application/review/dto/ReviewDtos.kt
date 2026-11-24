@@ -39,6 +39,13 @@ data class UserStatsResponse(
     val error: String?
 )
 
+// reply from GET api/users/me/badges: msg "success" with the ids of the badges the user earned, or an error code
+data class BadgesResponse(
+    val msg: String?,
+    val badges: List<String>?,
+    val error: String?
+)
+
 // reply from POST api/games/{gameId}/ratings: msg "success", or an error code with error
 data class RatingResponse(
     val msg: String?,
