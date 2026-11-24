@@ -3,22 +3,18 @@ package com.example.cpen321application.ui.screens.games
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.game.model.GameDetails
 import com.example.cpen321application.game.model.GameRole
 import com.example.cpen321application.game.model.GameState
+import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.OutlinedActionButton
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
@@ -123,15 +119,5 @@ private fun JoinButton(details: GameDetails, onRequestToJoin: () -> Unit) {
 
 @Composable
 private fun PrimaryButton(text: String, onClick: () -> Unit, enabled: Boolean = true) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-    ) {
-        Text(text = text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-    }
+    FormSubmitButton(text = text, isSending = false, onClick = onClick, modifier = Modifier.fillMaxWidth(), enabled = enabled)
 }

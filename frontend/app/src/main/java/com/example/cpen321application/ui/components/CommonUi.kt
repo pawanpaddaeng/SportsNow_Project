@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.ui.theme.SportsOnSurface
@@ -49,8 +50,14 @@ fun Modifier.pillBackground(background: Color, borderColor: Color?, horizontalPa
 
 // back button and the screen's title, trailing (e.g. an Edit button) goes on the right
 @Composable
-fun BackTitleBar(title: String, onBack: () -> Unit, trailing: @Composable RowScope.() -> Unit = {}) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+fun BackTitleBar(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 20.sp,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().then(modifier)) {
         IconButton(onClick = onBack) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -61,7 +68,7 @@ fun BackTitleBar(title: String, onBack: () -> Unit, trailing: @Composable RowSco
         Text(
             text = title,
             color = SportsOnSurface,
-            fontSize = 20.sp,
+            fontSize = fontSize,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f)
         )

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cpen321application.notification.model.AppNotification
 import com.example.cpen321application.notification.model.NotificationType
 import com.example.cpen321application.notification.model.notificationAge
+import com.example.cpen321application.ui.components.AvatarCircle
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.LazyTabScreen
@@ -174,13 +175,7 @@ private fun NotificationCard(notification: AppNotification, age: String, onClick
 // the notification's icon in a circle, like the avatars on the Friends screen
 @Composable
 private fun TypeIcon(icon: ImageVector) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(SportsPrimaryContainer)
-    ) {
+    AvatarCircle {
         Icon(imageVector = icon, contentDescription = null, tint = SportsOnPrimaryContainer, modifier = Modifier.size(20.dp))
     }
 }

@@ -1,22 +1,15 @@
 package com.example.cpen321application.ui.screens.games
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,8 +17,11 @@ import com.example.cpen321application.game.model.JoinRequestItem
 import com.example.cpen321application.game.model.JoinRequestsHeader
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
+import com.example.cpen321application.ui.components.DecisionButtons
+import com.example.cpen321application.ui.components.InitialAvatar
 import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.ListNote
+import com.example.cpen321application.ui.components.RequestCardFrame
 import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.theme.*
 
@@ -116,15 +112,7 @@ private fun RequestCard(
     onDecline: () -> Unit,
     onOpenProfile: () -> Unit
 ) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .border(1.dp, SportsOutlineVariant, shape)
-            .padding(16.dp)
-    ) {
+    RequestCardFrame {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -132,15 +120,7 @@ private fun RequestCard(
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClickLabel = "View profile", onClick = onOpenProfile)
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(SportsPrimaryContainer)
-            ) {
-                Text(text = request.initial, color = SportsOnPrimaryContainer, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            }
+            InitialAvatar(request.initial)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(text = request.name, color = SportsOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text(text = request.details, color = SportsOnSurfaceVariant, fontSize = 12.sp)
@@ -163,43 +143,14 @@ private fun RequestCard(
             )
         }
 
-        DecisionButtons(isBusy = isBusy, canApprove = canApprove, onApprove = onApprove, onDecline = onDecline)
-    }
-}
-
-// Decline and Approve side by side, Approve shows progress while the answer is sent
-@Composable
-private fun DecisionButtons(isBusy: Boolean, canApprove: Boolean, onApprove: () -> Unit, onDecline: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick = onDecline,
-            enabled = !isBusy,
-            shape = RoundedCornerShape(50),
-            border = BorderStroke(1.dp, SportsOutline),
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp)
-        ) {
-            Icon(Icons.Filled.Close, contentDescription = null, tint = SportsPrimary, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(text = "Decline", color = SportsPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-        Button(
-            onClick = onApprove,
-            enabled = !isBusy && canApprove,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = SportsPrimary),
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp)
-        ) {
-            if (isBusy) {
-                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            } else {
-                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Approve", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        }
+        // Approve shows progress while the answer is sent
+        DecisionButtons(
+            acceptLabel = "Approve",
+            isBusy = isBusy,
+            onAccept = onApprove,
+            onDecline = onDecline,
+            canAccept = canApprove,
+            showProgress = isBusy
+        )
     }
 }
