@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import { chatsRouter } from './chat/routes/chatRoutes';
 import { handleRouteErrors } from './core/http/asyncRoute';
+import { friendRequestsRouter } from './friend/routes/friendRequestRoutes';
 import { friendsRouter } from './friend/routes/friendRoutes';
 import { gamesRouter } from './game/routes/gameRoutes';
 import { invitesRouter } from './game/routes/inviteRoutes';
@@ -20,6 +21,7 @@ export function createApp(): Express {
   app.use(joinRequestsRouter());
   app.use(invitesRouter());
   app.use(friendsRouter());
+  app.use(friendRequestsRouter());
   app.use(usersRouter());
   app.use(chatsRouter());
   app.use(ratingsRouter());
