@@ -36,12 +36,12 @@ import com.example.cpen321application.ui.components.AvatarCircle
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.LazyTabScreen
-import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.PeopleIcon
 import com.example.cpen321application.ui.components.badgeText
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.components.pillBackground
+import com.example.cpen321application.ui.components.emptyListNote
 import com.example.cpen321application.ui.theme.*
 import java.time.Instant
 
@@ -89,11 +89,10 @@ fun NotificationsScreen(state: NotificationsUiState, actions: NotificationsActio
                 onClick = { actions.onOpenNotification(notification) }
             )
         }
-        if (state.notifications.isEmpty() && !state.isLoading && state.errorMessage == null) {
-            item(key = "empty") {
-                ListNote("No notifications yet. Join requests, invites and game reminders show up here.")
-            }
-        }
+        emptyListNote(
+            state.notifications, state.isLoading, state.errorMessage, key = "empty",
+            text = "No notifications yet. Join requests, invites and game reminders show up here."
+        )
     }
 }
 
@@ -180,11 +179,13 @@ private fun TypeIcon(icon: ImageVector) {
     }
 }
 
-private fun iconFor(type: NotificationType): ImageVector = when (type) {
-    NotificationType.FriendRequestAccepted -> PeopleIcon
-    NotificationType.JoinRequest -> Icons.Filled.Person
-    NotificationType.JoinRequestApproved -> Icons.Filled.Check
-    NotificationType.JoinRequestDeclined -> Icons.Filled.Close
-    NotificationType.GameInvite -> Icons.Filled.Email
-    NotificationType.GameStarting, NotificationType.Other -> Icons.Filled.Notifications
-}
+// each notification type's icon, the bell for game reminders and anything else
+private val TYPE_ICONS = mapOf(
+    NotificationType.FriendRequestAccepted to PeopleIcon,
+    NotificationType.JoinRequest to Icons.Filled.Person,
+    NotificationType.JoinRequestApproved to Icons.Filled.Check,
+    NotificationType.JoinRequestDeclined to Icons.Filled.Close,
+    NotificationType.GameInvite to Icons.Filled.Email
+)
+
+private fun iconFor(type: NotificationType): ImageVector = TYPE_ICONS[type] ?: Icons.Filled.Notifications

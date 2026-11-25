@@ -96,13 +96,13 @@ object AuthTokenStore {
 
     // user_id the server put in the token, null if it can't be read
     fun userIdOf(token: String): Int? {
-        val payload = decodePayload(token) ?: return null
-        return if (payload.has("user_id")) payload.optInt("user_id") else null
+        return decodePayload(token)?.takeIf { it.has("user_id") }?.optInt("user_id")
     }
 
     // the JWT's middle part is base64 encoded JSON with its fields
     private fun decodePayload(token: String): JSONObject? {
-        val payload = token.split(".").getOrNull(1) ?: return null
+        // a token without a middle part decodes to "", which isn't JSON either
+        val payload = token.split(".").getOrElse(1) { "" }
         return try {
             val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
             JSONObject(String(Base64.decode(payload, flags)))

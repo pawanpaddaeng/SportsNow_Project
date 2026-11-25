@@ -28,6 +28,7 @@ cpen321application/
 | `network/ServerGson.kt` | Gson setup. `@Required` fields make a reply fail to parse if the server leaves them out |
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
+| `session/AuthProblem.kt` | `authProblem`: reads why the server rejected a request with 401 (`expired_token`, `invalid_token` or `no_user`), for `Session.call` |
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |
 | `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. Tapping one opens the app with its data in the intent's extras, and `notificationRoute` (`navigation/NotificationLinks.kt`) picks the screen |
 | `notifications/GameEvents.kt` | Passes notifications to open screens so they reload (e.g. a new join request) |
@@ -143,7 +144,7 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), form fields, chips, map preview, cards, and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
+| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), back-button title bar, form fields and submit button, chips, map preview, cards, avatar circles (`AvatarCircle.kt`), request cards with their Decline/Accept buttons (`RequestCard.kt`), a list's loading bar, error and empty note (`ListStatus.kt`), and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
@@ -154,7 +155,7 @@ Screens only draw and report taps. They never call the server.
 | `screens/chat/` | Chat |
 | `theme/` | Colours, fonts and the app theme |
 
-A screen with an `…Parts`, `…Sections`, `…Fields` or `…Card` file next to it was split into smaller files. Those files belong to that screen only.
+A screen with an `…Parts`, `…Sections`, `…Fields`, `…Buttons` or `…Card` file next to it was split into smaller files (e.g. Game Details' `GameDetailsButtons.kt` and `GameDetailsJoinButton.kt`). Those files belong to that screen only.
 
 ## How a request flows
 

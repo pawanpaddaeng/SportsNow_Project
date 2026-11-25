@@ -19,10 +19,10 @@ import com.example.cpen321application.ui.components.ScrollingTabScreen
 import com.example.cpen321application.ui.theme.*
 
 // the Game Details actions that wait for the server, each with its own button and what's shown once it's done
-enum class GameAction(val doneMessage: String) {
-    Cancel("Game cancelled"),
-    Complete("Game completed"),
-    Leave("You left the game")
+enum class GameAction(val doneMessage: String, val buttonLabel: String) {
+    Cancel("Game cancelled", "Cancel Game"),
+    Complete("Game completed", "Mark as Completed"),
+    Leave("You left the game", "Leave Game")
 }
 
 /*  what the Game Details screen shows. details is null until the game loads; isLoading

@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.google.gson.JsonParseException
-import org.json.JSONException
-import org.json.JSONObject
 import retrofit2.Response
 import java.io.IOException
 
@@ -80,8 +78,7 @@ object Session {
     // renew's work, renewLock makes sure only one call runs it at a time
     private suspend fun renewWhileLocked(context: Context, expiredJwt: String): String? {
         // another call already renewed the session while this one waited
-        val current = jwtToken
-        if (current != null && current != expiredJwt) return current
+        jwtToken?.takeIf { it != expiredJwt }?.let { return it }
 
         val googleToken = triggerSilentGoogleSignIn(context) ?: return null
         val newJwt = try {
@@ -105,23 +102,5 @@ object Session {
         jwtToken = newJwt
         AuthTokenStore.save(context, newJwt)
         return newJwt
-    }
-
-    /*  the JWT middleware answers 401 with msg expired_token, invalid_token or
-        no_user. Returns that msg, or null if the request wasn't rejected for auth.
-        Reads a copy of the error body so callers can still read it afterwards
-     */
-    private fun authProblem(response: Response<*>): String? {
-        if (response.code() != 401) return null
-        return try {
-            val source = response.errorBody()?.source() ?: return "unauthorized"
-            source.request(Long.MAX_VALUE)
-            val text = source.buffer.clone().readUtf8()
-            JSONObject(text).optString("msg").ifBlank { "unauthorized" }
-        } catch (e: IOException) {
-            "unauthorized"
-        } catch (e: JSONException) {
-            "unauthorized"
-        }
     }
 }

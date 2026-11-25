@@ -16,9 +16,9 @@ import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.DecisionButtons
 import com.example.cpen321application.ui.components.LazyTabScreen
-import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.RequestCardFrame
 import com.example.cpen321application.ui.components.loadStatus
+import com.example.cpen321application.ui.components.emptyListNote
 import com.example.cpen321application.ui.theme.SportsOnSurface
 
 /*  what the Friend Requests screen shows. isLoading shows a loading bar and errorMessage a
@@ -63,11 +63,10 @@ fun FriendRequestsScreen(state: FriendRequestsUiState, actions: FriendRequestsAc
             )
         }
 
-        if (state.requests.isEmpty() && !state.isLoading && state.errorMessage == null) {
-            item(key = "empty") {
-                ListNote("No friend requests right now. You'll get a notification when someone adds you.")
-            }
-        }
+        emptyListNote(
+            state.requests, state.isLoading, state.errorMessage, key = "empty",
+            text = "No friend requests right now. You'll get a notification when someone adds you."
+        )
     }
 }
 
