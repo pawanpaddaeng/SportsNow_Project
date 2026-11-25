@@ -1,6 +1,7 @@
 import * as chatsDb from '../../../src/chat/db/chats';
 import { type ChatMessage } from '../../../src/chat/db/chats';
 import { startChatSocket } from '../../../src/chat/socket/chatSocket';
+import * as mysqlDb from '../../../src/core/db/mysql';
 import * as logger from '../../../src/core/logger';
 import * as push from '../../../src/core/notifications/push';
 import { createAuthToken } from '../../../src/user/auth/jwt';
@@ -99,6 +100,34 @@ describe('Mocked: WebSocket send_message', () => {
     expect(createChatMessage).toHaveBeenCalledWith(CHAT_ID, 2, 'Hi');
     expect(logError).toHaveBeenCalledWith(`Sending to chat ${CHAT_ID} failed:`, expect.any(Error));
     expect(player.isOpen()).toBe(true);
+  });
+
+  // Mocked behavior: chat 7 lets both in. createChatMessage runs for real: the database write
+  //   (executeWrite) saves the message as message 99, but the database query (selectRows) that
+  //   reads it back finds nothing, as when the chat is deleted between the two, e.g. by Remove
+  //   Friend. logError is watched
+  // Input: Olivia and Paul are connected, Paul sends "Hi" with client_id "c-4"
+  // Expected status code: none, it's a WebSocket reply
+  // Expected behavior: the failure is logged, Paul's app is told the message wasn't sent, and
+  //   Olivia is sent nothing
+  // Expected output: { type: "error", msg: "server_error", error: "Could not send the message", client_id: "c-4" }
+  test('Saved message is gone before it is read back', async () => {
+    const { organizerToken, playerToken } = signInBoth();
+    allowChat(GAME_CHAT);
+    jest.spyOn(mysqlDb, 'executeWrite').mockResolvedValue({ insertId: 99, affectedRows: 1, changedRows: 0 });
+    const selectRows = jest.spyOn(mysqlDb, 'selectRows').mockResolvedValue([]);
+    const logError = jest.spyOn(logger, 'logError').mockImplementation(() => undefined);
+    const organizer = await connectToChat(PORT, CHAT_ID, organizerToken);
+    const player = await connectToChat(PORT, CHAT_ID, playerToken);
+
+    player.sendMessage(CHAT_ID, 'Hi', 'c-4');
+
+    expect(await player.nextReply()).toEqual({
+      type: 'error', msg: 'server_error', error: 'Could not send the message', client_id: 'c-4',
+    });
+    expect(selectRows).toHaveBeenCalledWith(expect.stringContaining('WHERE m.message_id = ?'), [99]);
+    expect(logError).toHaveBeenCalledWith(`Sending to chat ${CHAT_ID} failed:`, expect.any(Error));
+    expect(await organizer.unreadReplies()).toEqual([]);
   });
 
   // Mocked behavior: chat 7 lets both in, createChatMessage saves the message, then

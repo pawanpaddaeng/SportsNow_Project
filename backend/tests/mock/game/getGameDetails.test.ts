@@ -83,6 +83,37 @@ describe('Mocked: GET /api/games/{gameId}', () => {
     expect(response.body).toEqual({ msg: 'server_error', error: 'Could not load the game, try again later' });
   });
 
+  // Mocked behavior: getGameById returns the game and getGamePlayers its organizer and player
+  //   2. selectRows stands in for getGameChatId's lookup and finds no chat for the game, which
+  //   the real database never allows since a game's chat is saved with it. Sign in is mocked
+  //   only so the route can run
+  // Input: player 2 opens game 42
+  // Expected status code: 200
+  // Expected behavior: the game details are still sent, without a chat to open
+  // Expected output: { msg: "success", viewer_role: "player", chat_id: null, ... }
+  test('Game has no chat', async () => {
+    // 1. sign in as player 2 (not what this test checks)
+    const player = testPlayer();
+    const token = signIn(player);
+
+    // 2. a game with its organizer and player 2, and no chat
+    const organizer = testOrganizer();
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValue(testGame());
+    jest.spyOn(gamesDb, 'getGamePlayers').mockResolvedValue([
+      { userId: organizer.userId, firstName: organizer.firstName, lastName: organizer.lastName, noShow: false },
+      { userId: player.userId, firstName: player.firstName, lastName: player.lastName, noShow: false },
+    ]);
+    const selectRows = jest.spyOn(mysqlDb, 'selectRows').mockResolvedValue([]);
+
+    // 3. open the game through the interface
+    const response = await api.get(`/api/games/${GAME_ID}`).set(withToken(token));
+
+    // 4. check the details came back without a chat
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ msg: 'success', viewer_role: 'player', chat_id: null });
+    expect(selectRows).toHaveBeenCalledWith(expect.stringContaining('FROM chats WHERE game_id = ?'), [GAME_ID]);
+  });
+
   // Mocked behavior: getGameById throws, as if the database failed.
   //   Sign in is mocked only so the route can run
   // Input: a signed in user opens game 42
