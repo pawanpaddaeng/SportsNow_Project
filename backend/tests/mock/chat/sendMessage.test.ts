@@ -37,9 +37,13 @@ function signInBoth(): { organizerToken: string; playerToken: string } {
   return { organizerToken: createAuthToken(1), playerToken: createAuthToken(2) };
 }
 
-// chat 7 lets both users in and is open, as a game chat or a friend chat
-function allowChat(isFriendChat: boolean): void {
-  jest.spyOn(chatsDb, 'getChatAccess').mockResolvedValue({ isMember: true, isClosed: false, isFriendChat });
+// what makes chat 7 game 42's chat or a friend chat
+const GAME_CHAT = { gameId: 42, gameTitle: 'Sunday Soccer' };
+const FRIEND_CHAT = { gameId: null, gameTitle: null };
+
+// chat 7 lets both users in and is open, as a game's or a friend chat
+function allowChat(kind: typeof GAME_CHAT | typeof FRIEND_CHAT): void {
+  jest.spyOn(chatsDb, 'getChatAccess').mockResolvedValue({ isMember: true, isClosed: false, ...kind });
   jest.spyOn(chatsDb, 'getChatMemberIds').mockResolvedValue([1, 2]);
 }
 
@@ -82,7 +86,7 @@ describe('Mocked: WebSocket send_message', () => {
   // Expected output: { type: "error", msg: "server_error", error: "Could not send the message", client_id: "c-1" }
   test('Database fails saving the message', async () => {
     const { playerToken } = signInBoth();
-    allowChat(false);
+    allowChat(GAME_CHAT);
     const createChatMessage = jest.spyOn(chatsDb, 'createChatMessage').mockRejectedValue(new Error('database down'));
     const logError = jest.spyOn(logger, 'logError').mockImplementation(() => undefined);
     const player = await connectToChat(PORT, CHAT_ID, playerToken);
@@ -106,7 +110,7 @@ describe('Mocked: WebSocket send_message', () => {
   // Expected output: new_message to Paul, nothing to Olivia
   test('Database fails reading who is in the chat after saving', async () => {
     const { organizerToken, playerToken } = signInBoth();
-    allowChat(false);
+    allowChat(GAME_CHAT);
     jest.spyOn(chatsDb, 'getChatMemberIds').mockRejectedValue(new Error('database down'));
     jest.spyOn(chatsDb, 'createChatMessage').mockResolvedValue(savedMessage('Hi'));
     const logError = jest.spyOn(logger, 'logError').mockImplementation(() => undefined);
@@ -139,7 +143,7 @@ describe('Mocked: WebSocket send_message', () => {
   // Expected output: bodies "aaa...a" (100, no "...") and 100 emoji followed by "..."
   test('Friend notification shows the first 100 characters', async () => {
     const { playerToken } = signInBoth();
-    allowChat(true);
+    allowChat(FRIEND_CHAT);
     const exactly100 = 'a'.repeat(100);
     const emoji101 = '😀'.repeat(101);
     jest.spyOn(chatsDb, 'createChatMessage')
@@ -170,7 +174,7 @@ describe('Mocked: WebSocket send_message', () => {
   // Expected output: new_message to Paul
   test('Friend notification fails', async () => {
     const { playerToken } = signInBoth();
-    allowChat(true);
+    allowChat(FRIEND_CHAT);
     jest.spyOn(chatsDb, 'createChatMessage').mockResolvedValue(savedMessage('Hi'));
     jest.spyOn(push, 'sendPushToUsers').mockRejectedValue(new Error('firebase down'));
     const logError = jest.spyOn(logger, 'logError').mockImplementation(() => undefined);
@@ -193,7 +197,7 @@ describe('Mocked: WebSocket send_message', () => {
   //   Olivia's is still open
   test('Connections that stop answering pings are dropped', async () => {
     const { organizerToken, playerToken } = signInBoth();
-    allowChat(false);
+    allowChat(GAME_CHAT);
     // only the check every 30 seconds is faked, the connections still need real timers
     jest.useFakeTimers({
       doNotFake: ['Date', 'hrtime', 'nextTick', 'performance', 'queueMicrotask', 'setImmediate',

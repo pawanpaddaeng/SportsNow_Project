@@ -173,7 +173,7 @@ private fun BadgesCard(earned: List<Badge>) {
                 fontSize = 14.sp
             )
         }
-        BadgeGrid(badges = Badge.entries, earned = earned.toSet(), onOpen = { badge -> openBadge = badge })
+        BadgeGrid(badges = Badge.entries, earned = earned.toSet(), onOpen = { badge -> openBadge = badge }, showHints = true)
     }
     openBadge?.let { badge -> BadgePopup(badge = badge, onDismiss = { openBadge = null }) }
 }

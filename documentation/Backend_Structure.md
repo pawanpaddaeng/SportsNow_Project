@@ -113,7 +113,7 @@ Only notifications a user should still see after dismissing the push are saved: 
 | --- | --- |
 | `routes/chatRoutes.ts` | `GET /api/chats/:chatId/messages`, a page of earlier messages for a current member of the chat |
 | `routes/chatJson.ts` | The JSON shape of a message, the same from the endpoint and the WebSocket |
-| `socket/chatSocket.ts` | The WebSocket server: checks who connects, sends messages to everyone in the chat, drops dead connections, and notifies a friend who doesn't have the chat open |
+| `socket/chatSocket.ts` | The WebSocket server: checks who connects, sends messages to everyone in the chat, drops dead connections, and sends a push to the chat's other members who don't have it open: a friend's message as `friend_message`, a game chat's as `game_message` (titled with the game) |
 | `db/chats.ts` | Chat queries: create a game's or two friends' chat, find a friend's chat, read access, read a page of messages, save a message |
 | `validation/sendMessage.ts` | Checks a `send_message` request: its type, chat id and text |
 

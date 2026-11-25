@@ -56,14 +56,18 @@ function sendJson(webSocket: WebSocket, reply: object): void {
   }
 }
 
+// the start of a message for its notification, by character so an emoji isn't split in two
+function messagePreview(text: string): string {
+  const characters = Array.from(text);
+  const preview = characters.slice(0, PUSH_PREVIEW_LENGTH).join('');
+  return characters.length > PUSH_PREVIEW_LENGTH ? `${preview}...` : preview;
+}
+
 // the notification for a friend's message, tagged so their messages show as one notification
 function friendMessagePush(message: ChatMessage): PushMessage {
-  // by character, cutting by length could split an emoji in two
-  const characters = Array.from(message.text);
-  const preview = characters.slice(0, PUSH_PREVIEW_LENGTH).join('');
   return {
     title: message.senderFirstName,
-    body: characters.length > PUSH_PREVIEW_LENGTH ? `${preview}...` : preview,
+    body: messagePreview(message.text),
     // the chat and its title, so tapping the notification opens it straight away
     data: {
       type: 'friend_message',
@@ -71,6 +75,18 @@ function friendMessagePush(message: ChatMessage): PushMessage {
       friendName: `${message.senderFirstName} ${message.senderLastName}`.trim(),
     },
     tag: `friend-${message.senderId}`,
+  };
+}
+
+/*  the notification for a message in a game's chat: the game's title, then who wrote what.
+    Tagged by game so a chat's messages show as one notification, tapping it opens the chat
+ */
+function gameMessagePush(message: ChatMessage, gameId: number, gameTitle: string): PushMessage {
+  return {
+    title: gameTitle,
+    body: `${message.senderFirstName}: ${messagePreview(message.text)}`,
+    data: { type: 'game_message', gameId: String(gameId) },
+    tag: `game-${gameId}`,
   };
 }
 
@@ -100,8 +116,8 @@ async function checkConnection(req: IncomingMessage): Promise<ChatClient | numbe
       receives { type: "error", msg, error, client_id } when its message wasn't sent:
                invalid_request, chat_not_found, forbidden, chat_closed or server_error
     Connecting is rejected with 400 (no chat_id or token), 401 (bad token), 403 (not a
-    player of the game or a friend), 404 (no such chat) or 500. A friend's message also
-    sends a notification, unless they have the chat open
+    player of the game or a friend), 404 (no such chat) or 500. A message also sends a
+    notification to the chat's other members who don't have it open
  */
 export function startChatSocket(port: number): ChatSocket {
   const webSockets = new WebSocketServer({ noServer: true, maxPayload: MAX_REQUEST_BYTES });
@@ -127,15 +143,15 @@ export function startChatSocket(port: number): ChatSocket {
     }
   }
 
-  // notifies the friend of a new message, unless it already reached them because they have the chat open
-  async function notifyFriend(message: ChatMessage): Promise<void> {
+  // sends push to the chat's members other than the sender who don't have the chat open, the message already reached those who do
+  async function notifyAbsentMembers(message: ChatMessage, push: PushMessage): Promise<void> {
     const connected = new Set<number>();
     for (const client of clients.values()) {
       if (client.chatId === message.chatId) connected.add(client.userId);
     }
     const memberIds = await getChatMemberIds(message.chatId);
     const absent = memberIds.filter((id) => id !== message.senderId && !connected.has(id));
-    await sendPushToUsers(absent, friendMessagePush(message));
+    await sendPushToUsers(absent, push);
   }
 
   // checks again on every message, the user may have left or the game may have ended since connecting
@@ -173,11 +189,12 @@ export function startChatSocket(port: number): ChatSocket {
     });
 
     // best effort, the message is already delivered and saved so a failure is only logged
-    if (access.isFriendChat) {
-      notifyFriend(saved).catch((error: unknown) => {
-        logError(`Notifying about a message in chat ${client.chatId} failed:`, error);
-      });
-    }
+    const push = access.gameId === null
+      ? friendMessagePush(saved)
+      : gameMessagePush(saved, access.gameId, access.gameTitle ?? 'Game chat');
+    notifyAbsentMembers(saved, push).catch((error: unknown) => {
+      logError(`Notifying about a message in chat ${client.chatId} failed:`, error);
+    });
   }
 
   function handleRequest(webSocket: WebSocket, client: ChatClient, raw: RawData): void {

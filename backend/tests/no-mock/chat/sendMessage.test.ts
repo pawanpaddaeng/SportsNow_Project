@@ -332,18 +332,38 @@ describe('Unmocked: WebSocket send_message', () => {
     expect(sendPushToUsers).toHaveBeenLastCalledWith([], notification);
   });
 
-  // Input: the player sends a message in the game chat while the organizer isn't connected
+  // Input: in the game chat, the player sends "Bringing a ball" while the organizer doesn't
+  //   have the chat open, then again once the organizer has it open
   // Expected status code: none, it's a WebSocket reply
-  // Expected behavior: game chat messages don't send notifications
-  // Expected output: new_message to the player, sendPushToUsers is never called
-  test('Game chat messages send no notification', async () => {
+  // Expected behavior: the organizer is sent a notification for the first message only, the
+  //   second reached them over the WebSocket. The test users have no devices, so no
+  //   notification leaves the server
+  // Expected output: sendPushToUsers([organizer], { title: "Evening Basketball", body:
+  //   "Pat: Bringing a ball", data: { type: "game_message", gameId }, tag: "game-<gameId>" }),
+  //   then sendPushToUsers([], ...)
+  test('Game players are notified of a message unless they have the chat open', async () => {
+    // 1. the game's chat, the organizer isn't connected
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers');
     const player = await connectToChat(PORT, chatId, createAuthToken(playerId));
 
+    // 2. the organizer is notified
     player.sendMessage(chatId, 'Bringing a ball', 'g-1');
-
     expect(await player.nextReply()).toMatchObject({ type: 'new_message', client_id: 'g-1' });
-    await player.unreadReplies();
-    expect(sendPushToUsers).not.toHaveBeenCalled();
+    const notification = {
+      title: 'Evening Basketball',
+      body: 'Pat: Bringing a ball',
+      data: { type: 'game_message', gameId: String(gameId) },
+      tag: `game-${gameId}`,
+    };
+    await waitUntil(() => sendPushToUsers.mock.calls.length === 1);
+    expect(sendPushToUsers).toHaveBeenCalledWith([organizerId], notification);
+
+    // 3. once the organizer has the chat open, nobody is left to notify
+    const organizer = await connectToChat(PORT, chatId, createAuthToken(organizerId));
+    player.sendMessage(chatId, 'Bringing a ball', 'g-2');
+    expect(await organizer.nextReply()).toMatchObject({ type: 'new_message', client_id: 'g-2' });
+    await waitUntil(() => sendPushToUsers.mock.calls.length === 2);
+    expect(sendPushToUsers).toHaveBeenCalledTimes(2);
+    expect(sendPushToUsers).toHaveBeenLastCalledWith([], notification);
   });
 });
