@@ -8,24 +8,6 @@ cleanUpAfterTests();
 
 // Interface POST /api/register_notif
 describe('Mocked: POST /api/register_notif', () => {
-  // Mocked behavior: saveDeviceToken is replaced so only the route runs. Sign in is mocked
-  //   only so the route can run
-  // Input: player 2 sends " device-token " with spaces around it
-  // Expected status code: 200
-  // Expected behavior: the token is saved for player 2 with the spaces trimmed
-  // Expected output: { msg: "success" }
-  test('Saves the trimmed token for the signed in user', async () => {
-    const player = testPlayer();
-    const token = signIn(player);
-    const saveDeviceToken = jest.spyOn(deviceTokens, 'saveDeviceToken').mockResolvedValue();
-
-    const response = await api.post('/api/register_notif').set(withToken(token)).send({ fcm_token: ' device-token ' });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ msg: 'success' });
-    expect(saveDeviceToken).toHaveBeenCalledWith('device-token', player.userId);
-  });
-
   // Mocked behavior: saveDeviceToken throws as if the database were down
   // Input: player 2 sends a device token
   // Expected status code: 500

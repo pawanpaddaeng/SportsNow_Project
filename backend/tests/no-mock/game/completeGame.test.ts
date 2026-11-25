@@ -1,5 +1,6 @@
+import { selectRows } from '../../../src/core/db/mysql';
 import { getGameById } from '../../../src/game/db/games';
-import { addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../helpers';
+import { addPlayer, addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../helpers';
 import { type ApiReply, expectGameReply } from '../../sharedHelpers';
 
 let organizerId: number;
@@ -27,6 +28,32 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
     // 3. check it was completed
     expectGameReply(response as ApiReply, { game_id: gameId, status: 'completed' });
     expect((await getGameById(gameId))?.status).toBe('completed');
+  });
+
+  // Input: the organizer completes their started game with Ben and Cara in it, marking Ben as a
+  //   no-show and sending his id twice
+  // Expected status code: 200
+  // Expected behavior: each player's attendance is saved once, with only Ben as a no-show
+  // Expected output: { msg: "success", game } with game.status "completed"
+  test('Organizer marks players who did not show up', async () => {
+    // 1. the organizer's started game with two players
+    const benId = await addUser('Ben');
+    const caraId = await addUser('Cara');
+    const gameId = await addStartedGame(organizerId);
+    await addPlayer(gameId, benId);
+    await addPlayer(gameId, caraId);
+
+    // 2. complete it with Ben unticked, his id sent twice
+    const response = await api.post(`/api/games/${gameId}/complete`).set(asUser(organizerId))
+      .send({ no_show_user_ids: [benId, benId] });
+
+    // 3. check who was saved as a no-show
+    expectGameReply(response as ApiReply, { game_id: gameId, status: 'completed' });
+    const attendance = await selectRows<{ user_id: number; no_show: number }>(
+      'SELECT user_id, no_show FROM game_attendance WHERE game_id = ?', [gameId]);
+    const noShows = new Map(attendance.map((row) => [row.user_id, Number(row.no_show)]));
+    expect(attendance).toHaveLength(3);
+    expect(noShows).toEqual(new Map([[organizerId, 0], [benId, 1], [caraId, 0]]));
   });
 
   // Input: the organizer completes their started game with a no-show id that isn't a user id

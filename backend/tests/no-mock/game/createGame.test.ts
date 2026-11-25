@@ -1,6 +1,6 @@
 import { selectRows } from '../../../src/core/db/mysql';
 import { createAuthToken } from '../../../src/user/auth/jwt';
-import { addUser, api, cleanUpAfterTests, getPlayerIds, ONE_DAY_MS, withToken } from '../helpers';
+import { addUser, api, cleanUpAfterTests, getPlayerIds, ONE_DAY_MS, validGameBody, withToken } from '../helpers';
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
@@ -75,5 +75,19 @@ describe('Unmocked: POST /api/games', () => {
     const chats = await selectRows<{ chat_id: number }>(
       'SELECT chat_id FROM chats WHERE game_id = ?', [gameId]);
     expect(chats).toHaveLength(1);
+  });
+
+  // Input: a valid game without its title, from a signed in user
+  // Expected status code: 400
+  // Expected behavior: the request is rejected before anything is saved
+  // Expected output: { msg: "invalid_request", error: "title is required (max 100 characters)" }
+  test('Invalid body never reaches the database', async () => {
+    const response = await api.post('/api/games').set(withToken(token))
+      .send(validGameBody({ title: undefined }));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ msg: 'invalid_request', error: 'title is required (max 100 characters)' });
+    const games = await selectRows<{ game_id: number }>('SELECT game_id FROM games WHERE organizer_id = ?', [organizerId]);
+    expect(games).toEqual([]);
   });
 });

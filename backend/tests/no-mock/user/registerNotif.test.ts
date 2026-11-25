@@ -1,4 +1,5 @@
 import { selectRows } from '../../../src/core/db/mysql';
+import { createAuthToken } from '../../../src/user/auth/jwt';
 import { addUser, api, asUser, type Call, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 
 let aliceId: number;
@@ -29,14 +30,15 @@ describe('Unmocked: POST /api/register_notif', () => {
     expect(await getSavedTokens(aliceId)).toEqual([]);
   });
 
-  // Input: Alice sends her device's Firebase token
+  // Input: Alice sends her device's Firebase token, with spaces around it
   // Expected status code: 200
-  // Expected behavior: the token is saved for Alice, so the server can send her notifications
+  // Expected behavior: the token is saved for Alice without the spaces, so the server can send
+  //   her notifications
   // Expected output: { msg: "success" }
-  test('Saves the device token for the signed in user', async () => {
+  test('Saves the trimmed device token for the signed in user', async () => {
     const fcmToken = `no-mock-register-notif-${aliceId}`;
 
-    const response = await api.post('/api/register_notif').set(asUser(aliceId)).send({ fcm_token: fcmToken });
+    const response = await api.post('/api/register_notif').set(asUser(aliceId)).send({ fcm_token: `  ${fcmToken} ` });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success' });
@@ -50,11 +52,24 @@ describe('Unmocked: POST /api/register_notif', () => {
   test.each([
     ['no fcm_token', {}],
     ['an fcm_token of only spaces', { fcm_token: '   ' }],
-  ])('Rejects a missing device token: %s', async (_case, body) => {
+    ['an fcm_token over 512 characters', { fcm_token: 'x'.repeat(513) }],
+  ])('Rejects a missing or too long device token: %s', async (_case, body) => {
     const response = await api.post('/api/register_notif').set(asUser(aliceId)).send(body);
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ msg: 'invalid_request', error: 'fcm_token is required (max 512 characters)' });
     expect(await getSavedTokens(aliceId)).toEqual([]);
+  });
+
+  // Input: no Authorization header, with Alice's JWT sent as jwt_token in the json body instead
+  // Expected status code: 200
+  // Expected behavior: the sign in check reads the token from the body, and the token is saved for Alice
+  // Expected output: { msg: "success" }
+  test('Accepts the JWT sent in the body as jwt_token', async () => {
+    const fcmToken = `no-mock-register-notif-body-${aliceId}`;
+    const response = await api.post('/api/register_notif').send({ jwt_token: createAuthToken(aliceId), fcm_token: fcmToken });
+
+    expect(response.status).toBe(200);
+    expect(await getSavedTokens(aliceId)).toEqual([fcmToken]);
   });
 });

@@ -8,24 +8,6 @@ cleanUpAfterTests();
 
 // Interface PATCH /api/notifications/read
 describe('Mocked: PATCH /api/notifications/read', () => {
-  // Mocked behavior: markNotificationsRead is replaced and reports 2 notifications marked.
-  //   Sign in is mocked only so the route can run
-  // Input: a signed in player marks their notifications read
-  // Expected status code: 200
-  // Expected behavior: the signed in user's notifications are marked read
-  // Expected output: { msg: "success" }
-  test('Marks the signed in user\'s notifications read', async () => {
-    const player = testPlayer();
-    const token = signIn(player);
-    const markRead = jest.spyOn(notificationsDb, 'markNotificationsRead').mockResolvedValue(2);
-
-    const response = await api.patch('/api/notifications/read').set(withToken(token));
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ msg: 'success' });
-    expect(markRead).toHaveBeenCalledWith(player.userId);
-  });
-
   // Mocked behavior: markNotificationsRead throws as if the database were down. Sign in is
   //   mocked only so the route can run
   // Input: a signed in player marks their notifications read
