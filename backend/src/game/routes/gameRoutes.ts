@@ -35,10 +35,10 @@ import {
   readBackGame,
   readGameId,
   REMOVE_PLAYER_ERRORS,
-  requireGame,
-  requireGameId,
   responseFor,
   sendError,
+  withGame,
+  withGameId,
 } from './gameErrors';
 
 type ViewerRole = 'organizer' | 'player' | 'viewer';
@@ -166,10 +166,7 @@ export function gamesRouter(): Router {
       Registered after /api/games/mine so "mine" isn't read as an id
    */
   router.get('/api/games/:gameId', requireAuth, asyncRoute('Could not load the game, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
-      const user = getAuthUser(res);
-      const game = await requireGame(req.params.gameId, res);
-      if (!game) return;
+    withGame(async (user, game, _req, res) => {
       const { gameId } = game;
 
       const players = await getGamePlayers(gameId);
@@ -190,7 +187,7 @@ export function gamesRouter(): Router {
         join_request_status: role === 'viewer' ? await getJoinRequestStatus(gameId, user.userId) : null,
         chat_id: role === 'viewer' ? null : await getGameChatId(gameId),
       });
-    }));
+    })));
 
   /*  edit game: the organizer replaces the game's details. The body has the same
       fields as create game; ends_at is kept as it is when left out. Responds with the
@@ -199,10 +196,7 @@ export function gamesRouter(): Router {
       403 forbidden (not the organizer), 404 not_found, 409 game_cancelled / game_started
    */
   router.put('/api/games/:gameId', requireAuth, asyncRoute('Could not update game, try again later',
-    async (req: Request<{ gameId: string }, unknown, CreateGameBody | undefined>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId<CreateGameBody | undefined>(async (user, gameId, req, res) => {
       const parsed = parseNewGame(req.body, user.userId);
       if (!parsed.ok) return invalidRequest(res, parsed.error);
       const keepEndsAt = req.body?.ends_at === undefined;
@@ -234,7 +228,7 @@ export function gamesRouter(): Router {
       }
 
       return res.status(200).json({ msg: 'success', game: gameJson(after) });
-    }));
+    })));
 
   /*  cancel game: the organizer cancels a game that hasn't started. It stays with
       status "cancelled" so players can see what happened, and they and anyone with a
@@ -242,10 +236,7 @@ export function gamesRouter(): Router {
       Errors: 400 invalid_request, 403 forbidden, 404 not_found, 409 game_cancelled / game_started
    */
   router.post('/api/games/:gameId/cancel', requireAuth, asyncRoute('Could not cancel game, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId(async (user, gameId, _req, res) => {
 
       const result = await cancelGame(gameId, user.userId);
       if (!result.ok) return sendError(res, gameChangeError(result.problem));
@@ -255,7 +246,7 @@ export function gamesRouter(): Router {
         body: `${game.title} at ${game.locationName} was cancelled by the organizer`,
         data: { type: 'game_cancelled', gameId: String(gameId) },
       }));
-    }));
+    })));
 
   /*  complete game: the organizer marks a game that has started as completed, after
       which anyone can leave it. The optional no_show_user_ids in the body are the players
@@ -264,10 +255,7 @@ export function gamesRouter(): Router {
       409 game_cancelled / game_not_started / game_completed
    */
   router.post('/api/games/:gameId/complete', requireAuth, asyncRoute('Could not complete game, try again later',
-    async (req: Request<{ gameId: string }, unknown, CompleteGameBody | undefined>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId<CompleteGameBody | undefined>(async (user, gameId, req, res) => {
       const parsed = parseCompleteGame(req.body);
       if (!parsed.ok) return invalidRequest(res, parsed.error);
 
@@ -279,7 +267,7 @@ export function gamesRouter(): Router {
         body: `${game.title} was marked completed by the organizer. Rate your teammates within ${RATING_WINDOW_HOURS} hours`,
         data: { type: 'game_completed', gameId: String(gameId) },
       }));
-    }));
+    })));
 
   /*  leave game: the signed in user stops being a player. Players can leave at any
       time, even mid-game. The organizer can only leave once the game is cancelled or
@@ -292,10 +280,7 @@ export function gamesRouter(): Router {
       409 not_player / organizer_must_cancel / organizer_must_complete
    */
   router.post('/api/games/:gameId/leave', requireAuth, asyncRoute('Could not leave the game, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId(async (user, gameId, _req, res) => {
 
       const result = await leaveGame(gameId, user.userId);
       if (!result.ok) return sendError(res, responseFor(LEAVE_GAME_ERRORS, result.problem));
@@ -318,7 +303,7 @@ export function gamesRouter(): Router {
       }
 
       return res.status(200).json({ msg: 'success', game: gameJson(game), game_deleted: false });
-    }));
+    })));
 
   /*  remove player: the organizer takes a player out of their game before it starts.
       The player can send a new join request later, and is notified. Responds with the

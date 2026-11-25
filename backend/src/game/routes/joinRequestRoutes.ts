@@ -21,10 +21,10 @@ import {
   logNotificationError,
   readBackGame,
   readGameId,
-  requireGame,
-  requireGameId,
   responseFor,
   sendError,
+  withGame,
+  withGameId,
 } from './gameErrors';
 
 // responses for a join request that can't be made, a missing, cancelled or started game as for edits
@@ -74,10 +74,7 @@ export function joinRequestsRouter(): Router {
       409 own_game / already_player / already_requested / game_full / game_cancelled / game_started
    */
   router.post('/api/games/:gameId/join-requests', requireAuth, asyncRoute('Could not send your request, try again later',
-    async (req: Request<{ gameId: string }, unknown, JoinRequestBody | undefined>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId<JoinRequestBody | undefined>(async (user, gameId, req, res) => {
       const parsed = parseJoinRequest(req.body);
       if (!parsed.ok) return invalidRequest(res, parsed.error);
 
@@ -98,17 +95,14 @@ export function joinRequestsRouter(): Router {
         msg: 'success',
         request: { request_id: result.requestId, game_id: gameId, status: 'pending' },
       });
-    }));
+    })));
 
   /*  the organizer's view of who asked to join: the game and its pending requests,
       newest first (an empty list when there are none).
       Errors: 400 invalid_request, 403 forbidden (not the organizer), 404 not_found
    */
   router.get('/api/games/:gameId/join-requests', requireAuth, asyncRoute('Could not load join requests, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
-      const user = getAuthUser(res);
-      const game = await requireGame(req.params.gameId, res);
-      if (!game) return;
+    withGame(async (user, game, _req, res) => {
       const { gameId } = game;
       if (game.organizerId !== user.userId) {
         return res.status(403).json({ msg: 'forbidden', error: 'Only the organizer can see join requests' });
@@ -121,7 +115,7 @@ export function joinRequestsRouter(): Router {
         requests: await Promise.all(requests.map(async (request) =>
           pendingJoinRequestJson(request, await getReputationScore(request.userId)))),
       });
-    }));
+    })));
 
   /*  the organizer approves or declines a pending request ({ decision: "approve" | "decline" }).
       Approving adds the requester to the game. Responds with the game after the decision

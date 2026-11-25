@@ -1,6 +1,5 @@
 package com.example.cpen321application.ui.screens.games
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +42,7 @@ import com.example.cpen321application.game.model.GameLocation
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FieldLabel
 import com.example.cpen321application.ui.components.LocationPreviewMap
+import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsOutline
@@ -104,15 +104,7 @@ internal fun LocationField(location: GameLocation?, onClick: () -> Unit) {
 // replaces the mockup's approval toggle: approval is always required
 @Composable
 internal fun ApprovalNote() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
+    CardRow(modifier = Modifier.cardBackground(SportsSurfaceContainer)) {
         Icon(
             imageVector = Icons.Filled.Info,
             contentDescription = null,

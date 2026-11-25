@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
 import com.example.cpen321application.core.rememberUnexpectedErrorHandler
 import com.example.cpen321application.core.runGuarded
 import com.example.cpen321application.core.showToast
@@ -33,6 +34,13 @@ import com.example.cpen321application.ui.screens.games.InputGameInfoScreen
 import com.example.cpen321application.ui.screens.games.InputGameInfoUiState
 import com.example.cpen321application.ui.screens.games.PickLocationScreen
 import kotlinx.coroutines.launch
+
+// what the Create and Edit Game forms' buttons do: submit sends the form, Back and Pick Location navigate
+private fun gameFormActions(navController: NavController, submit: (GameInfoForm) -> Unit) = InputGameInfoActions(
+    onSubmit = submit,
+    onBack = { navController.popBackStack() },
+    onPickLocation = { navController.navigate(Routes.PICK_LOCATION) }
+)
 
 @Composable
 fun CreateGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Modifier) {
@@ -66,11 +74,7 @@ fun CreateGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: 
 
     InputGameInfoScreen(
         state = InputGameInfoUiState(isSubmitting = isSubmitting, location = pickedLocation),
-        actions = InputGameInfoActions(
-            onSubmit = { form -> submit(form) },
-            onBack = { navController.popBackStack() },
-            onPickLocation = { navController.navigate(Routes.PICK_LOCATION) }
-        ),
+        actions = gameFormActions(navController) { form -> submit(form) },
         modifier = modifier
     )
 }
@@ -143,11 +147,7 @@ fun EditGameRoute(app: AppState, backStackEntry: NavBackStackEntry, modifier: Mo
             loadError = loadError,
             location = pickedLocation
         ),
-        actions = InputGameInfoActions(
-            onSubmit = { form -> submit(form) },
-            onBack = { navController.popBackStack() },
-            onPickLocation = { navController.navigate(Routes.PICK_LOCATION) }
-        ),
+        actions = gameFormActions(navController) { form -> submit(form) },
         modifier = modifier
     )
 }

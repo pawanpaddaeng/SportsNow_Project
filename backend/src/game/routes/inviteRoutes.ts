@@ -1,18 +1,18 @@
-import { Router, type Request, type Response } from 'express';
+import { Router } from 'express';
 import { asyncRoute } from '../../core/http/asyncRoute';
 import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
 import { notifyUsers } from '../../core/notifications/notify';
-import { getAuthUser, requireAuth } from '../../user/auth/middleware';
+import { requireAuth } from '../../user/auth/middleware';
 import { checkInvites, type InviteProblem } from '../db/invites';
 import { parseInvite, type InviteBody } from '../validation/invite';
 import {
   type ErrorResponse,
   GAME_CHANGE_ERRORS,
   logNotificationError,
-  requireGameId,
   responseFor,
   sendError,
+  withGameId,
 } from './gameErrors';
 
 // responses for friends the organizer can't invite, the game's problems as for edits
@@ -35,10 +35,7 @@ export function invitesRouter(): Router {
       404 not_found, 409 game_cancelled / game_started / game_full / already_player
    */
   router.post('/api/games/:gameId/invites', requireAuth, asyncRoute('Could not send your invites, try again later',
-    async (req: Request<{ gameId: string }, unknown, InviteBody | undefined>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId<InviteBody | undefined>(async (user, gameId, req, res) => {
       const parsed = parseInvite(req.body);
       if (!parsed.ok) return invalidRequest(res, parsed.error);
       const friendIds = parsed.value;
@@ -57,7 +54,7 @@ export function invitesRouter(): Router {
         .catch(logNotificationError);
 
       return res.status(201).json({ msg: 'success' });
-    }));
+    })));
 
   return router;
 }

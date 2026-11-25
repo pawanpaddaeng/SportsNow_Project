@@ -4,10 +4,10 @@ import { invalidRequest } from '../../core/http/responses';
 import { logInfo } from '../../core/logger';
 import {
   type ErrorResponse,
-  requireGame,
-  requireGameId,
   responseFor,
   sendError,
+  withGame,
+  withGameId,
 } from '../../game/routes/gameErrors';
 import { getAuthUser, requireAuth } from '../../user/auth/middleware';
 import {
@@ -56,10 +56,7 @@ export function ratingsRouter(): Router {
       show up, or the game isn't completed) / rating_closed, 404 not_found
    */
   router.get('/api/games/:gameId/ratings', requireAuth, asyncRoute('Could not load the players, try again later',
-    async (req: Request<{ gameId: string }>, res: Response) => {
-      const user = getAuthUser(res);
-      const game = await requireGame(req.params.gameId, res);
-      if (!game) return;
+    withGame(async (user, game, _req, res) => {
       const { gameId } = game;
       const result = await getPlayersToRate(gameId, user.userId);
       if (!result.ok) return sendError(res, result.problem === 'rating_closed' ? RATING_CLOSED : NOT_ALLOWED);
@@ -70,7 +67,7 @@ export function ratingsRouter(): Router {
         organizer_id: game.organizerId,
         players: result.players.map(playerToRateJson),
       });
-    }));
+    })));
 
   /*  records the user's rating of another player, once per player per game, within a day
       of the game being marked completed. Every category is required. Errors: 400
@@ -78,10 +75,7 @@ export function ratingsRouter(): Router {
       already_rated
    */
   router.post('/api/games/:gameId/ratings', requireAuth, asyncRoute('Could not submit your rating, try again later',
-    async (req: Request<{ gameId: string }, unknown, RatingBody | undefined>, res: Response) => {
-      const user = getAuthUser(res);
-      const gameId = requireGameId(req.params.gameId, res);
-      if (gameId === null) return;
+    withGameId<RatingBody | undefined>(async (user, gameId, req, res) => {
       const parsed = parseRating(req.body);
       if (!parsed.ok) return invalidRequest(res, parsed.error);
 
@@ -90,7 +84,7 @@ export function ratingsRouter(): Router {
 
       logInfo(`Rating recorded for game id: ${gameId}`);
       return res.status(201).json({ msg: 'success' });
-    }));
+    })));
 
   // the signed in user's reputation score, shown on their profile
   router.get('/api/users/me/stats', requireAuth, asyncRoute('Could not load your rating, try again later',
