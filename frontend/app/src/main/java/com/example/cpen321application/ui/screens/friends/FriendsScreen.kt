@@ -38,6 +38,8 @@ import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.components.sportsFieldColors
 import com.example.cpen321application.ui.components.emptyListNote
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Friends screen shows. A non blank query shows searchResults instead of the
@@ -55,15 +57,15 @@ data class FriendsUiState(
 
 // what the Friends screen's controls do
 data class FriendsActions(
-    val onQueryChange: (String) -> Unit = {},
+    val onQueryChange: (String) -> Unit = noActionWith,
     val onRetry: (() -> Unit)? = null,
-    val onAddFriend: (FriendPerson) -> Unit = {},
-    val onOpenFriendRequests: () -> Unit = {},
-    val onOpenProfile: (Int) -> Unit = {},
-    val onOpenChat: (FriendPerson) -> Unit = {},
+    val onAddFriend: (FriendPerson) -> Unit = noActionWith,
+    val onOpenFriendRequests: () -> Unit = noAction,
+    val onOpenProfile: (Int) -> Unit = noActionWith,
+    val onOpenChat: (FriendPerson) -> Unit = noActionWith,
     // called once the user confirmed, removing also deletes the chat with them
-    val onRemoveFriend: (FriendPerson) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onRemoveFriend: (FriendPerson) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*

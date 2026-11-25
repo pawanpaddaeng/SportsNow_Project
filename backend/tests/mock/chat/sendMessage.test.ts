@@ -1,14 +1,14 @@
 import * as chatsDb from '../../../src/chat/db/chats';
 import { type ChatMessage } from '../../../src/chat/db/chats';
-import { type ChatSocket, startChatSocket } from '../../../src/chat/socket/chatSocket';
+import { startChatSocket } from '../../../src/chat/socket/chatSocket';
 import * as logger from '../../../src/core/logger';
 import * as push from '../../../src/core/notifications/push';
 import { createAuthToken } from '../../../src/user/auth/jwt';
 import * as usersDb from '../../../src/user/db/users';
 import {
-  closeAllClients,
   connectToChat,
   openChatConnection,
+  useChatServer,
   waitForChatServer,
   waitUntil,
 } from '../../chatSocketClient';
@@ -25,20 +25,7 @@ const HEARTBEAT_MS = 30_000;
 // the id of the test chat
 const CHAT_ID = 7;
 
-let chatSocket: ChatSocket;
-
-beforeAll(async () => {
-  chatSocket = startChatSocket(PORT);
-  expect(await waitForChatServer(PORT)).toBe(true);
-});
-
-afterAll(() => {
-  chatSocket.close();
-});
-
-afterEach(() => {
-  closeAllClients();
-});
+useChatServer(PORT);
 
 cleanUpAfterTests();
 

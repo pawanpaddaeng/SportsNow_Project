@@ -42,6 +42,8 @@ import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.components.emptyListNote
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 import java.time.Instant
 
@@ -60,9 +62,9 @@ data class NotificationsUiState(
 // what the Notifications screen's controls do
 data class NotificationsActions(
     val onRetry: (() -> Unit)? = null,
-    val onOpenFriendRequests: () -> Unit = {},
-    val onOpenNotification: (AppNotification) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onOpenFriendRequests: () -> Unit = noAction,
+    val onOpenNotification: (AppNotification) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*

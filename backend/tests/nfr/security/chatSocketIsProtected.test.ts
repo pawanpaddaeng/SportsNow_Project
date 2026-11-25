@@ -1,6 +1,5 @@
-import { type ChatSocket, startChatSocket } from '../../../src/chat/socket/chatSocket';
 import { createAuthToken } from '../../../src/user/auth/jwt';
-import { closeAllClients, openChatConnection, waitForChatServer } from '../../chatSocketClient';
+import { openChatConnection, useChatServer } from '../../chatSocketClient';
 import { gameChatId } from '../../no-mock/chat/chatHelpers';
 import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../../no-mock/helpers';
 import { expiredToken, forgedToken, unsignedToken } from './securityHelpers';
@@ -13,20 +12,7 @@ import { expiredToken, forgedToken, unsignedToken } from './securityHelpers';
 // this file's own port, test files run at the same time
 const PORT = 18105;
 
-let chatSocket: ChatSocket;
-
-beforeAll(async () => {
-  chatSocket = startChatSocket(PORT);
-  expect(await waitForChatServer(PORT)).toBe(true);
-});
-
-afterAll(() => {
-  chatSocket.close();
-});
-
-afterEach(() => {
-  closeAllClients();
-});
+useChatServer(PORT);
 
 cleanUpAfterTests();
 

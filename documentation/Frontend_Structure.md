@@ -144,7 +144,7 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), back-button title bar, form fields and submit button, chips, map preview, cards, avatar circles (`AvatarCircle.kt`), request cards with their Decline/Accept buttons (`RequestCard.kt`), a list's loading bar, error and empty note (`ListStatus.kt`), and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
+| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), back-button title bar, form fields and submit button, chips, map preview, cards, avatar circles (`AvatarCircle.kt`), request cards with their Decline/Accept buttons (`RequestCard.kt`), a list's loading bar, error and empty note (`ListStatus.kt`), `noAction` / `noActionWith` (`NoAction.kt`, the do-nothing default for every screen's `Actions` callbacks), and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
@@ -155,7 +155,7 @@ Screens only draw and report taps. They never call the server.
 | `screens/chat/` | Chat |
 | `theme/` | Colours, fonts and the app theme |
 
-A screen with an `…Parts`, `…Sections`, `…Fields`, `…Buttons` or `…Card` file next to it was split into smaller files (e.g. Game Details' `GameDetailsButtons.kt` and `GameDetailsJoinButton.kt`). Those files belong to that screen only.
+A screen with an `…Parts`, `…Sections`, `…Fields`, `…Buttons` or `…Card` file next to it was split into smaller files (e.g. Game Details' `GameDetailsButtons.kt` and `GameDetailsJoinButton.kt`, or Profile's `ProfileReputationCard.kt`). Those files belong to that screen only.
 
 ## How a request flows
 

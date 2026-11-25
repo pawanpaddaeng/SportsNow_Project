@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws';
+import { startChatSocket } from '../src/chat/socket/chatSocket';
 
 // a test app on the chat WebSocket, shared by the mocked and unmocked chat tests
 
@@ -162,4 +163,24 @@ export async function waitUntil(isDone: () => boolean): Promise<boolean> {
     await sleep(CHECK_EVERY_MS);
   }
   return isDone();
+}
+
+/*  starts the chat WebSocket server on port before this file's tests and stops it after
+    them, closing any connection a test left open after each test
+ */
+export function useChatServer(port: number): void {
+  let chatSocket: ReturnType<typeof startChatSocket>;
+
+  beforeAll(async () => {
+    chatSocket = startChatSocket(port);
+    expect(await waitForChatServer(port)).toBe(true);
+  });
+
+  afterAll(() => {
+    chatSocket.close();
+  });
+
+  afterEach(() => {
+    closeAllClients();
+  });
 }
