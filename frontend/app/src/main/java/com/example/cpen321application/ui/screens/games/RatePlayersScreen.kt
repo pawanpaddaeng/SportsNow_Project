@@ -24,6 +24,7 @@ import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.ScrollingTabScreen
 import com.example.cpen321application.ui.components.SurfaceCard
 import com.example.cpen321application.ui.components.cardBackground
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
@@ -40,8 +41,8 @@ data class RatePlayersUiState(
 data class RatePlayersActions(
     val onBack: () -> Unit,
     val onRetry: (() -> Unit)? = null,
-    val onPlayerClick: (PlayerToRate) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onPlayerClick: (PlayerToRate) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 // the other players who showed up to a completed game, rating each of them is optional

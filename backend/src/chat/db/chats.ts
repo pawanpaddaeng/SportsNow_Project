@@ -75,20 +75,23 @@ export interface ChatAccess {
   isMember: boolean;
   // the game was completed or cancelled, the chat can be read but not written to. Friend chats never close
   isClosed: boolean;
-  isFriendChat: boolean;
+  // the game a game's chat belongs to and its title, for its message notifications. Both null for a friend chat
+  gameId: number | null;
+  gameTitle: string | null;
 }
 
 interface ChatAccessRow {
   // null for a friend chat
   status: string | null;
+  game_id: number | null;
+  title: string | null;
   is_member: number;
-  is_friend_chat: number;
 }
 
 // the user's access to the chat, or null if no chat has the id
 export async function getChatAccess(chatId: number, userId: number): Promise<ChatAccess | null> {
   const rows = await selectRows<ChatAccessRow>(
-    `SELECT g.status, c.game_id IS NULL AS is_friend_chat,
+    `SELECT g.status, c.game_id, g.title,
             EXISTS (SELECT 1 FROM game_players p WHERE p.game_id = c.game_id AND p.user_id = ?)
             OR EXISTS (SELECT 1 FROM friendships f
                        WHERE f.user_id = ?
@@ -104,7 +107,8 @@ export async function getChatAccess(chatId: number, userId: number): Promise<Cha
   return {
     isMember: Number(row.is_member) === 1,
     isClosed: row.status !== null && row.status !== 'scheduled',
-    isFriendChat: Number(row.is_friend_chat) === 1,
+    gameId: row.game_id,
+    gameTitle: row.title,
   };
 }
 

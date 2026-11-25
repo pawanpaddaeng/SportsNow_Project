@@ -1,4 +1,4 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import {
   type CompleteGameProblem,
   type Game,
@@ -10,6 +10,8 @@ import {
 import { invalidRequest } from '../../core/http/responses';
 import { logError } from '../../core/logger';
 import { readId } from '../../core/validation';
+import { getAuthUser } from '../../user/auth/middleware';
+import type { User } from '../../user/db/users';
 
 // notifications are best effort, a failure is only logged
 export function logNotificationError(error: unknown): void {
@@ -77,6 +79,35 @@ export async function requireGame(raw: string, res: Response): Promise<Game | nu
   const game = await getGameById(gameId);
   if (!game) sendError(res, gameChangeError('not_found'));
   return game;
+}
+
+// a request to a route under /api/games/:gameId, with its body typed as Body
+export type GameRequest<Body = unknown> = Request<{ gameId: string }, unknown, Body>;
+
+/*  a route handler under /api/games/:gameId that runs with the signed in user and the
+    route's game id, after answering 400 invalid_request itself for a malformed id
+ */
+export function withGameId<Body = unknown>(
+  handler: (user: User, gameId: number, req: GameRequest<Body>, res: Response) => Promise<unknown>,
+): (req: GameRequest<Body>, res: Response) => Promise<unknown> {
+  return async (req, res) => {
+    const gameId = requireGameId(req.params.gameId, res);
+    if (gameId === null) return;
+    return handler(getAuthUser(res), gameId, req, res);
+  };
+}
+
+/*  like withGameId, with the game itself, after answering 404 not_found when no game has
+    the id
+ */
+export function withGame(
+  handler: (user: User, game: Game, req: GameRequest, res: Response) => Promise<unknown>,
+): (req: GameRequest, res: Response) => Promise<unknown> {
+  return async (req, res) => {
+    const game = await requireGame(req.params.gameId, res);
+    if (!game) return;
+    return handler(getAuthUser(res), game, req, res);
+  };
 }
 
 // responses for a game the organizer can't mark completed, the rest as for edits

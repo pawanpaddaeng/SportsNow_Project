@@ -32,3 +32,16 @@ export function validGameBody(overrides: Record<string, unknown> = {}): Record<s
     ...overrides,
   };
 }
+
+// the parts of a server reply the tests read
+export interface ApiReply {
+  status: number;
+  body: { msg?: string; error?: string; game?: unknown };
+}
+
+// checks a 200 success reply whose game has the given fields, e.g. { game_id: 42, status: 'cancelled' }
+export function expectGameReply(response: ApiReply, fields: Record<string, unknown>): void {
+  expect(response.status).toBe(200);
+  expect(response.body.msg).toBe('success');
+  expect(response.body.game).toMatchObject(fields);
+}

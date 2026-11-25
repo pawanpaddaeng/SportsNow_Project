@@ -1,51 +1,36 @@
-import { type ChatSocket, startChatSocket } from '../../../src/chat/socket/chatSocket';
 import { MAX_MESSAGE_LENGTH } from '../../../src/chat/validation/sendMessage';
 import { executeWrite } from '../../../src/core/db/mysql';
 import * as push from '../../../src/core/notifications/push';
 import { createAuthToken } from '../../../src/user/auth/jwt';
-import {
-  closeAllClients,
-  connectToChat,
-  openChatConnection,
-  waitForChatServer,
-  waitUntil,
-} from '../../chatSocketClient';
+import { connectToChat, openChatConnection, useChatServer, waitUntil } from '../../chatSocketClient';
 import { makeFriends } from '../friend/friendHelpers';
 import { addGame, addPlayer, addUser, cleanUpAfterTests, setGameStatus } from '../helpers';
-import { gameChatId, getSavedMessages, MISSING_CHAT_ID, removeFromGame } from './chatHelpers';
+import {
+  addGameWithChat,
+  gameChatId,
+  getSavedMessages,
+  ISO_TIME,
+  MISSING_CHAT_ID,
+  removeFromGame,
+} from './chatHelpers';
 
 // this file's own port, test files run at the same time
 const PORT = 18101;
 // the close code for a user who is no longer in the chat
 const CLOSE_NOT_A_MEMBER = 4403;
-// a message's time as it is sent, UTC without milliseconds
-const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
-let chatSocket: ChatSocket;
 let organizerId: number;
 let playerId: number;
 let gameId: number;
 let chatId: number;
 
-beforeAll(async () => {
-  chatSocket = startChatSocket(PORT);
-  expect(await waitForChatServer(PORT)).toBe(true);
-});
-
-afterAll(() => {
-  chatSocket.close();
-});
+useChatServer(PORT);
 
 beforeEach(async () => {
-  organizerId = await addUser('Olive');
-  playerId = await addUser('Pat');
-  gameId = await addGame(organizerId);
-  await addPlayer(gameId, playerId);
-  chatId = await gameChatId(gameId);
+  ({ organizerId, playerId, gameId, chatId } = await addGameWithChat());
 });
 
 afterEach(() => {
-  closeAllClients();
   jest.restoreAllMocks();
 });
 
@@ -308,42 +293,62 @@ describe('Unmocked: WebSocket send_message', () => {
     // 1. a friend chat, the friend isn't connected
     const friendId = await addUser('Fern');
     const friendChatId = await makeFriends(playerId, friendId);
-    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers');
-    const player = await connectToChat(PORT, friendChatId, createAuthToken(playerId));
 
-    // 2. the friend is notified
-    player.sendMessage(friendChatId, 'Lunch?', 'f-1');
-    await player.nextReply();
-    const notification = {
+    // 2. the friend is notified of the first message only
+    await expectPushOnlyWhileAway({ chatId: friendChatId, senderId: playerId, recipientId: friendId, text: 'Lunch?' }, {
       title: 'Pat',
       body: 'Lunch?',
       data: { type: 'friend_message', chatId: String(friendChatId), friendName: 'Pat Tester' },
       tag: `friend-${playerId}`,
-    };
-    await waitUntil(() => sendPushToUsers.mock.calls.length === 1);
-    expect(sendPushToUsers).toHaveBeenCalledWith([friendId], notification);
-
-    // 3. once the friend has the chat open, nobody is left to notify
-    const friend = await connectToChat(PORT, friendChatId, createAuthToken(friendId));
-    player.sendMessage(friendChatId, 'Lunch?', 'f-2');
-    expect(await friend.nextReply()).toMatchObject({ type: 'new_message', client_id: 'f-2' });
-    await waitUntil(() => sendPushToUsers.mock.calls.length === 2);
-    expect(sendPushToUsers).toHaveBeenCalledTimes(2);
-    expect(sendPushToUsers).toHaveBeenLastCalledWith([], notification);
+    });
   });
 
-  // Input: the player sends a message in the game chat while the organizer isn't connected
+  // Input: in the game chat, the player sends "Bringing a ball" while the organizer doesn't
+  //   have the chat open, then again once the organizer has it open
   // Expected status code: none, it's a WebSocket reply
-  // Expected behavior: game chat messages don't send notifications
-  // Expected output: new_message to the player, sendPushToUsers is never called
-  test('Game chat messages send no notification', async () => {
-    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers');
-    const player = await connectToChat(PORT, chatId, createAuthToken(playerId));
-
-    player.sendMessage(chatId, 'Bringing a ball', 'g-1');
-
-    expect(await player.nextReply()).toMatchObject({ type: 'new_message', client_id: 'g-1' });
-    await player.unreadReplies();
-    expect(sendPushToUsers).not.toHaveBeenCalled();
+  // Expected behavior: the organizer is sent a notification for the first message only, the
+  //   second reached them over the WebSocket. The test users have no devices, so no
+  //   notification leaves the server
+  // Expected output: sendPushToUsers([organizer], { title: "Evening Basketball", body:
+  //   "Pat: Bringing a ball", data: { type: "game_message", gameId }, tag: "game-<gameId>" }),
+  //   then sendPushToUsers([], ...)
+  test('Game players are notified of a message unless they have the chat open', async () => {
+    // the game's chat, the organizer isn't connected and is notified of the first message only
+    await expectPushOnlyWhileAway({ chatId, senderId: playerId, recipientId: organizerId, text: 'Bringing a ball' }, {
+      title: 'Evening Basketball',
+      body: 'Pat: Bringing a ball',
+      data: { type: 'game_message', gameId: String(gameId) },
+      tag: `game-${gameId}`,
+    });
   });
 });
+
+// a message sent twice in a chat: first while the recipient doesn't have it open, then once they do
+interface AwayMessage {
+  chatId: number;
+  senderId: number;
+  recipientId: number;
+  text: string;
+}
+
+/*  the sender sends the message while the recipient doesn't have the chat open, which must
+    push notification to them, then again once they have it open, which must push to nobody
+    since it reached them over the WebSocket. sendPushToUsers is watched without replacing
+    it, the test users have no devices
+ */
+async function expectPushOnlyWhileAway(message: AwayMessage, notification: push.PushMessage): Promise<void> {
+  const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers');
+  const sender = await connectToChat(PORT, message.chatId, createAuthToken(message.senderId));
+
+  sender.sendMessage(message.chatId, message.text, 'away');
+  expect(await sender.nextReply()).toMatchObject({ type: 'new_message', client_id: 'away' });
+  await waitUntil(() => sendPushToUsers.mock.calls.length === 1);
+  expect(sendPushToUsers).toHaveBeenCalledWith([message.recipientId], notification);
+
+  const recipient = await connectToChat(PORT, message.chatId, createAuthToken(message.recipientId));
+  sender.sendMessage(message.chatId, message.text, 'open');
+  expect(await recipient.nextReply()).toMatchObject({ type: 'new_message', client_id: 'open' });
+  await waitUntil(() => sendPushToUsers.mock.calls.length === 2);
+  expect(sendPushToUsers).toHaveBeenCalledTimes(2);
+  expect(sendPushToUsers).toHaveBeenLastCalledWith([], notification);
+}

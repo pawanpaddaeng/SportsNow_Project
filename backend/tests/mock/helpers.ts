@@ -14,11 +14,8 @@ export { api, ONE_DAY_MS, validGameBody, withToken };
 // the id of the test game
 export const GAME_ID = 42;
 
-// the parts of a server reply the tests read
-export interface ApiReply {
-  status: number;
-  body: { msg?: string; error?: string; game?: unknown };
-}
+// the parts of a server reply the tests read, kept in sharedHelpers for the unmocked tests too
+export type { ApiReply } from '../sharedHelpers';
 
 // the user organizing the test game
 export function testOrganizer(): User {

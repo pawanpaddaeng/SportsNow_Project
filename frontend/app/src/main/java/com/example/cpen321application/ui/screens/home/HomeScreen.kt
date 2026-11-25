@@ -34,6 +34,8 @@ import com.example.cpen321application.ui.components.InitialAvatar
 import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.Pill
 import com.example.cpen321application.ui.components.cardBackground
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Home screen shows. isRefreshing shows a loading bar while the list updates,
@@ -48,10 +50,10 @@ data class HomeUiState(
 
 // what the Home screen's controls do
 data class HomeActions(
-    val onCreateGame: () -> Unit = {},
-    val onRefresh: () -> Unit = {},
-    val onGameClick: (GameSummary) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onCreateGame: () -> Unit = noAction,
+    val onRefresh: () -> Unit = noAction,
+    val onGameClick: (GameSummary) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*

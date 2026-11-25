@@ -33,11 +33,13 @@ import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.ConfirmDialog
 import com.example.cpen321application.ui.components.ConfirmText
-import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.components.loadStatus
 import com.example.cpen321application.ui.components.pillBackground
 import com.example.cpen321application.ui.components.sportsFieldColors
+import com.example.cpen321application.ui.components.emptyListNote
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Friends screen shows. A non blank query shows searchResults instead of the
@@ -55,15 +57,15 @@ data class FriendsUiState(
 
 // what the Friends screen's controls do
 data class FriendsActions(
-    val onQueryChange: (String) -> Unit = {},
+    val onQueryChange: (String) -> Unit = noActionWith,
     val onRetry: (() -> Unit)? = null,
-    val onAddFriend: (FriendPerson) -> Unit = {},
-    val onOpenFriendRequests: () -> Unit = {},
-    val onOpenProfile: (Int) -> Unit = {},
-    val onOpenChat: (FriendPerson) -> Unit = {},
+    val onAddFriend: (FriendPerson) -> Unit = noActionWith,
+    val onOpenFriendRequests: () -> Unit = noAction,
+    val onOpenProfile: (Int) -> Unit = noActionWith,
+    val onOpenChat: (FriendPerson) -> Unit = noActionWith,
     // called once the user confirmed, removing also deletes the chat with them
-    val onRemoveFriend: (FriendPerson) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onRemoveFriend: (FriendPerson) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*
@@ -138,9 +140,7 @@ private fun LazyListScope.searchResults(state: FriendsUiState, actions: FriendsA
             }
         }
     }
-    if (state.searchResults.isEmpty() && !state.isLoading && state.errorMessage == null) {
-        item(key = "noResults") { ListNote("No one found with that name.") }
-    }
+    emptyListNote(state.searchResults, state.isLoading, state.errorMessage, key = "noResults", text = "No one found with that name.")
 }
 
 private fun LazyListScope.friendsList(
@@ -162,9 +162,10 @@ private fun LazyListScope.friendsList(
             )
         }
     }
-    if (state.friends.isEmpty() && !state.isLoading && state.errorMessage == null) {
-        item(key = "noFriends") { ListNote("No friends yet. Search for someone by name to send them a request.") }
-    }
+    emptyListNote(
+        state.friends, state.isLoading, state.errorMessage, key = "noFriends",
+        text = "No friends yet. Search for someone by name to send them a request."
+    )
 }
 
 @Composable

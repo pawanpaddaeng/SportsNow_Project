@@ -1,9 +1,8 @@
 import { performance } from 'perf_hooks';
 
-import { type ChatSocket, startChatSocket } from '../../src/chat/socket/chatSocket';
 import { logInfo } from '../../src/core/logger';
 import { createAuthToken } from '../../src/user/auth/jwt';
-import { closeAllClients, connectToChat, waitForChatServer } from '../chatSocketClient';
+import { connectToChat, useChatServer } from '../chatSocketClient';
 import { gameChatId } from '../no-mock/chat/chatHelpers';
 import { addGame, addPlayer, addUser, cleanUpAfterTests } from '../no-mock/helpers';
 
@@ -21,20 +20,7 @@ const LIMIT_MS = 1000;
 // 20 messages, each allowed up to 1 second, takes longer than Jest's default 5 seconds
 jest.setTimeout(60_000);
 
-let chatSocket: ChatSocket;
-
-beforeAll(async () => {
-  chatSocket = startChatSocket(PORT);
-  expect(await waitForChatServer(PORT)).toBe(true);
-});
-
-afterAll(() => {
-  chatSocket.close();
-});
-
-afterEach(() => {
-  closeAllClients();
-});
+useChatServer(PORT);
 
 cleanUpAfterTests();
 

@@ -62,7 +62,7 @@ backend/src/
 | `routes/joinRequestRoutes.ts` | Send a join request, list pending requests, approve or decline |
 | `routes/inviteRoutes.ts` | `POST /api/games/:gameId/invites`: the organiser invites friends, each gets a `game_invite` notification |
 | `routes/gameJson.ts` | The JSON shapes sent to the app for games, players, Discover results and join requests |
-| `routes/gameErrors.ts` | Game id parsing, `readBackGame`, and the error tables that map problems like `game_full` to a status and message |
+| `routes/gameErrors.ts` | Game id parsing, `withGameId` / `withGame` (wrap a `/api/games/:gameId` handler so it gets the signed in user and the game id or game, after the 400/404 replies), `readBackGame`, and the error tables that map problems like `game_full` to a status and message |
 | `db/games.ts` | Game queries: create, read, my games, discover (distance search), update, cancel, players, and `lockGameForChange` |
 | `db/joinRequests.ts` | Join request queries: create, list pending, approve/decline, pending count and the user's request status |
 | `db/invites.ts` | `checkInvites`: the game is the organiser's and not cancelled, started or full, and everyone invited is their friend and not in it yet. Invites aren't stored, only their notifications are |
@@ -113,7 +113,8 @@ Only notifications a user should still see after dismissing the push are saved: 
 | --- | --- |
 | `routes/chatRoutes.ts` | `GET /api/chats/:chatId/messages`, a page of earlier messages for a current member of the chat |
 | `routes/chatJson.ts` | The JSON shape of a message, the same from the endpoint and the WebSocket |
-| `socket/chatSocket.ts` | The WebSocket server: checks who connects, sends messages to everyone in the chat, drops dead connections, and notifies a friend who doesn't have the chat open |
+| `socket/chatSocket.ts` | The WebSocket server: checks who connects, sends messages to everyone in the chat, drops dead connections, and sends a push to the chat's other members who don't have it open |
+| `socket/messagePush.ts` | What a new message's push says: a friend's message as `friend_message` (titled with their name), a game chat's as `game_message` (titled with the game), each showing the first 100 characters |
 | `db/chats.ts` | Chat queries: create a game's or two friends' chat, find a friend's chat, read access, read a page of messages, save a message |
 | `validation/sendMessage.ts` | Checks a `send_message` request: its type, chat id and text |
 
@@ -130,7 +131,7 @@ Example: a player taps **Send Request** in the app's join request popup.
 1. **Request arrives.** The app sends `POST /api/games/42/join-requests` with `Authorization: Bearer <jwt>` and a body like `{ "skill_level": "intermediate", "play_frequency": "weekly", "message": "..." }`.
 2. **Router.** `app.ts` parses the JSON body with `express.json()` and passes the request to `joinRequestsRouter`, which matches the path.
 3. **Auth.** `requireAuth` (`user/auth/middleware.ts`) reads the JWT and checks it with `verifyAuthToken`. It then loads the user with `findUserById`. If the token is missing, expired or invalid, it replies `400` or `401` and the handler never runs. Otherwise it stores the user for `getAuthUser(res)`.
-4. **Check the input.** The handler reads the game id with `requireGameId` (`gameErrors.ts`), then checks the body with `parseJoinRequest` (`validation/joinRequest.ts`). A bad value replies `400 invalid_request` through `invalidRequest`.
+4. **Check the input.** The handler is wrapped in `withGameId` (`gameErrors.ts`), which reads the game id (replying `400` for a bad one) and the signed in user. The handler then checks the body with `parseJoinRequest` (`validation/joinRequest.ts`). A bad value replies `400 invalid_request` through `invalidRequest`.
 5. **Database.** `createJoinRequest` (`db/joinRequests.ts`) runs in `inTransaction`:
    - It reads the game with `SELECT … FOR UPDATE`, which locks the game's row until the transaction ends. Two requests or approvals at the same moment can't both pass the checks.
    - It checks the rules: the game exists, isn't the user's own, isn't cancelled, started or full, and the user isn't already a player.

@@ -16,13 +16,15 @@ import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.components.ScrollingTabScreen
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 
 // the Game Details actions that wait for the server, each with its own button and what's shown once it's done
-enum class GameAction(val doneMessage: String) {
-    Cancel("Game cancelled"),
-    Complete("Game completed"),
-    Leave("You left the game")
+enum class GameAction(val doneMessage: String, val buttonLabel: String) {
+    Cancel("Game cancelled", "Cancel Game"),
+    Complete("Game completed", "Mark as Completed"),
+    Leave("You left the game", "Leave Game")
 }
 
 /*  what the Game Details screen shows. details is null until the game loads; isLoading
@@ -45,18 +47,18 @@ data class GameDetailsUiState(
 data class GameDetailsActions(
     val onBack: () -> Unit,
     val onRetry: (() -> Unit)? = null,
-    val onEdit: () -> Unit = {},
-    val onDirections: (GameLocation) -> Unit = {},
-    val onJoinRequests: () -> Unit = {},
-    val onOpenChat: () -> Unit = {},
-    val onInviteFriends: () -> Unit = {},
-    val onGameAction: (GameAction) -> Unit = {},
-    val onCompleteGame: (noShowUserIds: List<Int>) -> Unit = {},
-    val onRatePlayers: () -> Unit = {},
-    val onRemovePlayer: (GamePlayer) -> Unit = {},
-    val onOpenProfile: (Int) -> Unit = {},
-    val onRequestToJoin: () -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onEdit: () -> Unit = noAction,
+    val onDirections: (GameLocation) -> Unit = noActionWith,
+    val onJoinRequests: () -> Unit = noAction,
+    val onOpenChat: () -> Unit = noAction,
+    val onInviteFriends: () -> Unit = noAction,
+    val onGameAction: (GameAction) -> Unit = noActionWith,
+    val onCompleteGame: (noShowUserIds: List<Int>) -> Unit = noActionWith,
+    val onRatePlayers: () -> Unit = noAction,
+    val onRemovePlayer: (GamePlayer) -> Unit = noActionWith,
+    val onOpenProfile: (Int) -> Unit = noActionWith,
+    val onRequestToJoin: () -> Unit = noAction,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*

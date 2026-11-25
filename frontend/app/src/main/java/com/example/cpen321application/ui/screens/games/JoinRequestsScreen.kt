@@ -23,6 +23,7 @@ import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.RequestCardFrame
 import com.example.cpen321application.ui.components.loadStatus
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 
 /*  what the Join Requests screen shows. header is null until the game loads. isLoading
@@ -41,10 +42,10 @@ data class JoinRequestsUiState(
 data class JoinRequestsActions(
     val onBack: () -> Unit,
     val onRetry: (() -> Unit)? = null,
-    val onApprove: (JoinRequestItem) -> Unit = {},
-    val onDecline: (JoinRequestItem) -> Unit = {},
-    val onOpenProfile: (Int) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onApprove: (JoinRequestItem) -> Unit = noActionWith,
+    val onDecline: (JoinRequestItem) -> Unit = noActionWith,
+    val onOpenProfile: (Int) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*

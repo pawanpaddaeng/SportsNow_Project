@@ -68,14 +68,16 @@ fun AnimatedBadge(badge: Badge, modifier: Modifier = Modifier) {
 }
 
 /*  the badges three to a row, each with its name underneath. Badges in earned are in colour,
-    the rest grey. When onOpen is given, tapping an earned badge calls it
+    the rest grey. When onOpen is given, tapping an earned badge calls it. showHints adds how
+    to earn each badge under its name, on the user's own profile
  */
 @Composable
 fun BadgeGrid(
     badges: List<Badge>,
     earned: Set<Badge>,
     modifier: Modifier = Modifier,
-    onOpen: ((Badge) -> Unit)? = null
+    onOpen: ((Badge) -> Unit)? = null,
+    showHints: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = modifier.fillMaxWidth()) {
         badges.chunked(BADGES_PER_ROW).forEach { row ->
@@ -85,6 +87,7 @@ fun BadgeGrid(
                         badge = badge,
                         earned = badge in earned,
                         onOpen = onOpen,
+                        hint = badge.hint.takeIf { showHints },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -102,7 +105,7 @@ private val EarnedLook = CellLook(SportsOnSurface, FontWeight.Medium, status = "
 private val LockedLook = CellLook(SportsOnSurfaceVariant, FontWeight.Normal, status = "not earned yet")
 
 @Composable
-private fun BadgeCell(badge: Badge, earned: Boolean, onOpen: ((Badge) -> Unit)?, modifier: Modifier) {
+private fun BadgeCell(badge: Badge, earned: Boolean, onOpen: ((Badge) -> Unit)?, hint: String?, modifier: Modifier) {
     val look = if (earned) EarnedLook else LockedLook
     val canOpen = earned && onOpen != null
     Column(
@@ -118,7 +121,7 @@ private fun BadgeCell(badge: Badge, earned: Boolean, onOpen: ((Badge) -> Unit)?,
                 }
             )
             .semantics(mergeDescendants = true) {
-                contentDescription = "${badge.title} badge, ${look.status}"
+                contentDescription = listOfNotNull("${badge.title} badge, ${look.status}", hint).joinToString(". ")
             }
             .padding(vertical = 4.dp)
     ) {
@@ -131,6 +134,17 @@ private fun BadgeCell(badge: Badge, earned: Boolean, onOpen: ((Badge) -> Unit)?,
             textAlign = TextAlign.Center,
             maxLines = 2
         )
+        // how to earn it, in a few words, when the grid shows hints
+        hint?.let {
+            Text(
+                text = it,
+                color = SportsOnSurfaceVariant,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2
+            )
+        }
     }
 }
 

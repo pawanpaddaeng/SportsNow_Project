@@ -8,6 +8,7 @@ import { checkToken } from '../../user/auth/middleware';
 import { type ChatMessage, createChatMessage, getChatAccess, getChatMemberIds } from '../db/chats';
 import { chatMessageJson } from '../routes/chatJson';
 import { parseSendMessage, type SendMessage } from '../validation/sendMessage';
+import { messagePush } from './messagePush';
 
 // far more than the longest message, larger requests close the connection
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -15,8 +16,6 @@ const MAX_REQUEST_BYTES = 16 * 1024;
 const HEARTBEAT_MS = 30_000;
 // close code for a user who can no longer be in the chat, or a chat that is gone
 const CLOSE_NOT_A_MEMBER = 4403;
-// how much of a message its notification shows, in characters
-const PUSH_PREVIEW_LENGTH = 100;
 
 // who a connection belongs to and the one chat it is open for
 interface ChatClient {
@@ -56,24 +55,6 @@ function sendJson(webSocket: WebSocket, reply: object): void {
   }
 }
 
-// the notification for a friend's message, tagged so their messages show as one notification
-function friendMessagePush(message: ChatMessage): PushMessage {
-  // by character, cutting by length could split an emoji in two
-  const characters = Array.from(message.text);
-  const preview = characters.slice(0, PUSH_PREVIEW_LENGTH).join('');
-  return {
-    title: message.senderFirstName,
-    body: characters.length > PUSH_PREVIEW_LENGTH ? `${preview}...` : preview,
-    // the chat and its title, so tapping the notification opens it straight away
-    data: {
-      type: 'friend_message',
-      chatId: String(message.chatId),
-      friendName: `${message.senderFirstName} ${message.senderLastName}`.trim(),
-    },
-    tag: `friend-${message.senderId}`,
-  };
-}
-
 /*  decides who is connecting and to which chat: ?chat_id= and the JWT in the Authorization
     header. Returns the new client, or the status to reject with. A closed chat can still
     be opened, sending to it is what fails
@@ -100,8 +81,8 @@ async function checkConnection(req: IncomingMessage): Promise<ChatClient | numbe
       receives { type: "error", msg, error, client_id } when its message wasn't sent:
                invalid_request, chat_not_found, forbidden, chat_closed or server_error
     Connecting is rejected with 400 (no chat_id or token), 401 (bad token), 403 (not a
-    player of the game or a friend), 404 (no such chat) or 500. A friend's message also
-    sends a notification, unless they have the chat open
+    player of the game or a friend), 404 (no such chat) or 500. A message also sends a
+    notification to the chat's other members who don't have it open
  */
 export function startChatSocket(port: number): ChatSocket {
   const webSockets = new WebSocketServer({ noServer: true, maxPayload: MAX_REQUEST_BYTES });
@@ -127,15 +108,15 @@ export function startChatSocket(port: number): ChatSocket {
     }
   }
 
-  // notifies the friend of a new message, unless it already reached them because they have the chat open
-  async function notifyFriend(message: ChatMessage): Promise<void> {
+  // sends push to the chat's members other than the sender who don't have the chat open, the message already reached those who do
+  async function notifyAbsentMembers(message: ChatMessage, push: PushMessage): Promise<void> {
     const connected = new Set<number>();
     for (const client of clients.values()) {
       if (client.chatId === message.chatId) connected.add(client.userId);
     }
     const memberIds = await getChatMemberIds(message.chatId);
     const absent = memberIds.filter((id) => id !== message.senderId && !connected.has(id));
-    await sendPushToUsers(absent, friendMessagePush(message));
+    await sendPushToUsers(absent, push);
   }
 
   // checks again on every message, the user may have left or the game may have ended since connecting
@@ -173,11 +154,9 @@ export function startChatSocket(port: number): ChatSocket {
     });
 
     // best effort, the message is already delivered and saved so a failure is only logged
-    if (access.isFriendChat) {
-      notifyFriend(saved).catch((error: unknown) => {
-        logError(`Notifying about a message in chat ${client.chatId} failed:`, error);
-      });
-    }
+    notifyAbsentMembers(saved, messagePush(saved, access)).catch((error: unknown) => {
+      logError(`Notifying about a message in chat ${client.chatId} failed:`, error);
+    });
   }
 
   function handleRequest(webSocket: WebSocket, client: ChatClient, raw: RawData): void {

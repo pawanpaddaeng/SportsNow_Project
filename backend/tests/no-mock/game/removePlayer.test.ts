@@ -1,4 +1,5 @@
 import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, getPlayerIds } from '../helpers';
+import { type ApiReply, expectGameReply } from '../../sharedHelpers';
 
 let organizerId: number;
 let playerId: number;
@@ -26,9 +27,7 @@ describe('Unmocked: DELETE /api/games/{gameId}/players/{userId}', () => {
     const response = await api.delete(`/api/games/${gameId}/players/${playerId}`).set(asUser(organizerId));
 
     // 3. check the reply
-    expect(response.status).toBe(200);
-    expect(response.body.msg).toBe('success');
-    expect(response.body.game).toMatchObject({ game_id: gameId, player_count: 1 });
+    expectGameReply(response as ApiReply, { game_id: gameId, player_count: 1 });
 
     // 4. check only the organizer is left in the game
     expect(await getPlayerIds(gameId)).toEqual([organizerId]);

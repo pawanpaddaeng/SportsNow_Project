@@ -1,5 +1,6 @@
 import { getGameById } from '../../../src/game/db/games';
 import { addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../helpers';
+import { type ApiReply, expectGameReply } from '../../sharedHelpers';
 
 let organizerId: number;
 
@@ -24,9 +25,7 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
     const response = await api.post(`/api/games/${gameId}/complete`).set(asUser(organizerId));
 
     // 3. check it was completed
-    expect(response.status).toBe(200);
-    expect(response.body.msg).toBe('success');
-    expect(response.body.game).toMatchObject({ game_id: gameId, status: 'completed' });
+    expectGameReply(response as ApiReply, { game_id: gameId, status: 'completed' });
     expect((await getGameById(gameId))?.status).toBe('completed');
   });
 

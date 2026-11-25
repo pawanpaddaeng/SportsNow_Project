@@ -10,6 +10,7 @@ import {
   MISSING_GAME_ID,
   withToken,
 } from '../helpers';
+import { type ApiReply, expectGameReply } from '../../sharedHelpers';
 
 let organizerId: number;
 let otherUserId: number;
@@ -36,9 +37,7 @@ describe('Unmocked: POST /api/games/{gameId}/cancel', () => {
     const response = await api.post(`/api/games/${gameId}/cancel`).set(asUser(organizerId));
 
     // 3. check it was cancelled
-    expect(response.status).toBe(200);
-    expect(response.body.msg).toBe('success');
-    expect(response.body.game).toMatchObject({ game_id: gameId, status: 'cancelled' });
+    expectGameReply(response as ApiReply, { game_id: gameId, status: 'cancelled' });
     expect((await getGameById(gameId))?.status).toBe('cancelled');
   });
 

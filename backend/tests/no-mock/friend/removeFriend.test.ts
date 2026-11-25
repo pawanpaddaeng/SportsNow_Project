@@ -1,28 +1,19 @@
-import { type ChatSocket, startChatSocket } from '../../../src/chat/socket/chatSocket';
 import { createAuthToken } from '../../../src/user/auth/jwt';
-import { closeAllClients, connectToChat, waitForChatServer } from '../../chatSocketClient';
+import { connectToChat, useChatServer } from '../../chatSocketClient';
 import { addMessages, getSavedMessages } from '../chat/chatHelpers';
 import { addUser, api, asUser, type Call, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 import { countFriendshipRows, getFriendChatIds, makeFriends, MISSING_ID } from './friendHelpers';
 
 // this file's own port, test files run at the same time
-const PORT = 18104;
+const PORT = 18106;
 // the close code for a user who is no longer in the chat, or a chat that is gone
 const CLOSE_NOT_A_MEMBER = 4403;
 
-let chatSocket: ChatSocket;
 let userId: number;
 let friendId: number;
 let chatId: number;
 
-beforeAll(async () => {
-  chatSocket = startChatSocket(PORT);
-  expect(await waitForChatServer(PORT)).toBe(true);
-});
-
-afterAll(() => {
-  chatSocket.close();
-});
+useChatServer(PORT);
 
 // every test starts with Uma and Fay as friends, with a chat holding 3 messages
 beforeEach(async () => {
@@ -30,10 +21,6 @@ beforeEach(async () => {
   friendId = await addUser('Fay');
   chatId = await makeFriends(userId, friendId);
   await addMessages(chatId, userId, 3);
-});
-
-afterEach(() => {
-  closeAllClients();
 });
 
 cleanUpAfterTests();

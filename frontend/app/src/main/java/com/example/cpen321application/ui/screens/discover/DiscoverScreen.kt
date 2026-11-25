@@ -24,6 +24,8 @@ import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.LazyTabScreen
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.components.SelectableChip
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 import java.util.Locale
 
@@ -46,12 +48,12 @@ data class DiscoverUiState(
     goes back to searching near the user
  */
 data class DiscoverActions(
-    val onRetry: () -> Unit = {},
-    val onRefresh: () -> Unit = {},
-    val onChangeLocation: () -> Unit = {},
-    val onUseMyLocation: () -> Unit = {},
-    val onGameClick: (DiscoverGame) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onRetry: () -> Unit = noAction,
+    val onRefresh: () -> Unit = noAction,
+    val onChangeLocation: () -> Unit = noAction,
+    val onUseMyLocation: () -> Unit = noAction,
+    val onGameClick: (DiscoverGame) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*

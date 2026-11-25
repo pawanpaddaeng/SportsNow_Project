@@ -22,6 +22,7 @@ import com.example.cpen321application.ui.components.ChipGroup
 import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.LabeledTextField
 import com.example.cpen321application.ui.components.PickerField
+import com.example.cpen321application.ui.components.noAction
 import com.example.cpen321application.ui.theme.*
 import java.io.Serializable
 import java.time.Instant
@@ -64,7 +65,7 @@ data class InputGameInfoUiState(
 data class InputGameInfoActions(
     val onSubmit: (GameInfoForm) -> Unit,
     val onBack: () -> Unit,
-    val onPickLocation: () -> Unit = {}
+    val onPickLocation: () -> Unit = noAction
 )
 
 /*  the form's values while they're being edited. Serializable so rememberSaveable

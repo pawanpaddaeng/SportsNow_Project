@@ -27,7 +27,9 @@ cpen321application/
 | `network/ServerApi.kt` | Every backend endpoint as a Retrofit function, split into `UserApi`, `GameApi`, `FriendApi`, `ReviewApi` and `NotificationApi` services |
 | `network/ServerGson.kt` | Gson setup. `@Required` fields make a reply fail to parse if the server leaves them out |
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
+| `network/ServerErrors.kt` | `catchingServerErrors`: wraps a repository's server call so a network error and an unreadable reply each become its `Failed` result, with the message for each |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
+| `session/AuthProblem.kt` | `authProblem`: reads why the server rejected a request with 401 (`expired_token`, `invalid_token` or `no_user`), for `Session.call` |
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |
 | `notifications/PushNotificationService.kt` | Receives Firebase push notifications and shows them. Tapping one opens the app with its data in the intent's extras, and `notificationRoute` (`navigation/NotificationLinks.kt`) picks the screen |
 | `notifications/GameEvents.kt` | Passes notifications to open screens so they reload (e.g. a new join request) |
@@ -143,7 +145,7 @@ Screens only draw and report taps. They never call the server.
 
 | Folder | Contents |
 | --- | --- |
-| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), form fields, chips, map preview, cards, and the player profile popup. `components/badges/` draws the badges (grey when not earned), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
+| `components/` | Pieces used by several screens: bottom bar (with the bell's badge), back-button title bar, form fields and submit button, chips, map preview, cards, avatar circles (`AvatarCircle.kt`), request cards with their Decline/Accept buttons (`RequestCard.kt`), a list's loading bar, error and empty note (`ListStatus.kt`), `noAction` / `noActionWith` (`NoAction.kt`, the do-nothing default for every screen's `Actions` callbacks), and the player profile popup. `components/badges/` draws the badges (grey when not earned, and on the user's own Profile each with a short line saying how to earn it, `Badge.hint`), their unlock animations, the three-per-row grid and the popup an earned badge opens on Profile |
 | `screens/auth/` | Sign In, Sign Up |
 | `screens/home/` | Home |
 | `screens/discover/` | Discover, plus its search area and game card |
@@ -154,7 +156,7 @@ Screens only draw and report taps. They never call the server.
 | `screens/chat/` | Chat |
 | `theme/` | Colours, fonts and the app theme |
 
-A screen with an `…Parts`, `…Sections`, `…Fields` or `…Card` file next to it was split into smaller files. Those files belong to that screen only.
+A screen with an `…Parts`, `…Sections`, `…Fields`, `…Buttons` or `…Card` file next to it was split into smaller files (e.g. Game Details' `GameDetailsButtons.kt` and `GameDetailsJoinButton.kt`, or Profile's `ProfileReputationCard.kt`). Those files belong to that screen only.
 
 ## How a request flows
 
@@ -197,8 +199,8 @@ If loading fails after the game was already shown, the old details stay on scree
 2. `PushNotificationService` shows the notification and calls `GameEvents.publish`.
 3. Any open route for that game reloads. `AppNavigation` also refreshes Home when a join request is approved, and reloads `NotificationsState` so the bell's badge counts the new one.
 4. Friend request notifications have a `type` starting with `friend_request` and no `gameId`. They go through `FriendEvents` instead, and `AppNavigation` refreshes the friends state (Friends and Friend Requests) and the badge.
-5. Tapping a notification opens the app with its data in the intent's extras. `MainActivity` turns it into a route with `notificationRoute` and `AppNavigation` opens it if the user is signed in: Friend Requests for a `friend_request`, the Friends tab for `friend_request_accepted`, Join Requests for a `join_request`, the chat for a `friend_message`, and Game Details for the other game notifications (an invite, an answered join request, a start or rating reminder, a game edited, cancelled or completed).
-6. A `friend_message` notification has a `chatId` and `friendName` instead of a `gameId`, and `GameEvents` and `FriendEvents` both ignore it. The server doesn't send one to a user who has that chat open, and a friend's newest message replaces the last one's notification.
+5. Tapping a notification opens the app with its data in the intent's extras. `MainActivity` turns it into a route with `notificationRoute` and `AppNavigation` opens it if the user is signed in: Friend Requests for a `friend_request`, the Friends tab for `friend_request_accepted`, Join Requests for a `join_request`, the chat for a `friend_message`, the game's chat for a `game_message`, and Game Details for the other game notifications (an invite, an answered join request, a start or rating reminder, a game edited, cancelled or completed).
+6. A `friend_message` notification has a `chatId` and `friendName` instead of a `gameId`, and `GameEvents` and `FriendEvents` both ignore it. A `game_message` has the `gameId`, but `GameEvents` skips it too, since a chat message doesn't change the game. The server doesn't send either to a user who has that chat open, and a chat's newest message replaces the last one's notification.
 7. Most notifications are also saved on the server (see the design doc), so the Notifications tab lists them after the push is dismissed. Tapping one there opens the same screen as tapping the push.
 
 **Session ends**

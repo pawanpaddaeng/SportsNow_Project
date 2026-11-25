@@ -18,9 +18,12 @@ object GameEvents {
     private val _events = MutableSharedFlow<GameEvent>(extraBufferCapacity = 8)
     val events: SharedFlow<GameEvent> = _events
 
+    // a message in a game's chat doesn't change the game, so screens about it don't reload
+    private const val CHAT_MESSAGE_TYPE = "game_message"
+
     // called by PushNotificationService for every notification with a type and gameId
     fun publish(data: Map<String, String>) {
-        val type = data["type"] ?: return
+        val type = data["type"]?.takeIf { it != CHAT_MESSAGE_TYPE } ?: return
         val gameId = data["gameId"]?.toIntOrNull() ?: return
         _events.tryEmit(GameEvent(type, gameId))
     }

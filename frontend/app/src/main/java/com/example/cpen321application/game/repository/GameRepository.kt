@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.cpen321application.core.NETWORK_MESSAGE
 import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.catchingServerErrors
 import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.game.dto.CompleteGameBody
@@ -22,8 +23,8 @@ import com.example.cpen321application.game.dto.PendingJoinRequestDto
 import com.example.cpen321application.game.model.GameInfoForm
 import com.example.cpen321application.game.model.toGameInfoForm
 import com.google.gson.JsonParseException
-import retrofit2.Response
 import java.io.IOException
+import retrofit2.Response
 
 const val COULD_NOT_LOAD_GAME ="Couldn't load this game, try again"
 
@@ -58,7 +59,10 @@ private suspend fun changeGame(
     failureMessage: String,
     request: suspend (authorization: String) -> Response<CreateGameResponse>
 ): GameChangeResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = GameChangeResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = GameChangeResult.Failed(failureMessage)
+    ) {
         val response = Session.call(context, request)
             ?: return GameChangeResult.Failed(SESSION_ENDED_MESSAGE)
         val reply = readReply(response, CreateGameResponse::class.java)
@@ -67,10 +71,6 @@ private suspend fun changeGame(
             reply?.msg == "success" && (game != null || reply.gameDeleted == true) -> GameChangeResult.Done(game)
             else -> GameChangeResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
         }
-    } catch (e: IOException) {
-        GameChangeResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        GameChangeResult.Failed(failureMessage)
     }
 }
 
@@ -122,7 +122,10 @@ sealed interface GameDetailsResult {
 }
 
 suspend fun fetchGameDetails(context: Context, gameId: Int): GameDetailsResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = GameDetailsResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = GameDetailsResult.Failed(COULD_NOT_LOAD_GAME)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.getGameDetails(authorization = authorization, gameId = gameId)
         } ?: return GameDetailsResult.Failed(SESSION_ENDED_MESSAGE)
@@ -135,10 +138,6 @@ suspend fun fetchGameDetails(context: Context, gameId: Int): GameDetailsResult {
         } else {
             GameDetailsResult.Failed(COULD_NOT_LOAD_GAME)
         }
-    } catch (e: IOException) {
-        GameDetailsResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        GameDetailsResult.Failed(COULD_NOT_LOAD_GAME)
     }
 }
 
@@ -172,7 +171,10 @@ sealed interface DiscoverGamesResult {
 
 suspend fun fetchDiscoverGames(context: Context, latitude: Double, longitude: Double): DiscoverGamesResult {
     val failed = DiscoverGamesResult.Failed("Couldn't load games near you, try again")
-    return try {
+    return catchingServerErrors(
+        networkFailure = DiscoverGamesResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = failed
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.getDiscoverGames(
                 authorization = authorization,
@@ -187,10 +189,6 @@ suspend fun fetchDiscoverGames(context: Context, latitude: Double, longitude: Do
             "no_games" -> DiscoverGamesResult.Loaded(emptyList())
             else -> failed
         }
-    } catch (e: IOException) {
-        DiscoverGamesResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        failed
     }
 }
 
@@ -213,7 +211,10 @@ suspend fun sendJoinRequest(
         playFrequency = playFrequency,
         message = message?.trim()?.takeIf { it.isNotEmpty() }
     )
-    return try {
+    return catchingServerErrors(
+        networkFailure = JoinRequestResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = JoinRequestResult.Failed(failureMessage)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.sendJoinRequest(authorization = authorization, gameId = gameId, request = request)
         } ?: return JoinRequestResult.Failed(SESSION_ENDED_MESSAGE)
@@ -223,10 +224,6 @@ suspend fun sendJoinRequest(
         } else {
             JoinRequestResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
         }
-    } catch (e: IOException) {
-        JoinRequestResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        JoinRequestResult.Failed(failureMessage)
     }
 }
 
@@ -245,7 +242,10 @@ sealed interface InviteFriendsResult {
 // the organizer invites friends to their game, the server notifies each of them
 suspend fun inviteFriends(context: Context, gameId: Int, friendIds: List<Int>): InviteFriendsResult {
     val failureMessage = "Could not send your invites, try again"
-    return try {
+    return catchingServerErrors(
+        networkFailure = InviteFriendsResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = InviteFriendsResult.Failed(failureMessage)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.inviteFriends(
                 authorization = authorization,
@@ -259,16 +259,15 @@ suspend fun inviteFriends(context: Context, gameId: Int, friendIds: List<Int>): 
         } else {
             InviteFriendsResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
         }
-    } catch (e: IOException) {
-        InviteFriendsResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        InviteFriendsResult.Failed(failureMessage)
     }
 }
 
 suspend fun fetchPendingJoinRequests(context: Context, gameId: Int): PendingJoinRequestsResult {
     val failed = PendingJoinRequestsResult.Failed("Couldn't load join requests, try again")
-    return try {
+    return catchingServerErrors(
+        networkFailure = PendingJoinRequestsResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = failed
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.getPendingJoinRequests(authorization = authorization, gameId = gameId)
         } ?: return PendingJoinRequestsResult.Failed(SESSION_ENDED_MESSAGE)
@@ -284,10 +283,6 @@ suspend fun fetchPendingJoinRequests(context: Context, gameId: Int): PendingJoin
         } else {
             failed
         }
-    } catch (e: IOException) {
-        PendingJoinRequestsResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        failed
     }
 }
 
@@ -305,7 +300,10 @@ suspend fun decideJoinRequest(
 ): JoinRequestDecisionResult {
     val failureMessage = "Could not save your answer, try again"
     val request = JoinRequestDecisionBody(decision = if (approve) "approve" else "decline")
-    return try {
+    return catchingServerErrors(
+        networkFailure = JoinRequestDecisionResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = JoinRequestDecisionResult.Failed(failureMessage)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.decideJoinRequest(
                 authorization = authorization,
@@ -321,10 +319,6 @@ suspend fun decideJoinRequest(
         } else {
             JoinRequestDecisionResult.Failed(userError(reply?.msg, reply?.error) ?: failureMessage)
         }
-    } catch (e: IOException) {
-        JoinRequestDecisionResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        JoinRequestDecisionResult.Failed(failureMessage)
     }
 }
 
@@ -335,7 +329,10 @@ sealed interface MyGamesResult {
 
 suspend fun fetchMyGames(context: Context): MyGamesResult {
     val failed = MyGamesResult.Failed("Couldn't update your games, try again")
-    return try {
+    return catchingServerErrors(
+        networkFailure = MyGamesResult.Failed("Couldn't reach the server, showing your last loaded games"),
+        unreadableReply = failed
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.getMyGames(authorization = authorization)
         } ?: return MyGamesResult.Failed(SESSION_ENDED_MESSAGE)
@@ -349,9 +346,5 @@ suspend fun fetchMyGames(context: Context): MyGamesResult {
             "no_games" -> MyGamesResult.Loaded(organized = emptyList(), joined = emptyList())
             else -> failed
         }
-    } catch (e: IOException) {
-        MyGamesResult.Failed("Couldn't reach the server, showing your last loaded games")
-    } catch (e: JsonParseException) {
-        failed
     }
 }

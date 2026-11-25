@@ -34,6 +34,8 @@ import com.example.cpen321application.chat.model.ChatMessage
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.RetryMessage
 import com.example.cpen321application.ui.components.sportsFieldColors
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.*
 
 // how close to the oldest loaded message scrolling loads the next page
@@ -57,10 +59,10 @@ data class ChatUiState(
 data class ChatActions(
     val onBack: () -> Unit,
     val onRetry: (() -> Unit)? = null,
-    val onSend: (String) -> Unit = {},
-    val onRetrySend: (ChatMessage) -> Unit = {},
-    val onLoadOlder: () -> Unit = {},
-    val onOpenProfile: (Int) -> Unit = {}
+    val onSend: (String) -> Unit = noActionWith,
+    val onRetrySend: (ChatMessage) -> Unit = noActionWith,
+    val onLoadOlder: () -> Unit = noAction,
+    val onOpenProfile: (Int) -> Unit = noActionWith
 )
 
 /*

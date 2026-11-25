@@ -25,7 +25,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -34,8 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BirthYearField
+import com.example.cpen321application.ui.components.CardRow
 import com.example.cpen321application.ui.components.FormSubmitButton
 import com.example.cpen321application.ui.components.LabeledTextField
+import com.example.cpen321application.ui.components.cardBackground
 import com.example.cpen321application.ui.theme.SportsOnSurface
 import com.example.cpen321application.ui.theme.SportsOnSurfaceVariant
 import com.example.cpen321application.ui.theme.SportsPrimary
@@ -137,15 +138,7 @@ private fun EditProfileTopBar(onBack: () -> Unit) {
 
 @Composable
 private fun GoogleAccountCard(email: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SportsSurfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
+    CardRow(modifier = Modifier.cardBackground(SportsSurfaceContainer)) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Verified with Google",

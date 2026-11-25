@@ -47,7 +47,7 @@ describe('Mocked: GET /api/chats/:chatId/messages', () => {
     const token = signIn(testPlayer());
 
     // 2. let the user in, then make reading the messages fail
-    jest.spyOn(chatsDb, 'getChatAccess').mockResolvedValue({ isMember: true, isClosed: false, isFriendChat: false });
+    jest.spyOn(chatsDb, 'getChatAccess').mockResolvedValue({ isMember: true, isClosed: false, gameId: 42, gameTitle: 'Sunday Soccer' });
     const getChatMessages = jest.spyOn(chatsDb, 'getChatMessages').mockRejectedValue(new Error('database down'));
 
     // 3. read the older page through the interface

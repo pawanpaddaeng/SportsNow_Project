@@ -33,6 +33,15 @@ fun LazyListScope.loadStatus(isLoading: Boolean, errorMessage: String?, onRetry:
     }
 }
 
+/*  text as a note in place of a list that has nothing in it, once it has loaded without
+    an error. key is the note's item key in the list
+ */
+fun LazyListScope.emptyListNote(items: List<*>, isLoading: Boolean, errorMessage: String?, key: String, text: String) {
+    if (items.isEmpty() && !isLoading && errorMessage == null) {
+        item(key = key) { ListNote(text) }
+    }
+}
+
 // a small centered note in a list, e.g. when it's empty
 @Composable
 fun ListNote(text: String) {

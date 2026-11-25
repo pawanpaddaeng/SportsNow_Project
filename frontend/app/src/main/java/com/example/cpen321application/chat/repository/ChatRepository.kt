@@ -5,6 +5,7 @@ import com.example.cpen321application.chat.dto.ChatMessageDto
 import com.example.cpen321application.core.NETWORK_MESSAGE
 import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.catchingServerErrors
 import com.example.cpen321application.core.session.Session
 import com.google.gson.JsonParseException
 import java.io.IOException
@@ -20,7 +21,10 @@ sealed interface ChatMessagesResult {
 
 // a page of the chat's messages, newest first. before is the oldest message_id the app has
 suspend fun fetchChatMessages(context: Context, chatId: Int, before: Int? = null): ChatMessagesResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = ChatMessagesResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = ChatMessagesResult.Failed(COULD_NOT_LOAD_MESSAGES)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.gameService.getChatMessages(authorization = authorization, chatId = chatId, before = before)
         } ?: return ChatMessagesResult.Failed(SESSION_ENDED_MESSAGE)
@@ -33,10 +37,6 @@ suspend fun fetchChatMessages(context: Context, chatId: Int, before: Int? = null
         } else {
             ChatMessagesResult.Failed(COULD_NOT_LOAD_MESSAGES)
         }
-    } catch (e: IOException) {
-        ChatMessagesResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        ChatMessagesResult.Failed(COULD_NOT_LOAD_MESSAGES)
     }
 }
 

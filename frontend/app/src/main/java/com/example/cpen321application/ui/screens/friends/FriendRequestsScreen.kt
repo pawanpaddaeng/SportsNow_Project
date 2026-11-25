@@ -16,9 +16,11 @@ import com.example.cpen321application.ui.components.BackTitleBar
 import com.example.cpen321application.ui.components.BottomTab
 import com.example.cpen321application.ui.components.DecisionButtons
 import com.example.cpen321application.ui.components.LazyTabScreen
-import com.example.cpen321application.ui.components.ListNote
 import com.example.cpen321application.ui.components.RequestCardFrame
 import com.example.cpen321application.ui.components.loadStatus
+import com.example.cpen321application.ui.components.emptyListNote
+import com.example.cpen321application.ui.components.noAction
+import com.example.cpen321application.ui.components.noActionWith
 import com.example.cpen321application.ui.theme.SportsOnSurface
 
 /*  what the Friend Requests screen shows. isLoading shows a loading bar and errorMessage a
@@ -33,12 +35,12 @@ data class FriendRequestsUiState(
 
 // what the Friend Requests screen's controls do
 data class FriendRequestsActions(
-    val onBack: () -> Unit = {},
+    val onBack: () -> Unit = noAction,
     val onRetry: (() -> Unit)? = null,
-    val onAccept: (FriendRequestItem) -> Unit = {},
-    val onDecline: (FriendRequestItem) -> Unit = {},
-    val onOpenProfile: (Int) -> Unit = {},
-    val onTabSelected: (BottomTab) -> Unit = {}
+    val onAccept: (FriendRequestItem) -> Unit = noActionWith,
+    val onDecline: (FriendRequestItem) -> Unit = noActionWith,
+    val onOpenProfile: (Int) -> Unit = noActionWith,
+    val onTabSelected: (BottomTab) -> Unit = noActionWith
 )
 
 /*
@@ -63,11 +65,10 @@ fun FriendRequestsScreen(state: FriendRequestsUiState, actions: FriendRequestsAc
             )
         }
 
-        if (state.requests.isEmpty() && !state.isLoading && state.errorMessage == null) {
-            item(key = "empty") {
-                ListNote("No friend requests right now. You'll get a notification when someone adds you.")
-            }
-        }
+        emptyListNote(
+            state.requests, state.isLoading, state.errorMessage, key = "empty",
+            text = "No friend requests right now. You'll get a notification when someone adds you."
+        )
     }
 }
 
