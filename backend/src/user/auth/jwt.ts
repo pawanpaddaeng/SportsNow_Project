@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import { sign, TokenExpiredError, verify } from 'jsonwebtoken';
 import { env } from '../../core/config/env';
 
 // how long a token stays valid before the app has to sign in again
@@ -19,7 +19,7 @@ export function createAuthToken(userId: number): string {
     user_id: userId,
     iat: Math.floor(Date.now() / 1000),
   };
-  return jwt.sign(payload, env.jwtSecret, { algorithm: 'HS256', expiresIn: TOKEN_LIFETIME });
+  return sign(payload, env.jwtSecret, { algorithm: 'HS256', expiresIn: TOKEN_LIFETIME });
 }
 
 export type VerifyTokenResult =
@@ -29,13 +29,13 @@ export type VerifyTokenResult =
 // checks the token's signature and expiry, and that it has the fields createAuthToken puts in
 export function verifyAuthToken(token: string): VerifyTokenResult {
   try {
-    const decoded = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] });
+    const decoded = verify(token, env.jwtSecret, { algorithms: ['HS256'] });
     if (typeof decoded === 'string' || typeof decoded.user_id !== 'number' || typeof decoded.iat !== 'number') {
       return { ok: false, reason: 'invalid' };
     }
     return { ok: true, payload: { user_id: decoded.user_id, iat: decoded.iat } };
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if (error instanceof TokenExpiredError) {
       return { ok: false, reason: 'expired' };
     }
     return { ok: false, reason: 'invalid' };
