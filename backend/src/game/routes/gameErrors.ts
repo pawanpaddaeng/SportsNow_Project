@@ -23,12 +23,6 @@ export function readGameId(raw: string): number | null {
   return readId(raw);
 }
 
-// the route's game id, or null after answering 400 invalid_request when it isn't a valid id
-export function requireGameId(raw: string, res: Response): number | null {
-  const gameId = readGameId(raw);
-  if (gameId === null) invalidRequest(res, 'gameId must be a positive whole number');
-  return gameId;
-}
 
 // an error status with its json body, e.g. from gameChangeError
 export interface ErrorResponse {
@@ -70,17 +64,6 @@ export function gameChangeError(problem: GameChangeProblem): ErrorResponse {
   return responseFor(GAME_CHANGE_ERRORS, problem);
 }
 
-/*  the route's game, or null after answering 400 invalid_request for a malformed id
-    or 404 not_found when no game has it
- */
-export async function requireGame(raw: string, res: Response): Promise<Game | null> {
-  const gameId = requireGameId(raw, res);
-  if (gameId === null) return null;
-  const game = await getGameById(gameId);
-  if (!game) sendError(res, gameChangeError('not_found'));
-  return game;
-}
-
 // a request to a route under /api/games/:gameId, with its body typed as Body
 export type GameRequest<Body = unknown> = Request<{ gameId: string }, unknown, Body>;
 
@@ -91,8 +74,8 @@ export function withGameId<Body = unknown>(
   handler: (user: User, gameId: number, req: GameRequest<Body>, res: Response) => Promise<unknown>,
 ): (req: GameRequest<Body>, res: Response) => Promise<unknown> {
   return async (req, res) => {
-    const gameId = requireGameId(req.params.gameId, res);
-    if (gameId === null) return;
+    const gameId = readGameId(req.params.gameId);
+    if (gameId === null) return invalidRequest(res, 'gameId must be a positive whole number');
     return handler(getAuthUser(res), gameId, req, res);
   };
 }
@@ -103,11 +86,11 @@ export function withGameId<Body = unknown>(
 export function withGame(
   handler: (user: User, game: Game, req: GameRequest, res: Response) => Promise<unknown>,
 ): (req: GameRequest, res: Response) => Promise<unknown> {
-  return async (req, res) => {
-    const game = await requireGame(req.params.gameId, res);
-    if (!game) return;
-    return handler(getAuthUser(res), game, req, res);
-  };
+  return withGameId(async (user, gameId, req, res) => {
+    const game = await getGameById(gameId);
+    if (!game) return sendError(res, gameChangeError('not_found'));
+    return handler(user, game, req, res);
+  });
 }
 
 // responses for a game the organizer can't mark completed, the rest as for edits

@@ -178,8 +178,11 @@ private fun Badges(badges: List<Badge>) {
 @Composable
 private fun FriendStatus(profile: PlayerProfile, isAdding: Boolean, onAddFriend: () -> Unit) {
     if (profile.isSelf) return
-    when (profile.friendship) {
-        FriendshipStatus.None -> Button(
+    val note = FRIENDSHIP_NOTES[profile.friendship]
+    if (note != null) {
+        StatusNote(note)
+    } else {
+        Button(
             onClick = onAddFriend,
             enabled = !isAdding,
             shape = RoundedCornerShape(50),
@@ -194,11 +197,15 @@ private fun FriendStatus(profile: PlayerProfile, isAdding: Boolean, onAddFriend:
                 Text(text = "Add Friend", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
-        FriendshipStatus.Friends -> StatusNote("You're friends")
-        FriendshipStatus.RequestSent -> StatusNote("Friend request sent")
-        FriendshipStatus.RequestReceived -> StatusNote("Sent you a friend request. Answer it in the Friends tab.")
     }
 }
+
+// what the popup says instead of Add Friend when the two are already friends or a request is waiting
+private val FRIENDSHIP_NOTES = mapOf(
+    FriendshipStatus.Friends to "You're friends",
+    FriendshipStatus.RequestSent to "Friend request sent",
+    FriendshipStatus.RequestReceived to "Sent you a friend request. Answer it in the Friends tab."
+)
 
 @Composable
 private fun StatusNote(text: String) {

@@ -197,21 +197,25 @@ internal fun PlayersSection(details: GameDetails, onSeeAll: () -> Unit) {
         val shown = details.players.take(MAX_AVATARS)
         val hidden = details.players.size - shown.size
         Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
-            shown.forEach { player -> Avatar(text = player.initial, size = 40.dp, fontSize = 16) }
+            // white rings keep the overlapping avatars apart
+            shown.forEach { player ->
+                Avatar(text = player.initial, size = 40.dp, fontSize = 16, borderColor = Color.White)
+            }
             if (hidden > 0) {
                 Avatar(
                     text = "+$hidden",
                     size = 40.dp,
                     fontSize = 16,
                     background = SportsSurfaceContainer,
-                    textColor = SportsOnSurfaceVariant
+                    textColor = SportsOnSurfaceVariant,
+                    borderColor = Color.White
                 )
             }
         }
     }
 }
 
-// round initial (or count) bubble, white ring so overlapping avatars stay apart
+// round initial (or count) bubble, with a ring of borderColor when it's given
 @Composable
 internal fun Avatar(
     text: String,
@@ -219,7 +223,7 @@ internal fun Avatar(
     fontSize: Int,
     background: Color = SportsPrimaryContainer,
     textColor: Color = SportsOnPrimaryContainer,
-    borderColor: Color? = if (size >= 40.dp) Color.White else null
+    borderColor: Color? = null
 ) {
     Box(
         contentAlignment = Alignment.Center,
