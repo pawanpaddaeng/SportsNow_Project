@@ -1,5 +1,6 @@
+import { WebSocket } from 'ws';
 import * as chatsDb from '../../../src/chat/db/chats';
-import { type ChatMessage } from '../../../src/chat/db/chats';
+import { type ChatAccess, type ChatMessage } from '../../../src/chat/db/chats';
 import { startChatSocket } from '../../../src/chat/socket/chatSocket';
 import * as mysqlDb from '../../../src/core/db/mysql';
 import * as logger from '../../../src/core/logger';
@@ -43,7 +44,7 @@ const GAME_CHAT = { gameId: 42, gameTitle: 'Sunday Soccer' };
 const FRIEND_CHAT = { gameId: null, gameTitle: null };
 
 // chat 7 lets both users in and is open, as a game's or a friend chat
-function allowChat(kind: typeof GAME_CHAT | typeof FRIEND_CHAT): void {
+function allowChat(kind: Pick<ChatAccess, 'gameId' | 'gameTitle'>): void {
   jest.spyOn(chatsDb, 'getChatAccess').mockResolvedValue({ isMember: true, isClosed: false, ...kind });
   jest.spyOn(chatsDb, 'getChatMemberIds').mockResolvedValue([1, 2]);
 }
@@ -214,6 +215,80 @@ describe('Mocked: WebSocket send_message', () => {
     expect(await player.nextReply()).toMatchObject({ type: 'new_message', client_id: 'c-3' });
     await waitUntil(() => logError.mock.calls.length > 0);
     expect(logError).toHaveBeenCalledWith(`Notifying about a message in chat ${CHAT_ID} failed:`, expect.any(Error));
+  });
+
+  // Mocked behavior: chat 7 lets Paul in and createChatMessage saves his message. The
+  //   WebSocket's send throws once, right after Paul's message is sent, so the server's reply
+  //   fails. sendPushToUsers is replaced and logError is watched
+  // Input: Paul sends "Hi" with client_id "c-5"
+  // Expected status code: none, it's a WebSocket reply
+  // Expected behavior: the failed reply is only logged, the server keeps running and Paul's
+  //   connection stays open
+  // Expected output: no reply to Paul
+  test('Sending a reply fails', async () => {
+    const { playerToken } = signInBoth();
+    allowChat(GAME_CHAT);
+    jest.spyOn(chatsDb, 'createChatMessage').mockResolvedValue(savedMessage('Hi'));
+    jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(0);
+    const logError = jest.spyOn(logger, 'logError').mockImplementation(() => undefined);
+    const player = await connectToChat(PORT, CHAT_ID, playerToken);
+
+    player.sendMessage(CHAT_ID, 'Hi', 'c-5');
+    // Paul's message is already sent, so the next send is the server's reply
+    jest.spyOn(WebSocket.prototype, 'send').mockImplementationOnce(() => { throw new Error('connection broke'); });
+
+    await waitUntil(() => logError.mock.calls.length > 0);
+    expect(logError).toHaveBeenCalledWith('Sending over a chat connection failed:', expect.any(Error));
+    expect(await player.unreadReplies()).toEqual([]);
+    expect(player.isOpen()).toBe(true);
+  });
+
+  // Mocked behavior: chat 7 lets Paul connect. When he sends, the server's access check is
+  //   held back until his connection has closed, then says the chat is closed. The WebSocket's
+  //   send and logError are watched
+  // Input: Paul sends "Hi" with client_id "c-6", then closes his connection straight away
+  // Expected status code: none
+  // Expected behavior: the server doesn't try to reply over the closed connection, and
+  //   nothing fails
+  // Expected output: nothing is sent
+  test('Reply to a connection that already closed is skipped', async () => {
+    const { playerToken } = signInBoth();
+    allowChat(GAME_CHAT);
+    const player = await connectToChat(PORT, CHAT_ID, playerToken);
+    let finishCheck: (access: ChatAccess) => void = () => undefined;
+    jest.spyOn(chatsDb, 'getChatAccess').mockReturnValueOnce(new Promise((resolve) => { finishCheck = resolve; }));
+    const logError = jest.spyOn(logger, 'logError').mockImplementation(() => undefined);
+
+    player.sendMessage(CHAT_ID, 'Hi', 'c-6');
+    player.close();
+    await player.closed;
+    const send = jest.spyOn(WebSocket.prototype, 'send');
+    finishCheck({ isMember: true, isClosed: true, ...GAME_CHAT });
+    await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  // Mocked behavior: chat 7 is game 42's chat but has no game title, which the real database
+  //   never allows. createChatMessage saves the message, sendPushToUsers is replaced to check
+  //   what Olivia is sent
+  // Input: Paul sends "Hi" with client_id "g-1" while Olivia doesn't have the chat open
+  // Expected status code: none, it's a WebSocket reply
+  // Expected behavior: Olivia is still notified, with "Game chat" as the title
+  // Expected output: a notification titled "Game chat" with body "Paul: Hi"
+  test('Game chat with no title is notified as "Game chat"', async () => {
+    const { playerToken } = signInBoth();
+    allowChat({ gameId: 42, gameTitle: null });
+    jest.spyOn(chatsDb, 'createChatMessage').mockResolvedValue(savedMessage('Hi'));
+    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(1);
+    const player = await connectToChat(PORT, CHAT_ID, playerToken);
+
+    player.sendMessage(CHAT_ID, 'Hi', 'g-1');
+    await player.nextReply();
+
+    await waitUntil(() => sendPushToUsers.mock.calls.length === 1);
+    expect(sendPushToUsers).toHaveBeenCalledWith([1], expect.objectContaining({ title: 'Game chat', body: 'Paul: Hi' }));
   });
 
   // Mocked behavior: chat 7 lets both in. Fake timers run the server's check every

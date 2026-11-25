@@ -63,6 +63,16 @@ export class ChatTestClient {
     this.webSocket.send(text);
   }
 
+  // sends these bytes as a text message, even if they aren't valid UTF-8 text
+  sendBytesAsText(bytes: Buffer): void {
+    this.webSocket.send(bytes, { binary: false });
+  }
+
+  // closes the connection from the app's side
+  close(): void {
+    this.webSocket.close();
+  }
+
   // the next reply, failing the test if none comes in time
   nextReply(): Promise<ChatReply> {
     const queued = this.replies.shift();

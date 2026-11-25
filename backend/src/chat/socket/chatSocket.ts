@@ -36,13 +36,13 @@ function rejectUpgrade(socket: Duplex, status: number): void {
 
 function readBearerToken(req: IncomingMessage): string | null {
   const header = req.headers.authorization;
-  return header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() || null : null;
+  const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+  return token === '' ? null : token;
 }
 
-// a request's text, whichever way ws hands over its bytes
+// a request's text. The server keeps ws's default binaryType "nodebuffer", so ws always hands it over as one Buffer
 function requestText(raw: RawData): string {
-  if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8');
-  return Buffer.isBuffer(raw) ? raw.toString('utf8') : Buffer.from(raw).toString('utf8');
+  return (raw as Buffer).toString('utf8');
 }
 
 // sends to one connection, it may have closed already so a failure is only logged
@@ -60,7 +60,8 @@ function sendJson(webSocket: WebSocket, reply: object): void {
     be opened, sending to it is what fails
  */
 async function checkConnection(req: IncomingMessage): Promise<ChatClient | number> {
-  const chatId = readId(new URL(req.url ?? '/', 'http://localhost').searchParams.get('chat_id') ?? '');
+  // Node always sets url on an upgrade request, String() only satisfies its optional type
+  const chatId = readId(new URL(String(req.url), 'http://localhost').searchParams.get('chat_id') ?? '');
   const token = readBearerToken(req);
   if (chatId === null || token === null) return 400;
 

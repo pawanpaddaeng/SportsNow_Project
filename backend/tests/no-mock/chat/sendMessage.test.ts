@@ -172,6 +172,20 @@ describe('Unmocked: WebSocket send_message', () => {
     expect(player.isOpen()).toBe(true);
   });
 
+  // Input: the player sends a text message whose bytes (0xff, 0xfe) aren't valid UTF-8
+  // Expected status code: none, it's a WebSocket connection
+  // Expected behavior: the WebSocket library rejects it as a broken connection, the server
+  //   logs the connection error and the connection is closed. Nothing is saved
+  // Expected output: the connection closes with 1007 (invalid message data)
+  test('A message that is not valid text closes the connection', async () => {
+    const player = await connectToChat(PORT, chatId, createAuthToken(playerId));
+
+    player.sendBytesAsText(Buffer.from([0xff, 0xfe]));
+
+    expect((await player.closed).code).toBe(1007);
+    expect(await getSavedMessages(chatId)).toEqual([]);
+  });
+
   // Input: the player's connection is for the game chat, they send to another chat_id
   //   they are also a player of, with client_id "c-2"
   // Expected status code: none, it's a WebSocket reply
