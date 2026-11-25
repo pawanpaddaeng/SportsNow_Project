@@ -27,6 +27,7 @@ cpen321application/
 | `network/ServerApi.kt` | Every backend endpoint as a Retrofit function, split into `UserApi`, `GameApi`, `FriendApi`, `ReviewApi` and `NotificationApi` services |
 | `network/ServerGson.kt` | Gson setup. `@Required` fields make a reply fail to parse if the server leaves them out |
 | `network/ReadReply.kt` | Reads a reply's JSON from the body, or from the error body for 4xx/5xx |
+| `network/ServerErrors.kt` | `catchingServerErrors`: wraps a repository's server call so a network error and an unreadable reply each become its `Failed` result, with the message for each |
 | `session/Session.kt` | `Session.call` sends a request with the JWT. If the JWT expired it signs in again silently and retries once. If that fails, the app goes back to sign in |
 | `session/AuthProblem.kt` | `authProblem`: reads why the server rejected a request with 401 (`expired_token`, `invalid_token` or `no_user`), for `Session.call` |
 | `session/AuthTokenStore.kt` | Saves the JWT on the phone, encrypted with AES-256-GCM using a key in the Android Keystore |

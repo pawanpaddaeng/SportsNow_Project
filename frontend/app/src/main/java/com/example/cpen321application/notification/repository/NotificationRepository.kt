@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.cpen321application.core.NETWORK_MESSAGE
 import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.catchingServerErrors
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.notification.model.NotificationsPage
 import com.example.cpen321application.notification.model.toNotificationsPage
@@ -19,7 +20,10 @@ sealed interface NotificationsResult {
 
 // the user's newest notifications with the counts for the badge and the Friend requests button
 suspend fun fetchNotifications(context: Context): NotificationsResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = NotificationsResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = NotificationsResult.Failed(COULD_NOT_LOAD)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.notificationService.getNotifications(authorization)
         } ?: return NotificationsResult.Failed(SESSION_ENDED_MESSAGE)
@@ -29,10 +33,6 @@ suspend fun fetchNotifications(context: Context): NotificationsResult {
         } else {
             NotificationsResult.Failed(COULD_NOT_LOAD)
         }
-    } catch (e: IOException) {
-        NotificationsResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        NotificationsResult.Failed(COULD_NOT_LOAD)
     }
 }
 
@@ -40,14 +40,10 @@ suspend fun fetchNotifications(context: Context): NotificationsResult {
     is shown when it didn't: they just stay unread until the next time
  */
 suspend fun markNotificationsRead(context: Context): Boolean {
-    return try {
+    return catchingServerErrors(networkFailure = false, unreadableReply = false) {
         val response = Session.call(context) { authorization ->
             ServerApi.notificationService.markNotificationsRead(authorization)
         } ?: return false
         response.isSuccessful && response.body()?.msg == "success"
-    } catch (e: IOException) {
-        false
-    } catch (e: JsonParseException) {
-        false
     }
 }

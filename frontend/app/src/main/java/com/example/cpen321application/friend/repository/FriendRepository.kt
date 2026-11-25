@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.cpen321application.core.NETWORK_MESSAGE
 import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.catchingServerErrors
 import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.friend.dto.FriendChangeResponse
@@ -18,8 +19,8 @@ import com.example.cpen321application.friend.model.FriendRequestItem
 import com.example.cpen321application.friend.model.toFriendPerson
 import com.example.cpen321application.friend.model.toFriendRequestItem
 import com.google.gson.JsonParseException
-import retrofit2.Response
 import java.io.IOException
+import retrofit2.Response
 
 sealed interface FriendResult<out T> {
     data class Done<T>(val value: T) : FriendResult<T>
@@ -36,7 +37,10 @@ private suspend fun <R : FriendReplyDto, T> askServer(
     request: suspend (authorization: String) -> Response<R>,
     readValue: (R) -> T
 ): FriendResult<T> {
-    return try {
+    return catchingServerErrors(
+        networkFailure = FriendResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = FriendResult.Failed(failureMessage)
+    ) {
         val response = Session.call(context, request) ?: return FriendResult.Failed(SESSION_ENDED_MESSAGE)
         val reply = readReply(response, replyType)
         if (reply?.msg == "success") {
@@ -45,10 +49,6 @@ private suspend fun <R : FriendReplyDto, T> askServer(
             val serverError = reply?.error.takeIf { reply?.msg != null && reply.msg != "server_error" }
             FriendResult.Failed(serverError ?: failureMessage)
         }
-    } catch (e: IOException) {
-        FriendResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        FriendResult.Failed(failureMessage)
     }
 }
 

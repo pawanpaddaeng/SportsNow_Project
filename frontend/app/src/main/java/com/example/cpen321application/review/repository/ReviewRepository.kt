@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.cpen321application.core.NETWORK_MESSAGE
 import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.catchingServerErrors
 import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.review.dto.PlayersToRateResponse
@@ -33,7 +34,10 @@ sealed interface PlayersToRateResult {
 }
 
 suspend fun fetchPlayersToRate(context: Context, gameId: Int): PlayersToRateResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = PlayersToRateResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = PlayersToRateResult.Failed(COULD_NOT_LOAD_PLAYERS)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.reviewService.getPlayersToRate(authorization = authorization, gameId = gameId)
         } ?: return PlayersToRateResult.Failed(SESSION_ENDED_MESSAGE)
@@ -48,10 +52,6 @@ suspend fun fetchPlayersToRate(context: Context, gameId: Int): PlayersToRateResu
         } else {
             PlayersToRateResult.Failed(COULD_NOT_LOAD_PLAYERS)
         }
-    } catch (e: IOException) {
-        PlayersToRateResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        PlayersToRateResult.Failed(COULD_NOT_LOAD_PLAYERS)
     }
 }
 
@@ -62,7 +62,10 @@ sealed interface ReputationScoreResult {
 }
 
 suspend fun fetchMyReputationScore(context: Context): ReputationScoreResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = ReputationScoreResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = ReputationScoreResult.Failed(COULD_NOT_LOAD_SCORE)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.reviewService.getMyStats(authorization = authorization)
         } ?: return ReputationScoreResult.Failed(SESSION_ENDED_MESSAGE)
@@ -72,10 +75,6 @@ suspend fun fetchMyReputationScore(context: Context): ReputationScoreResult {
         } else {
             ReputationScoreResult.Failed(COULD_NOT_LOAD_SCORE)
         }
-    } catch (e: IOException) {
-        ReputationScoreResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        ReputationScoreResult.Failed(COULD_NOT_LOAD_SCORE)
     }
 }
 
@@ -86,7 +85,10 @@ sealed interface BadgesResult {
 }
 
 suspend fun fetchMyBadges(context: Context): BadgesResult {
-    return try {
+    return catchingServerErrors(
+        networkFailure = BadgesResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = BadgesResult.Failed(COULD_NOT_LOAD_BADGES)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.reviewService.getMyBadges(authorization = authorization)
         } ?: return BadgesResult.Failed(SESSION_ENDED_MESSAGE)
@@ -96,10 +98,6 @@ suspend fun fetchMyBadges(context: Context): BadgesResult {
         } else {
             BadgesResult.Failed(COULD_NOT_LOAD_BADGES)
         }
-    } catch (e: IOException) {
-        BadgesResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        BadgesResult.Failed(COULD_NOT_LOAD_BADGES)
     }
 }
 
@@ -123,7 +121,10 @@ suspend fun submitRating(
         reliability = scores.getValue(RatingCategory.Reliability),
         overall = scores.getValue(RatingCategory.Overall)
     )
-    return try {
+    return catchingServerErrors(
+        networkFailure = SubmitRatingResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = SubmitRatingResult.Failed(COULD_NOT_SUBMIT_RATING)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.reviewService.submitRating(authorization = authorization, gameId = gameId, request = body)
         } ?: return SubmitRatingResult.Failed(SESSION_ENDED_MESSAGE)
@@ -133,9 +134,5 @@ suspend fun submitRating(
             reply?.msg != "server_error" && reply?.error != null -> SubmitRatingResult.Failed(reply.error)
             else -> SubmitRatingResult.Failed(COULD_NOT_SUBMIT_RATING)
         }
-    } catch (e: IOException) {
-        SubmitRatingResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        SubmitRatingResult.Failed(COULD_NOT_SUBMIT_RATING)
     }
 }

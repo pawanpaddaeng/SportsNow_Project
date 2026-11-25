@@ -5,6 +5,7 @@ import android.util.Base64
 import com.example.cpen321application.core.NETWORK_MESSAGE
 import com.example.cpen321application.core.SESSION_ENDED_MESSAGE
 import com.example.cpen321application.core.network.ServerApi
+import com.example.cpen321application.core.network.catchingServerErrors
 import com.example.cpen321application.core.network.readReply
 import com.example.cpen321application.core.session.Session
 import com.example.cpen321application.user.dto.LoginRequest
@@ -17,15 +18,15 @@ import com.example.cpen321application.user.dto.readAuthResponse
 import com.example.cpen321application.user.model.PlayerProfile
 import com.example.cpen321application.user.model.toPlayerProfile
 import com.google.gson.JsonParseException
-import org.json.JSONException
-import org.json.JSONObject
-import retrofit2.Response
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.Locale
+import org.json.JSONException
+import org.json.JSONObject
+import retrofit2.Response
 
 private const val LOAD_FAILED_MESSAGE = "Couldn't load your profile, try again"
 private const val SAVE_FAILED_MESSAGE = "Couldn't save your profile, try again"
@@ -88,17 +89,13 @@ sealed interface DeleteAccountResult {
 
 // the server answers "no_user" (404) when the Google account needs to sign up first
 suspend fun login(googleToken: String): LoginResult {
-    return try {
+    return catchingServerErrors(networkFailure = LoginResult.Failed, unreadableReply = LoginResult.Failed) {
         val body = readAuthResponse(ServerApi.userService.login(LoginRequest(idToken = googleToken)))
         when {
             body?.msg == "signedIn" && body.jwtToken != null -> LoginResult.SignedIn(body.jwtToken)
             body?.msg == "no_user" -> LoginResult.NoUser
             else -> LoginResult.Failed
         }
-    } catch (e: IOException) {
-        LoginResult.Failed
-    } catch (e: JsonParseException) {
-        LoginResult.Failed
     }
 }
 
@@ -107,7 +104,10 @@ suspend fun signUp(details: SignUpDetails): SignUpResult {
     val email = details.email
         ?: return SignUpResult.Failed("Could not read the email of your Google account, verify again")
 
-    return try {
+    return catchingServerErrors(
+        networkFailure = SignUpResult.Failed("Cannot Reach Server"),
+        unreadableReply = SignUpResult.Failed(SIGN_UP_FAILED_MESSAGE)
+    ) {
         val response = ServerApi.userService.signUp(
             SignUpRequest(
                 idToken = details.idToken,
@@ -125,10 +125,6 @@ suspend fun signUp(details: SignUpDetails): SignUpResult {
                 SignUpResult.Failed("Your Google verification expired, verify with Google again")
             else -> SignUpResult.Failed(body?.error ?: SIGN_UP_FAILED_MESSAGE)
         }
-    } catch (e: IOException) {
-        SignUpResult.Failed("Cannot Reach Server")
-    } catch (e: JsonParseException) {
-        SignUpResult.Failed(SIGN_UP_FAILED_MESSAGE)
     }
 }
 
@@ -171,7 +167,10 @@ suspend fun updateMyProfile(context: Context, form: ProfileForm): ProfileResult 
 }
 
 // the server deletes the account with its games, spots in games and messages
-suspend fun deleteMyAccount(context: Context): DeleteAccountResult = try {
+suspend fun deleteMyAccount(context: Context): DeleteAccountResult = catchingServerErrors(
+    networkFailure = DeleteAccountResult.Failed(NETWORK_MESSAGE),
+    unreadableReply = DeleteAccountResult.Failed(DELETE_FAILED_MESSAGE)
+) {
     val response = Session.call(context) { authorization ->
         ServerApi.userService.deleteMyAccount(authorization = authorization)
     }
@@ -181,27 +180,22 @@ suspend fun deleteMyAccount(context: Context): DeleteAccountResult = try {
         reply?.msg == "success" -> DeleteAccountResult.Deleted
         else -> DeleteAccountResult.Failed(reply?.error ?: DELETE_FAILED_MESSAGE)
     }
-} catch (e: IOException) {
-    DeleteAccountResult.Failed(NETWORK_MESSAGE)
-} catch (e: JsonParseException) {
-    DeleteAccountResult.Failed(DELETE_FAILED_MESSAGE)
 }
 
 private suspend fun requestProfile(
     context: Context,
     failureMessage: String,
     request: suspend (authorization: String) -> Response<ProfileResponse>
-): ProfileResult = try {
+): ProfileResult = catchingServerErrors(
+    networkFailure = ProfileResult.Failed(NETWORK_MESSAGE),
+    unreadableReply = ProfileResult.Failed(failureMessage)
+) {
     val response = Session.call(context, request)
     if (response == null) {
         ProfileResult.Failed(SESSION_ENDED_MESSAGE)
     } else {
         toProfileResult(readReply(response, ProfileResponse::class.java), failureMessage)
     }
-} catch (e: IOException) {
-    ProfileResult.Failed(NETWORK_MESSAGE)
-} catch (e: JsonParseException) {
-    ProfileResult.Failed(failureMessage)
 }
 
 private fun toProfileResult(reply: ProfileResponse?, failureMessage: String): ProfileResult {
@@ -221,7 +215,10 @@ sealed interface PublicProfileResult {
 
 suspend fun fetchPublicProfile(context: Context, userId: Int): PublicProfileResult {
     val failureMessage = "Couldn't load this profile, try again"
-    return try {
+    return catchingServerErrors(
+        networkFailure = PublicProfileResult.Failed(NETWORK_MESSAGE),
+        unreadableReply = PublicProfileResult.Failed(failureMessage)
+    ) {
         val response = Session.call(context) { authorization ->
             ServerApi.userService.getPublicProfile(authorization = authorization, userId = userId)
         } ?: return PublicProfileResult.Failed(SESSION_ENDED_MESSAGE)
@@ -233,10 +230,6 @@ suspend fun fetchPublicProfile(context: Context, userId: Int): PublicProfileResu
                 PublicProfileResult.Failed("This player no longer exists.", canRetry = false)
             else -> PublicProfileResult.Failed(failureMessage)
         }
-    } catch (e: IOException) {
-        PublicProfileResult.Failed(NETWORK_MESSAGE)
-    } catch (e: JsonParseException) {
-        PublicProfileResult.Failed(failureMessage)
     }
 }
 
