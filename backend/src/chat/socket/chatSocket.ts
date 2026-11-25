@@ -8,6 +8,7 @@ import { checkToken } from '../../user/auth/middleware';
 import { type ChatMessage, createChatMessage, getChatAccess, getChatMemberIds } from '../db/chats';
 import { chatMessageJson } from '../routes/chatJson';
 import { parseSendMessage, type SendMessage } from '../validation/sendMessage';
+import { messagePush } from './messagePush';
 
 // far more than the longest message, larger requests close the connection
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -15,8 +16,6 @@ const MAX_REQUEST_BYTES = 16 * 1024;
 const HEARTBEAT_MS = 30_000;
 // close code for a user who can no longer be in the chat, or a chat that is gone
 const CLOSE_NOT_A_MEMBER = 4403;
-// how much of a message its notification shows, in characters
-const PUSH_PREVIEW_LENGTH = 100;
 
 // who a connection belongs to and the one chat it is open for
 interface ChatClient {
@@ -54,40 +53,6 @@ function sendJson(webSocket: WebSocket, reply: object): void {
   } catch (error) {
     logError('Sending over a chat connection failed:', error);
   }
-}
-
-// the start of a message for its notification, by character so an emoji isn't split in two
-function messagePreview(text: string): string {
-  const characters = Array.from(text);
-  const preview = characters.slice(0, PUSH_PREVIEW_LENGTH).join('');
-  return characters.length > PUSH_PREVIEW_LENGTH ? `${preview}...` : preview;
-}
-
-// the notification for a friend's message, tagged so their messages show as one notification
-function friendMessagePush(message: ChatMessage): PushMessage {
-  return {
-    title: message.senderFirstName,
-    body: messagePreview(message.text),
-    // the chat and its title, so tapping the notification opens it straight away
-    data: {
-      type: 'friend_message',
-      chatId: String(message.chatId),
-      friendName: `${message.senderFirstName} ${message.senderLastName}`.trim(),
-    },
-    tag: `friend-${message.senderId}`,
-  };
-}
-
-/*  the notification for a message in a game's chat: the game's title, then who wrote what.
-    Tagged by game so a chat's messages show as one notification, tapping it opens the chat
- */
-function gameMessagePush(message: ChatMessage, gameId: number, gameTitle: string): PushMessage {
-  return {
-    title: gameTitle,
-    body: `${message.senderFirstName}: ${messagePreview(message.text)}`,
-    data: { type: 'game_message', gameId: String(gameId) },
-    tag: `game-${gameId}`,
-  };
 }
 
 /*  decides who is connecting and to which chat: ?chat_id= and the JWT in the Authorization
@@ -189,10 +154,7 @@ export function startChatSocket(port: number): ChatSocket {
     });
 
     // best effort, the message is already delivered and saved so a failure is only logged
-    const push = access.gameId === null
-      ? friendMessagePush(saved)
-      : gameMessagePush(saved, access.gameId, access.gameTitle ?? 'Game chat');
-    notifyAbsentMembers(saved, push).catch((error: unknown) => {
+    notifyAbsentMembers(saved, messagePush(saved, access)).catch((error: unknown) => {
       logError(`Notifying about a message in chat ${client.chatId} failed:`, error);
     });
   }

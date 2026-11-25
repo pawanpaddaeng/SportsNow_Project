@@ -1,10 +1,25 @@
 import { MESSAGES_PAGE_SIZE } from '../../../src/chat/db/chats';
 import { makeFriends } from '../friend/friendHelpers';
-import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, setGameStatus, withToken } from '../helpers';
-import { addMessage, addMessages, gameChatId, MISSING_CHAT_ID, removeFromGame, unfriend } from './chatHelpers';
-
-// a message's time as the route returns it, UTC without milliseconds
-const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+import {
+  addGame,
+  addPlayer,
+  addUser,
+  api,
+  asUser,
+  cleanUpAfterTests,
+  setGameStatus,
+  withToken,
+} from '../helpers';
+import {
+  addGameWithChat,
+  addMessage,
+  addMessages,
+  gameChatId,
+  ISO_TIME,
+  MISSING_CHAT_ID,
+  removeFromGame,
+  unfriend,
+} from './chatHelpers';
 
 let organizerId: number;
 let playerId: number;
@@ -12,11 +27,7 @@ let gameId: number;
 let chatId: number;
 
 beforeEach(async () => {
-  organizerId = await addUser('Olive');
-  playerId = await addUser('Pat');
-  gameId = await addGame(organizerId);
-  await addPlayer(gameId, playerId);
-  chatId = await gameChatId(gameId);
+  ({ organizerId, playerId, gameId, chatId } = await addGameWithChat());
 });
 
 cleanUpAfterTests();

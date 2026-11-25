@@ -1,7 +1,11 @@
 import { executeWrite, selectRows } from '../../../src/core/db/mysql';
 import { getGameChatId } from '../../../src/chat/db/chats';
+import { addGame, addPlayer, addUser } from '../helpers';
 
 // setup and checks shared by the unmocked chat tests, straight on the database
+
+// a message's time as the server sends it, UTC without milliseconds
+export const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 // an id far above any id the tests create
 export const MISSING_CHAT_ID = 999999999;
@@ -56,4 +60,21 @@ export function getSavedMessages(chatId: number): Promise<SavedMessage[]> {
     'SELECT message_id, sender_id, text FROM chat_messages WHERE chat_id = ? ORDER BY message_id',
     [chatId],
   );
+}
+
+// an upcoming game organized by Olive with Pat in it, and the game's chat
+export interface GameWithChat {
+  organizerId: number;
+  playerId: number;
+  gameId: number;
+  chatId: number;
+}
+
+// saves Olive's upcoming game with Pat in it, the setup the chat tests start from
+export async function addGameWithChat(): Promise<GameWithChat> {
+  const organizerId = await addUser('Olive');
+  const playerId = await addUser('Pat');
+  const gameId = await addGame(organizerId);
+  await addPlayer(gameId, playerId);
+  return { organizerId, playerId, gameId, chatId: await gameChatId(gameId) };
 }
