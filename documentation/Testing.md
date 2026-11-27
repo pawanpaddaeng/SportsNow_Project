@@ -26,6 +26,7 @@
 | Nov 25, 2026 | 2.1 | More `send_message` tests, for the chat server code no test reached. Without mocks: a message that isn't valid UTF-8 closes the connection. With mocks: a reply that fails to send, a reply to a connection that already closed, and a game chat with no title. `chatSocketClient.ts` can now send raw bytes and close a connection. |
 | Nov 25, 2026 | 2.1 | The unmocked `GET /api/users/me/stats` test "An unusual game counts a quarter as much" covers a game far from the middle of a player's games, which only the unit tests reached before, and those don't run with the interface tests. The MVP badge rule now only checks the score, which is only set once a player has 10 ratings, so the unit test for a high score from 9 ratings is removed. |
 | Nov 27, 2026 | 2.1 | The unmocked `send_message` test "Bad requests are answered invalid_request" also sends a `chat_id` that isn't a number and one that is 0, so the `chat_id` check is covered by the interface tests and not only the unit tests. |
+| Nov 27, 2026 | 2.1 | Added the unmocked `POST /api/games` test "A body that is not valid JSON is turned down". The mocked `DELETE /api/friends/{userId}` test "Database fails while removing" now gives the real transaction code a fake connection, instead of replacing the transaction, and checks it is rolled back and its connection released. |
 
 ---
 
@@ -107,7 +108,7 @@ How a start reminder says how soon the game starts has no database code, so it a
 | **GET /api/friends/requests** | [`backend/tests/no-mock/friend/listFriendRequests.test.ts#L13`](../backend/tests/no-mock/friend/listFriendRequests.test.ts#L13) | [`backend/tests/mock/friend/listFriendRequests.test.ts#L10`](../backend/tests/mock/friend/listFriendRequests.test.ts#L10) | Friends DB |
 | **POST /api/friends/requests** | [`backend/tests/no-mock/friend/sendFriendRequest.test.ts#L15`](../backend/tests/no-mock/friend/sendFriendRequest.test.ts#L15) | [`backend/tests/mock/friend/sendFriendRequest.test.ts#L22`](../backend/tests/mock/friend/sendFriendRequest.test.ts#L22) | Friends DB, Firebase push, Logger |
 | **PATCH /api/friends/requests/{requestId}** | [`backend/tests/no-mock/friend/answerFriendRequest.test.ts#L25`](../backend/tests/no-mock/friend/answerFriendRequest.test.ts#L25) | [`backend/tests/mock/friend/answerFriendRequest.test.ts#L24`](../backend/tests/mock/friend/answerFriendRequest.test.ts#L24) | Friends DB, MySQL transaction, Notifications DB, Firebase push, Logger |
-| **DELETE /api/friends/{userId}** | [`backend/tests/no-mock/friend/removeFriend.test.ts#L29`](../backend/tests/no-mock/friend/removeFriend.test.ts#L29) | [`backend/tests/mock/friend/removeFriend.test.ts#L11`](../backend/tests/mock/friend/removeFriend.test.ts#L11) | Friends DB, MySQL transaction |
+| **DELETE /api/friends/{userId}** | [`backend/tests/no-mock/friend/removeFriend.test.ts#L29`](../backend/tests/no-mock/friend/removeFriend.test.ts#L29) | [`backend/tests/mock/friend/removeFriend.test.ts#L12`](../backend/tests/mock/friend/removeFriend.test.ts#L12) | Friends DB, MySQL connection |
 
 The unmocked Friend tests share their setup helpers in [`backend/tests/no-mock/friend/friendHelpers.ts`](../backend/tests/no-mock/friend/friendHelpers.ts).
 
@@ -242,6 +243,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Organizer creates a game | All fields, starting tomorrow | 201 | The game is saved. The user is its organizer and first player, and its chat is opened. Returns the game with `player_count` 1 and `status` "scheduled" |
 | No mocks | Invalid body never reaches the database | A game without `title` | 400 | No game is saved for the user. Returns `{ msg: "invalid_request", error: "title is required (max 100 characters)" }` |
+| No mocks | A body that is not valid JSON is turned down | The body `{bad`, sent as `application/json` | 400 | The body can't be read, so Express turns the request down before the route runs, not as a server error. No game is saved |
 | With mocks | Database fails while saving | `createGame` throws | 500 | Returns `{ msg: "server_error" }`. The game is never read back |
 
 **GET /api/games/mine** (the user's games)
@@ -493,7 +495,7 @@ Every test starts with two friends who share a chat holding 3 messages.
 | No mocks | Removed friend with the chat open is disconnected | The friend has the chat open over the WebSocket, is removed, then sends a message | 200 | Nothing is saved. The friend gets `{ type: "error", msg: "chat_not_found" }` and the connection is closed with 4403 |
 | No mocks | Friends again get a new, empty chat | After the removal, the removed friend sends a new request and it's accepted | 200, 201, 200 | They're friends again with a new chat whose `chat_id` is different, listed in `GET /api/friends`, with no messages |
 | With mocks | Database fails | `removeFriend` throws | 500 | Returns `{ msg: "server_error", error: "Could not remove this friend, try again later" }` |
-| With mocks | Database fails while removing | A fake transaction: both users are locked, then deleting the friendship fails | 500 | The chat is never deleted. Returns `{ msg: "server_error" }` |
+| With mocks | Database fails while removing | The pool hands out a fake connection, so the real transaction code runs on it: both users are locked, then deleting the friendship fails | 500 | The transaction is rolled back, never committed, and the connection is given back to the pool. The chat is never deleted. Returns `{ msg: "server_error" }` |
 
 
 ##### Review component

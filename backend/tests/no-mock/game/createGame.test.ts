@@ -90,4 +90,18 @@ describe('Unmocked: POST /api/games', () => {
     const games = await selectRows<{ game_id: number }>('SELECT game_id FROM games WHERE organizer_id = ?', [organizerId]);
     expect(games).toEqual([]);
   });
+
+  // Input: a body sent as JSON that isn't valid JSON, "{bad", from a signed in user
+  // Expected status code: 400
+  // Expected behavior: the body can't be read, so the request is turned down before the route
+  //   runs, by Express's own handling instead of a server error. No game is saved
+  // Expected output: Express's 400 Bad Request reply
+  test('A body that is not valid JSON is turned down', async () => {
+    const response = await api.post('/api/games').set(withToken(token))
+      .set('Content-Type', 'application/json').send('{bad');
+
+    expect(response.status).toBe(400);
+    const games = await selectRows<{ game_id: number }>('SELECT game_id FROM games WHERE organizer_id = ?', [organizerId]);
+    expect(games).toEqual([]);
+  });
 });
