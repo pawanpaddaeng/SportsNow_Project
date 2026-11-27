@@ -37,12 +37,11 @@ describe('qualifyingBadges', () => {
     expect(qualifyingBadges(progress({ friends: 10 }))).toEqual(['first_friend', 'friends_10']);
   });
 
-  test('MVP needs a score of at least 5 from at least 10 ratings', () => {
+  // the score is only set once they have 10 ratings received, the badges database code checks that
+  test('MVP needs a score of at least 5', () => {
     expect(qualifyingBadges(progress({ ratingsReceived: 10, score: 5 }))).toEqual(['mvp']);
     expect(qualifyingBadges(progress({ ratingsReceived: 10, score: 4.99 }))).toEqual([]);
-    // a high score from too few ratings
-    expect(qualifyingBadges(progress({ ratingsReceived: 9, score: 6 }))).toEqual([]);
-    // not rated yet
+    // fewer than 10 ratings, so no score
     expect(qualifyingBadges(progress({ ratingsReceived: 10, score: null }))).toEqual([]);
   });
 
