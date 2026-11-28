@@ -22,6 +22,7 @@ const IN_30_MINUTES = 30 * ONE_MINUTE_MS + 30 * 1000;
 const IN_59_MINUTES = 59 * ONE_MINUTE_MS + 30 * 1000;
 const IN_45_MINUTES = 45 * ONE_MINUTE_MS + 30 * 1000;
 const IN_2_HOURS = 120 * ONE_MINUTE_MS;
+const IN_1_MINUTE = ONE_MINUTE_MS + 30 * 1000;
 
 let organizerId: number;
 let playerId: number;
@@ -83,6 +84,17 @@ describe('Unmocked: game start reminders', () => {
     await sendDueStartReminders();
 
     expect(await remindersFor(organizerId, gameId)).toEqual(['Evening Basketball starts in 1 hour']);
+  });
+
+  // Input: a game starting in a minute and a half, as when the reminder goes out late
+  // Expected behavior: the reminder says the minute that's left, in the singular
+  // Expected output: the reminder "Evening Basketball starts in 1 minute"
+  test('A reminder a minute before the start says 1 minute', async () => {
+    const gameId = await addGame(organizerId, { startsAt: startsIn(IN_1_MINUTE) });
+
+    await sendDueStartReminders();
+
+    expect(await remindersFor(organizerId, gameId)).toEqual(['Evening Basketball starts in 1 minute']);
   });
 
   // Input: a game starting in 2 hours, a game that started yesterday, and a cancelled game
