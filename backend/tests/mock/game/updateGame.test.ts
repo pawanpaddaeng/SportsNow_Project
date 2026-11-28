@@ -60,6 +60,46 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     });
   });
 
+  // Mocked behavior: the games database is replaced: getGameById returns the game before the
+  //   edit, then after it with a new sport, longitude, max players, skill level and
+  //   description, and the same title, time, place name, address and latitude. updateGame
+  //   reports a change and getUsersToNotify returns users 2 and 3. sendPushToUsers is replaced
+  //   to check what they're told. Sign in is mocked only so the route can run
+  // Input: the organizer edits those details of their game
+  // Expected status code: 200
+  // Expected behavior: the notification names every detail that changed, the moved pin counts
+  //   as a new location
+  // Expected output: { msg: "success", game }
+  test('Players are told every detail that changed', async () => {
+    // 1. sign in as the organizer (not what this test checks)
+    const token = signIn(testOrganizer());
+
+    // 2. a game whose sport, pin, spots, skill level and description change
+    const before = testGame();
+    const after = testGame({
+      sport: 'basketball',
+      longitude: -123.2,
+      maxPlayers: 12,
+      skillLevel: 'beginner',
+      description: 'Bring water',
+    });
+    jest.spyOn(gamesDb, 'getGameById').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+    jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: true });
+    jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
+    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
+
+    // 3. edit it through the interface, and let the notifications finish
+    const response = await api.put(`/api/games/${GAME_ID}`).set(withToken(token))
+      .send(validGameBody());
+    await letNotificationsFinish();
+
+    // 4. check the reply and that the notification names each change
+    expect(response.status).toBe(200);
+    expect(sendPushToUsers).toHaveBeenCalledWith([2, 3], expect.objectContaining({
+      body: `${after.title}: the organizer changed the sport, location, max players, skill level, description`,
+    }));
+  });
+
   // Mocked behavior: the games database is replaced: getGameById returns the same game before
   //   and after, and updateGame reports no change. sendPushToUsers is replaced to check it
   //   isn't called. Sign in is mocked only so the route can run

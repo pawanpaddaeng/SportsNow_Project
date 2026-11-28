@@ -11,6 +11,7 @@ import {
   cleanUpAfterTests,
   getPlayerIds,
   MISSING_GAME_ID,
+  setGameStatus,
 } from '../helpers';
 
 let organizerId: number;
@@ -78,6 +79,23 @@ describe('Unmocked: POST /api/games/{gameId}/leave', () => {
     const chats = await selectRows<{ chat_id: number }>(
       'SELECT chat_id FROM chats WHERE game_id = ?', [gameId]);
     expect(chats).toEqual([]);
+  });
+
+  // Input: a player leaves a completed game the organizer is still in
+  // Expected status code: 200
+  // Expected behavior: the player is taken off it, the game stays for the organizer, and
+  //   since the game is over the organizer isn't told
+  // Expected output: { msg: "success", game, game_deleted: false }
+  test('Player leaves a completed game', async () => {
+    const gameId = await addStartedGame(organizerId);
+    await addPlayer(gameId, playerId);
+    await setGameStatus(gameId, 'completed');
+
+    const response = await api.post(`/api/games/${gameId}/leave`).set(asUser(playerId));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ msg: 'success', game_deleted: false, game: { game_id: gameId, status: 'completed' } });
+    expect(await getPlayerIds(gameId)).toEqual([organizerId]);
   });
 
   // Input: Paul leaves a game no game has the id of, Pia leaves a game she isn't in, and the

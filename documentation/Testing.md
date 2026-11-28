@@ -30,6 +30,7 @@
 | Nov 27, 2026 | 2.1 | Added mocked tests that run our push code (`src/core/notifications/push.ts`) against a fake Firebase Admin SDK, in [`backend/tests/mock/fakeFirebase.ts`](../backend/tests/mock/fakeFirebase.ts), instead of replacing it: a friend request push to two devices that deletes a dead token, a Firebase failure, and a tagged friend message push. `PushMessage.data` is now required, since every push already sends it. |
 | Nov 27, 2026 | 2.1 | Added the unmocked tests "A query of only an accent mark matches nobody" for `GET /api/users/search` and "A reminder a minute before the start says 1 minute" for the game start reminders, cases only the unit tests reached before. |
 | Nov 27, 2026 | 2.1 | Added unmocked error tests for completing, leaving, editing, inviting to and removing players from games, and a viewer who never asked to join. |
+| Nov 27, 2026 | 2.1 | Added game route tests: bad ids and leaving a completed game without mocks, and with mocks a game gone after cancelling, a failed notify lookup, an edit changing every detail, and an unknown problem. |
 
 ---
 
@@ -298,6 +299,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Moving the start past the kept end time | A game from tomorrow 6 to 8 PM, edited without `ends_at` and with a start the day after | 400 | The game doesn't change. Returns `{ msg: "invalid_request", error: "starts_at must be before the game ends" }` |
 | No mocks | An edit can set the end time | A game with no end time, edited with an `ends_at` 2 hours after its start | 200 | The new end time is saved and returned |
 | With mocks | Players are told | Valid edit, `sendPushToUsers` replaced | 200 | Players and people with pending requests (not the organizer) get a `game_updated` notification that says what changed |
+| With mocks | Players are told every detail that changed | The game read back after the edit has a new sport, longitude, max players, skill level and description. `sendPushToUsers` replaced | 200 | The notification says "…changed the sport, location, max players, skill level, description", and a moved pin counts as a new location |
 | With mocks | Nothing changed | Same values as before, `sendPushToUsers` replaced | 200 | No notification is sent |
 | With mocks | Database fails | `updateGame` throws | 500 | Returns `{ msg: "server_error" }` |
 
@@ -312,6 +314,8 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Not the organizer | Another user cancels it | 403 | The game doesn't change. Returns `{ msg: "forbidden" }` |
 | With mocks | Players are told | `sendPushToUsers` replaced | 200 | Players and people with pending requests get a `game_cancelled` notification |
 | With mocks | Database fails | `cancelGame` throws | 500 | Returns `{ msg: "server_error" }` |
+| With mocks | Game is gone right after cancelling | `cancelGame` succeeds, then `getGameById` finds no game when it's read back | 500 | The failure is logged and nobody is told. Returns `{ msg: "server_error" }` |
+| With mocks | Looking up who to notify fails | `cancelGame` succeeds, `getUsersToNotify` throws | 200 | The game is still cancelled. The failure is logged as "Notifying players of game 42 failed:" |
 
 **POST /api/games/{gameId}/complete** (mark a game completed)
 
@@ -329,13 +333,16 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Player leaves a game that has another player | A player leaves an upcoming game that has another player | 200 | The player is no longer in the game, and the other player and the game remain. Returns the game with `player_count` down by one |
 | No mocks | Last player leaves and the game is deleted | The organizer, the only player left in their cancelled game, leaves it | 200 | The game, its players and its chat are deleted. Returns `{ msg: "success", game: null, game_deleted: true }` |
 | No mocks | Leaving is turned down when it is not allowed | A missing game, a user who isn't in the game, and the organizer leaving their upcoming and their started game | 404, 409, 409, 409 | Nobody leaves. Returns `not_found`, `not_player`, `organizer_must_cancel`, then `organizer_must_complete` |
+| No mocks | Player leaves a completed game | A player leaves a completed game the organizer is still in | 200 | The player is taken off it and the game stays. The organizer isn't told, since the game is over. Returns `game_deleted: false` |
 | With mocks | Database fails | `leaveGame` throws | 500 | Returns `{ msg: "server_error" }` |
+| With mocks | Database reports a problem the route does not know | `leaveGame` reports a problem with no listed response | 500 | The failure is logged and answered as a normal server error. Returns `{ msg: "server_error", error: "Could not leave the game, try again later" }` |
 
 **DELETE /api/games/{gameId}/players/{userId}** (remove a player from a game)
 
 | **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Organizer removes the second player | The organizer removes the other player from their upcoming game | 200 | The player is no longer in the game, and only the organizer is left. Returns the game with `player_count` 1 |
+| No mocks | Rejects a bad game or user id | `abc` as the game id, then as the user id | 400 | Nobody is removed. Returns `{ msg: "invalid_request", error: "gameId and userId must be positive whole numbers" }` |
 | No mocks | Removing is turned down when it is not allowed | A player removing the organizer, a missing game, the organizer removing themselves, and removing a user who isn't in the game | 403, 404, 409, 404 | Nobody is removed. Returns `forbidden`, `not_found`, `organizer_self`, then `player_not_found` |
 
 **POST /api/games/{gameId}/invites** (invite friends to a game)

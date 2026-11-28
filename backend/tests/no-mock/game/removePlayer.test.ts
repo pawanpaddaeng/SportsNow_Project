@@ -33,6 +33,22 @@ describe('Unmocked: DELETE /api/games/{gameId}/players/{userId}', () => {
     expect(await getPlayerIds(gameId)).toEqual([organizerId]);
   });
 
+  // Input: the organizer removes a player with "abc" as the game id, then as the user id
+  // Expected status code: 400
+  // Expected behavior: nobody is removed
+  // Expected output: { msg: "invalid_request", error: "gameId and userId must be positive whole numbers" }
+  test('Rejects a bad game or user id', async () => {
+    const gameId = await addGame(organizerId);
+    await addPlayer(gameId, playerId);
+
+    for (const path of [`/api/games/abc/players/${playerId}`, `/api/games/${gameId}/players/abc`]) {
+      const response = await api.delete(path).set(asUser(organizerId));
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ msg: 'invalid_request', error: 'gameId and userId must be positive whole numbers' });
+    }
+    expect(await getPlayerIds(gameId)).toEqual(expect.arrayContaining([organizerId, playerId]));
+  });
+
   // Input: Paul tries to remove the organizer, the organizer removes Paul from a game no game
   //   has the id of, removes themselves, and removes Otto, who isn't in the game
   // Expected status code: 403, 404, 409 and 404
