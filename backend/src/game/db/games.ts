@@ -417,7 +417,7 @@ export type CompleteGameResult = { ok: true } | { ok: false; problem: CompleteGa
 export async function completeGame(
   gameId: number,
   userId: number,
-  noShowUserIds: number[] = [],
+  noShowUserIds: number[],
 ): Promise<CompleteGameResult> {
   return inTransaction(async (connection) => {
     const locked = await lockOrganizedGame(connection, gameId, userId);

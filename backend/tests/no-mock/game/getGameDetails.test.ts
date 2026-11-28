@@ -87,6 +87,19 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
     expect(response.body.join_request_status).toBe('pending');
   });
 
+  // Input: a user opens a game they never asked to join
+  // Expected status code: 200
+  // Expected behavior: the user only views it, nothing changes
+  // Expected output: { msg: "success", ... } with viewer_role "viewer" and join_request_status null
+  test('Viewer who never asked to join', async () => {
+    const gameId = await addGame(organizerId);
+
+    const response = await api.get(`/api/games/${gameId}`).set(asUser(viewerId));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ viewer_role: 'viewer', join_request_status: null });
+  });
+
   // Input: a signed in user opens /api/games/abc
   // Expected status code: 400
   // Expected behavior: the request is rejected, nothing changes

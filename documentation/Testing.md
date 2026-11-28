@@ -29,6 +29,7 @@
 | Nov 27, 2026 | 2.1 | Added the unmocked `POST /api/games` test "A body that is not valid JSON is turned down". The mocked `DELETE /api/friends/{userId}` test "Database fails while removing" now gives the real transaction code a fake connection, instead of replacing the transaction, and checks it is rolled back and its connection released. |
 | Nov 27, 2026 | 2.1 | Added mocked tests that run our push code (`src/core/notifications/push.ts`) against a fake Firebase Admin SDK, in [`backend/tests/mock/fakeFirebase.ts`](../backend/tests/mock/fakeFirebase.ts), instead of replacing it: a friend request push to two devices that deletes a dead token, a Firebase failure, and a tagged friend message push. `PushMessage.data` is now required, since every push already sends it. |
 | Nov 27, 2026 | 2.1 | Added the unmocked tests "A query of only an accent mark matches nobody" for `GET /api/users/search` and "A reminder a minute before the start says 1 minute" for the game start reminders, cases only the unit tests reached before. |
+| Nov 27, 2026 | 2.1 | Added unmocked error tests for completing, leaving, editing, inviting to and removing players from games, and a viewer who never asked to join. |
 
 ---
 
@@ -91,7 +92,7 @@ The unmocked User tests share their setup helpers in [`backend/tests/no-mock/use
 | **PUT /api/games/{gameId}** | [`backend/tests/no-mock/game/updateGame.test.ts#L29`](../backend/tests/no-mock/game/updateGame.test.ts#L29) | [`backend/tests/mock/game/updateGame.test.ts#L22`](../backend/tests/mock/game/updateGame.test.ts#L22) | Games DB, Firebase push |
 | **POST /api/games/{gameId}/cancel** | [`backend/tests/no-mock/game/cancelGame.test.ts#L26`](../backend/tests/no-mock/game/cancelGame.test.ts#L26) | [`backend/tests/mock/game/cancelGame.test.ts#L20`](../backend/tests/mock/game/cancelGame.test.ts#L20) | Games DB, Firebase push |
 | **POST /api/games/{gameId}/complete** | [`backend/tests/no-mock/game/completeGame.test.ts#L15`](../backend/tests/no-mock/game/completeGame.test.ts#L15) | None | None |
-| **POST /api/games/{gameId}/leave** | [`backend/tests/no-mock/game/leaveGame.test.ts#L18`](../backend/tests/no-mock/game/leaveGame.test.ts#L18) | [`backend/tests/mock/game/leaveGame.test.ts#L10`](../backend/tests/mock/game/leaveGame.test.ts#L10) | Games DB |
+| **POST /api/games/{gameId}/leave** | [`backend/tests/no-mock/game/leaveGame.test.ts#L29`](../backend/tests/no-mock/game/leaveGame.test.ts#L29) | [`backend/tests/mock/game/leaveGame.test.ts#L10`](../backend/tests/mock/game/leaveGame.test.ts#L10) | Games DB |
 | **DELETE /api/games/{gameId}/players/{userId}** | [`backend/tests/no-mock/game/removePlayer.test.ts#L15`](../backend/tests/no-mock/game/removePlayer.test.ts#L15) | None yet | None |
 | **POST /api/games/{gameId}/invites** | [`backend/tests/no-mock/game/inviteFriends.test.ts#L32`](../backend/tests/no-mock/game/inviteFriends.test.ts#L32) | [`backend/tests/mock/game/inviteFriends.test.ts#L25`](../backend/tests/mock/game/inviteFriends.test.ts#L25) | Games DB, Friends DB, Notifications DB, Firebase push |
 | **POST /api/games/{gameId}/join-requests** | [`backend/tests/no-mock/game/sendJoinRequest.test.ts#L32`](../backend/tests/no-mock/game/sendJoinRequest.test.ts#L32) | [`backend/tests/mock/game/sendJoinRequest.test.ts#L24`](../backend/tests/mock/game/sendJoinRequest.test.ts#L24) | Join Requests DB, Notifications DB, Firebase push |
@@ -275,6 +276,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Organizer | The organizer opens their game, which has two pending requests | 200 | `viewer_role` is "organizer" and `pending_requests` is 2 |
 | No mocks | Player | A user opens a game they joined | 200 | `viewer_role` is "player" |
 | No mocks | Viewer | A user opens a game they asked to join | 200 | `viewer_role` is "viewer" and `join_request_status` is "pending" |
+| No mocks | Viewer who never asked to join | A user opens a game they never asked to join | 200 | `viewer_role` is "viewer" and `join_request_status` is `null` |
 | No mocks | Bad id | `/api/games/abc` | 400 | Returns `{ msg: "invalid_request" }` |
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
 | With mocks | Organizer not in players list | `getGamePlayers` doesn't return the organizer, the user lookup in `findOrganizer` does | 200 | `organizer` comes from the user lookup |
@@ -293,6 +295,8 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Game already started | Edit a game that already started | 409 | The game doesn't change. Returns `{ msg: "game_started" }` |
 | No mocks | Not the organizer | Another user edits the game | 403 | The game doesn't change. Returns `{ msg: "forbidden" }` |
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
+| No mocks | Moving the start past the kept end time | A game from tomorrow 6 to 8 PM, edited without `ends_at` and with a start the day after | 400 | The game doesn't change. Returns `{ msg: "invalid_request", error: "starts_at must be before the game ends" }` |
+| No mocks | An edit can set the end time | A game with no end time, edited with an `ends_at` 2 hours after its start | 200 | The new end time is saved and returned |
 | With mocks | Players are told | Valid edit, `sendPushToUsers` replaced | 200 | Players and people with pending requests (not the organizer) get a `game_updated` notification that says what changed |
 | With mocks | Nothing changed | Same values as before, `sendPushToUsers` replaced | 200 | No notification is sent |
 | With mocks | Database fails | `updateGame` throws | 500 | Returns `{ msg: "server_error" }` |
@@ -315,6 +319,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Organizer marks their started game completed | The organizer completes their started game | 200 | The game's `status` becomes "completed". Returns the game |
 | No mocks | A malformed no-show list is rejected | `no_show_user_ids: ["seven"]` | 400 | The game doesn't change. Returns `{ msg: "invalid_request" }` |
+| No mocks | Games that cannot be completed are turned down | A player who isn't the organizer, a missing game, an already completed game, and a game that hasn't started | 403, 404, 409, 409 | No game changes. Returns `forbidden`, `not_found`, `game_completed`, then `game_not_started` |
 | No mocks | Organizer marks players who did not show up | Ben and Cara play in the organizer's started game. The organizer completes it with `no_show_user_ids` holding Ben's id twice | 200 | Each player's attendance is saved once: Ben as a no-show, Cara and the organizer as having played. Returns the game with `status` "completed" |
 
 **POST /api/games/{gameId}/leave** (leave a game)
@@ -323,6 +328,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Player leaves a game that has another player | A player leaves an upcoming game that has another player | 200 | The player is no longer in the game, and the other player and the game remain. Returns the game with `player_count` down by one |
 | No mocks | Last player leaves and the game is deleted | The organizer, the only player left in their cancelled game, leaves it | 200 | The game, its players and its chat are deleted. Returns `{ msg: "success", game: null, game_deleted: true }` |
+| No mocks | Leaving is turned down when it is not allowed | A missing game, a user who isn't in the game, and the organizer leaving their upcoming and their started game | 404, 409, 409, 409 | Nobody leaves. Returns `not_found`, `not_player`, `organizer_must_cancel`, then `organizer_must_complete` |
 | With mocks | Database fails | `leaveGame` throws | 500 | Returns `{ msg: "server_error" }` |
 
 **DELETE /api/games/{gameId}/players/{userId}** (remove a player from a game)
@@ -330,6 +336,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Organizer removes the second player | The organizer removes the other player from their upcoming game | 200 | The player is no longer in the game, and only the organizer is left. Returns the game with `player_count` 1 |
+| No mocks | Removing is turned down when it is not allowed | A player removing the organizer, a missing game, the organizer removing themselves, and removing a user who isn't in the game | 403, 404, 409, 404 | Nobody is removed. Returns `forbidden`, `not_found`, `organizer_self`, then `player_not_found` |
 
 **POST /api/games/{gameId}/invites** (invite friends to a game)
 
@@ -341,6 +348,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | `friend_ids` is rejected | `friend_ids` is missing, empty, text, not whole or zero | 400 | Returns `{ msg: "invalid_request" }` |
 | No mocks | Organizer cannot invite someone who is not their friend | The organizer invites a friend and a user who isn't their friend | 403 | Nobody is invited and no notification is saved. Returns `{ msg: "not_friend" }` |
 | No mocks | A player who is not the organizer cannot invite | A player invites their own friend | 403 | Returns `{ msg: "forbidden" }` |
+| No mocks | Inviting to a game that does not exist | The organizer invites a friend to an id with no game | 404 | Nobody is invited. Returns `{ msg: "not_found" }` |
 | With mocks | Organizer invites two friends | The organizer invites two friends, `saveNotifications` and `sendPushToUser` replaced | 201 | Each friend gets a `game_invite` notification, saved and sent as a push. Returns `{ msg: "success" }` |
 | With mocks | Database error | `getGameById` throws | 500 | Nobody is notified. Returns `{ msg: "server_error" }` |
 

@@ -8,6 +8,7 @@ import {
   api,
   asUser,
   cleanUpAfterTests,
+  MISSING_GAME_ID,
   setGameStatus,
 } from '../helpers';
 import { noticesAfterAWhile, waitForNotices } from '../notification/notificationHelpers';
@@ -161,5 +162,17 @@ describe('Unmocked: POST /api/games/{gameId}/invites', () => {
     // 3. check it was rejected
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ msg: 'forbidden', error: 'Only the organizer can invite friends to this game' });
+  });
+
+  // Input: the organizer invites Fay to a game no game has the id of
+  // Expected status code: 404
+  // Expected behavior: nobody is invited
+  // Expected output: { msg: "not_found" }
+  test('Inviting to a game that does not exist', async () => {
+    const response = await api.post(`/api/games/${MISSING_GAME_ID}/invites`).set(asUser(organizerId))
+      .send({ friend_ids: [friendId] });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toMatchObject({ msg: 'not_found' });
   });
 });

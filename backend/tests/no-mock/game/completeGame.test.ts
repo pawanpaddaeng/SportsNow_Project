@@ -1,6 +1,6 @@
 import { selectRows } from '../../../src/core/db/mysql';
 import { getGameById } from '../../../src/game/db/games';
-import { addPlayer, addStartedGame, addUser, api, asUser, cleanUpAfterTests } from '../helpers';
+import { addGame, addPlayer, addStartedGame, addUser, api, asUser, cleanUpAfterTests, MISSING_GAME_ID, setGameStatus } from '../helpers';
 import { type ApiReply, expectGameReply } from '../../sharedHelpers';
 
 let organizerId: number;
@@ -75,5 +75,34 @@ describe('Unmocked: POST /api/games/{gameId}/complete', () => {
       error: 'no_show_user_ids must be a list of user ids',
     });
     expect((await getGameById(gameId))?.status).toBe('scheduled');
+  });
+
+  // Input: a player who isn't the organizer completes the game, the organizer completes a game
+  //   no game has the id of, one that was already completed, and one that hasn't started
+  // Expected status code: 403, 404, 409 and 409
+  // Expected behavior: no game changes
+  // Expected output: { msg: "forbidden" }, { msg: "not_found" }, { msg: "game_completed" } and
+  //   { msg: "game_not_started" }
+  test('Games that cannot be completed are turned down', async () => {
+    const playerId = await addUser('Paul');
+    const startedId = await addStartedGame(organizerId);
+    await addPlayer(startedId, playerId);
+    const completedId = await addStartedGame(organizerId);
+    await setGameStatus(completedId, 'completed');
+    const upcomingId = await addGame(organizerId);
+
+    const cases: [number, number, number, string][] = [
+      [startedId, playerId, 403, 'forbidden'],
+      [MISSING_GAME_ID, organizerId, 404, 'not_found'],
+      [completedId, organizerId, 409, 'game_completed'],
+      [upcomingId, organizerId, 409, 'game_not_started'],
+    ];
+    for (const [gameId, userId, status, msg] of cases) {
+      const response = await api.post(`/api/games/${gameId}/complete`).set(asUser(userId));
+      expect(response.status).toBe(status);
+      expect(response.body).toMatchObject({ msg });
+    }
+    expect((await getGameById(startedId))?.status).toBe('scheduled');
+    expect((await getGameById(upcomingId))?.status).toBe('scheduled');
   });
 });
