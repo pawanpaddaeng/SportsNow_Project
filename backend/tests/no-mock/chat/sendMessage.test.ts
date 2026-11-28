@@ -145,7 +145,8 @@ describe('Unmocked: WebSocket send_message', () => {
     expect(player.isOpen()).toBe(true);
   });
 
-  // Input: a request that isn't JSON, one with type "typing", and one with text "   "
+  // Input: a request that isn't JSON, one with type "typing", one with chat_id "abc", one with
+  //   chat_id 0, and one with text "   "
   // Expected status code: none, it's a WebSocket reply
   // Expected behavior: nothing is saved, the connection stays open for the next message
   // Expected output: { type: "error", msg: "invalid_request", error, client_id: null } for
@@ -163,6 +164,14 @@ describe('Unmocked: WebSocket send_message', () => {
       type: 'error', msg: 'invalid_request', error: 'type must be send_message', client_id: null,
     });
 
+    // a chat_id that isn't a number, then a number that isn't a positive whole number
+    for (const badChatId of ['abc', 0]) {
+      player.sendRaw(JSON.stringify({ type: 'send_message', chat_id: badChatId, text: 'Hi' }));
+      expect(await player.nextReply()).toEqual({
+        type: 'error', msg: 'invalid_request', error: 'chat_id must be a positive whole number', client_id: null,
+      });
+    }
+
     player.sendMessage(chatId, '   ', 'blank');
     expect(await player.nextReply()).toEqual({
       type: 'error', msg: 'invalid_request', error: 'text must not be empty', client_id: null,
@@ -170,6 +179,20 @@ describe('Unmocked: WebSocket send_message', () => {
 
     expect(await getSavedMessages(chatId)).toEqual([]);
     expect(player.isOpen()).toBe(true);
+  });
+
+  // Input: the player sends a text message whose bytes (0xff, 0xfe) aren't valid UTF-8
+  // Expected status code: none, it's a WebSocket connection
+  // Expected behavior: the WebSocket library rejects it as a broken connection, the server
+  //   logs the connection error and the connection is closed. Nothing is saved
+  // Expected output: the connection closes with 1007 (invalid message data)
+  test('A message that is not valid text closes the connection', async () => {
+    const player = await connectToChat(PORT, chatId, createAuthToken(playerId));
+
+    player.sendBytesAsText(Buffer.from([0xff, 0xfe]));
+
+    expect((await player.closed).code).toBe(1007);
+    expect(await getSavedMessages(chatId)).toEqual([]);
   });
 
   // Input: the player's connection is for the game chat, they send to another chat_id

@@ -1,3 +1,4 @@
+import { updateUserProfile } from '../../../src/user/db/users';
 import { ageRange } from '../../../src/user/routes/publicProfileRoutes';
 import { addFriends, addUser, api, asUser, type Call, cleanUpAfterTests, expectSignInRequired } from '../helpers';
 
@@ -49,6 +50,21 @@ describe('Unmocked: GET /api/users/{userId}', () => {
     const sent = JSON.stringify(response.body);
     expect(sent).not.toContain('no-mock-test@example.com');
     expect(sent).not.toContain('1995');
+  });
+
+  // Input: Ben's birth year is changed so he turns 70 this year, then Alice opens his profile
+  // Expected status code: 200
+  // Expected behavior: the oldest age range is shown, never his birth year
+  // Expected output: profile.age_range "65+"
+  test('A player over 64 shows the oldest age range', async () => {
+    const birthYear = new Date().getUTCFullYear() - 70;
+    await updateUserProfile(benId, { firstName: 'Ben', lastName: 'Tester', birthYear });
+
+    const response = await api.get(`/api/users/${benId}`).set(asUser(aliceId));
+
+    expect(response.status).toBe(200);
+    expect(response.body.profile).toMatchObject({ user_id: benId, age_range: '65+' });
+    expect(JSON.stringify(response.body)).not.toContain(String(birthYear));
   });
 
   // Input: Alice and Ben are friends, and Alice opens Ben's profile

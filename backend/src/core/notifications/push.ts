@@ -29,7 +29,7 @@ export interface PushMessage {
   title: string;
   body: string;
   // extra values for the app, e.g. { type: 'join_request', gameId: '42' }
-  data?: Record<string, string>;
+  data: Record<string, string>;
   // a new notification replaces the one showing with the same tag, instead of adding another
   tag?: string;
 }
@@ -47,7 +47,7 @@ export async function sendPushToUser(userId: number, message: PushMessage): Prom
     const result = await getMessaging().sendEachForMulticast({
       tokens,
       notification: { title: message.title, body: message.body },
-      data: message.data ?? {},
+      data: message.data,
       ...(message.tag === undefined ? {} : { android: { notification: { tag: message.tag } } }),
     });
 

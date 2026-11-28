@@ -1,4 +1,4 @@
-import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, getPlayerIds } from '../helpers';
+import { addGame, addPlayer, addUser, api, asUser, cleanUpAfterTests, getPlayerIds, MISSING_GAME_ID } from '../helpers';
 import { type ApiReply, expectGameReply } from '../../sharedHelpers';
 
 let organizerId: number;
@@ -31,5 +31,46 @@ describe('Unmocked: DELETE /api/games/{gameId}/players/{userId}', () => {
 
     // 4. check only the organizer is left in the game
     expect(await getPlayerIds(gameId)).toEqual([organizerId]);
+  });
+
+  // Input: the organizer removes a player with "abc" as the game id, then as the user id
+  // Expected status code: 400
+  // Expected behavior: nobody is removed
+  // Expected output: { msg: "invalid_request", error: "gameId and userId must be positive whole numbers" }
+  test('Rejects a bad game or user id', async () => {
+    const gameId = await addGame(organizerId);
+    await addPlayer(gameId, playerId);
+
+    for (const path of [`/api/games/abc/players/${playerId}`, `/api/games/${gameId}/players/abc`]) {
+      const response = await api.delete(path).set(asUser(organizerId));
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ msg: 'invalid_request', error: 'gameId and userId must be positive whole numbers' });
+    }
+    expect(await getPlayerIds(gameId)).toEqual(expect.arrayContaining([organizerId, playerId]));
+  });
+
+  // Input: Paul tries to remove the organizer, the organizer removes Paul from a game no game
+  //   has the id of, removes themselves, and removes Otto, who isn't in the game
+  // Expected status code: 403, 404, 409 and 404
+  // Expected behavior: nobody is removed
+  // Expected output: { msg: "forbidden" }, { msg: "not_found" }, { msg: "organizer_self" } and
+  //   { msg: "player_not_found" }
+  test('Removing is turned down when it is not allowed', async () => {
+    const outsiderId = await addUser('Otto');
+    const gameId = await addGame(organizerId);
+    await addPlayer(gameId, playerId);
+
+    const cases: [number, number, number, number, string][] = [
+      [gameId, playerId, organizerId, 403, 'forbidden'],
+      [MISSING_GAME_ID, organizerId, playerId, 404, 'not_found'],
+      [gameId, organizerId, organizerId, 409, 'organizer_self'],
+      [gameId, organizerId, outsiderId, 404, 'player_not_found'],
+    ];
+    for (const [targetGameId, userId, removedId, status, msg] of cases) {
+      const response = await api.delete(`/api/games/${targetGameId}/players/${removedId}`).set(asUser(userId));
+      expect(response.status).toBe(status);
+      expect(response.body).toMatchObject({ msg });
+    }
+    expect(await getPlayerIds(gameId)).toEqual(expect.arrayContaining([organizerId, playerId]));
   });
 });

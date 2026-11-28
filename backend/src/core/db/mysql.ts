@@ -1,8 +1,8 @@
-import mysql from 'mysql2/promise';
+import { createPool } from 'mysql2/promise';
 import { env } from '../config/env';
 
 // One pool for the whole app; mysql2 reuses connections from it.
-export const pool = mysql.createPool(env.mysqlUrl);
+export const pool = createPool(env.mysqlUrl);
 
 // values that can fill a query's ? placeholders
 export type SqlValue = string | number | boolean | Date | null;

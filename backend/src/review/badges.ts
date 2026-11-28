@@ -17,8 +17,8 @@ export const BADGES = [
 
 export type BadgeId = typeof BADGES[number];
 
-/*  what the badges are worked out from. score is the reputation score, null if they aren't
-    rated yet or it wasn't needed (fewer than MVP_RATINGS ratings received)
+/*  what the badges are worked out from. score is the reputation score, null while they have
+    fewer than MVP_RATINGS ratings received, which is how MVP needs that many ratings
  */
 export interface BadgeProgress {
   // games organized by someone else that the user is a player in
@@ -54,8 +54,8 @@ const RULES: [BadgeId, (progress: BadgeProgress) => boolean][] = [
   ['games_10', (p) => p.gamesPlayed >= REGULAR_GAMES],
   ['games_50', (p) => p.gamesPlayed >= VETERAN_GAMES],
   ['friends_10', (p) => p.friends >= SOCIAL_FRIENDS],
-  // not rated yet counts as 0, below MVP_SCORE
-  ['mvp', (p) => p.ratingsReceived >= MVP_RATINGS && (p.score ?? 0) >= MVP_SCORE],
+  // score is only set once they have MVP_RATINGS ratings received
+  ['mvp', (p) => p.score !== null && p.score >= MVP_SCORE],
   ['mega_mvp', (p) => p.perfectRatings >= MEGA_MVP_PERFECT_RATINGS],
 ];
 

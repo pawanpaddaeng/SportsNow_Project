@@ -126,4 +126,26 @@ describe('Unmocked: GET /api/users/me/stats', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ msg: 'success', reputation_score: 4.65 });
   });
+
+  // Input: four games with Alice and Ben, played March 1 to 4. Ben gave Alice 6 stars in the
+  //   first three and 1 star in the newest
+  // Expected status code: 200
+  // Expected behavior: the middle of her four games is 6, so the 1 star game is more than 1.5
+  //   stars from it and counts a quarter as much: (15 + 0.25 × 1 + 6 × (0.9 + 0.81 + 0.729)) /
+  //   (3 + 0.25 + 2.439). Counted in full it would be 4.76
+  // Expected output: { msg: "success", reputation_score: 5.25 }
+  test('An unusual game counts a quarter as much', async () => {
+    for (const day of ['01', '02', '03', '04']) {
+      const gameId = await addStartedGame(organizerId);
+      for (const userId of [aliceId, benId]) {
+        await addAttendance(gameId, userId, false, `2026-03-${day} 18:00:00`);
+      }
+      await addRating(gameId, benId, aliceId, day === '04' ? 1 : 6);
+    }
+
+    const response = await api.get('/api/users/me/stats').set(asUser(aliceId));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ msg: 'success', reputation_score: 5.25 });
+  });
 });

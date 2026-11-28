@@ -163,4 +163,39 @@ describe('Unmocked: PUT /api/games/{gameId}', () => {
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ msg: 'not_found', error: 'This game does not exist' });
   });
+
+  // Input: a game from tomorrow at 6 PM to 8 PM is edited without ends_at, so its end is kept,
+  //   with a new start the day after
+  // Expected status code: 400
+  // Expected behavior: the game would end before it starts, so it doesn't change
+  // Expected output: { msg: "invalid_request", error: "starts_at must be before the game ends" }
+  test('Moving the start past the kept end time', async () => {
+    const startsAt = new Date(Date.now() + ONE_DAY_MS);
+    const gameId = await addGame(organizerId, { startsAt, endsAt: new Date(startsAt.getTime() + 2 * 60 * 60 * 1000) });
+
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))
+      .send(validGameBody({ starts_at: new Date(Date.now() + 2 * ONE_DAY_MS).toISOString() }));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ msg: 'invalid_request', error: 'starts_at must be before the game ends' });
+    expect((await getGameById(gameId))?.title).toBe('Evening Basketball');
+  });
+
+  // Input: the organizer edits their game, which has no end time, sending an ends_at 2 hours
+  //   after its start
+  // Expected status code: 200
+  // Expected behavior: the new end time is saved
+  // Expected output: { msg: "success", game } with that ends_at
+  test('An edit can set the end time', async () => {
+    const gameId = await addGame(organizerId);
+    const startsAt = new Date(Math.floor((Date.now() + 2 * ONE_DAY_MS) / 1000) * 1000);
+    const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
+
+    const response = await api.put(`/api/games/${gameId}`).set(asUser(organizerId))
+      .send(validGameBody({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() }));
+
+    expect(response.status).toBe(200);
+    expect(new Date(response.body.game.ends_at as string).getTime()).toBe(endsAt.getTime());
+    expect(new Date((await getGameById(gameId))?.endsAt ?? 0).getTime()).toBe(endsAt.getTime());
+  });
 });

@@ -91,6 +91,18 @@ describe('Unmocked: GET /api/users/search', () => {
     expect(response.body).toEqual({ msg: 'success', users: [] });
   });
 
+  // Input: q is only an accent mark (U+0301, the combining acute accent), not a letter
+  // Expected status code: 200
+  // Expected behavior: accents are removed before names are compared, so nothing is left to
+  //   search for and nobody matches
+  // Expected output: { msg: "success", users: [] }
+  test('A query of only an accent mark matches nobody', async () => {
+    const response = await api.get('/api/users/search').query({ q: '́' }).set(asUser(searcherId));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ msg: 'success', users: [] });
+  });
+
   // Input: the searcher searches their own full name, "Brimwold Searcher", with spaces around it
   // Expected status code: 200
   // Expected behavior: the text is trimmed, and the searcher never finds themselves

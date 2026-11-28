@@ -2,11 +2,13 @@ import {
   addGame,
   addJoinRequest,
   addPlayer,
+  addStartedGame,
   addUser,
   api,
   asUser,
   cleanUpAfterTests,
   MISSING_GAME_ID,
+  setGameStatus,
 } from '../helpers';
 
 let organizerId: number;
@@ -85,6 +87,37 @@ describe('Unmocked: GET /api/games/{gameId}', () => {
     expect(response.body.game.game_id).toBe(gameId);
     expect(response.body.viewer_role).toBe('viewer');
     expect(response.body.join_request_status).toBe('pending');
+  });
+
+  // Input: the organizer left their completed game, and Paul, still in it, opens it
+  // Expected status code: 200
+  // Expected behavior: the organizer isn't one of the players any more, so they're looked up
+  //   by their account, nothing changes
+  // Expected output: { msg: "success", organizer, ... } with the organizer's id and name
+  test('Organizer who left a completed game is still shown', async () => {
+    const gameId = await addStartedGame(organizerId);
+    await addPlayer(gameId, playerId);
+    await setGameStatus(gameId, 'completed');
+    expect((await api.post(`/api/games/${gameId}/leave`).set(asUser(organizerId))).status).toBe(200);
+
+    const response = await api.get(`/api/games/${gameId}`).set(asUser(playerId));
+
+    expect(response.status).toBe(200);
+    expect(response.body.organizer).toEqual({ user_id: organizerId, first_name: 'Olivia', last_name: 'Tester', no_show: false });
+    expect(response.body.players.map((player: { user_id: number }) => player.user_id)).toEqual([playerId]);
+  });
+
+  // Input: a user opens a game they never asked to join
+  // Expected status code: 200
+  // Expected behavior: the user only views it, nothing changes
+  // Expected output: { msg: "success", ... } with viewer_role "viewer" and join_request_status null
+  test('Viewer who never asked to join', async () => {
+    const gameId = await addGame(organizerId);
+
+    const response = await api.get(`/api/games/${gameId}`).set(asUser(viewerId));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ viewer_role: 'viewer', join_request_status: null });
   });
 
   // Input: a signed in user opens /api/games/abc

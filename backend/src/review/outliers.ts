@@ -23,9 +23,8 @@ export interface WeightedGame {
 // the middle value, or the average of the two middle values when there's an even number
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
-  const lower = sorted.at(Math.floor((sorted.length - 1) / 2)) ?? 0;
-  const upper = sorted.at(Math.floor(sorted.length / 2)) ?? 0;
-  return (lower + upper) / 2;
+  const middles = sorted.slice(Math.floor((sorted.length - 1) / 2), Math.floor(sorted.length / 2) + 1);
+  return middles.reduce((sum, value) => sum + value, 0) / middles.length;
 }
 
 // the middle of the games they showed up to, or null while there are too few to tell what's unusual

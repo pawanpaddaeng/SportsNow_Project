@@ -58,8 +58,8 @@ export async function getFriendshipStatus(userId: number, otherUserId: number): 
                     WHERE sender_id = ? AND receiver_id = ? AND status = 'pending') AS request_received`,
     [userId, otherUserId, userId, otherUserId, otherUserId, userId],
   );
-  const row = rows[0];
-  return row ? toFriendshipStatus(row) : 'none';
+  // SELECT EXISTS with no FROM always returns exactly one row, so this is that row's status
+  return rows.reduce<FriendshipStatus>((_status, row) => toFriendshipStatus(row), 'none');
 }
 
 /*  users whose name matches or is similar to text, best match first, except the user

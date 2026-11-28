@@ -1,6 +1,9 @@
-// the value at index in a row of the table, 0 past its end
+/*  the value at index in a row of the table. Every index editDistance reads is inside its row:
+    the only read that could fall outside, beforePrevious at j - 2, is behind a swap check that
+    can't pass before the second letter of both words
+ */
 function cell(row: number[], index: number): number {
-  return row.at(index) ?? 0;
+  return row[index] as number;
 }
 
 /*  how many single letter changes turn a into b, swapping two neighbouring letters counts

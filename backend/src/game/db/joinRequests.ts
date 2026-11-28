@@ -145,7 +145,8 @@ export async function countPendingJoinRequests(gameId: number): Promise<number> 
     `SELECT ${PENDING_REQUESTS_COUNT} AS count FROM games g WHERE g.game_id = ?`,
     [gameId],
   );
-  return Number(rows[0]?.count ?? 0);
+  // one row for the game, or none if it doesn't exist, which counts as 0
+  return rows.reduce((total, row) => total + Number(row.count), 0);
 }
 
 interface JoinRequestStatusRow {

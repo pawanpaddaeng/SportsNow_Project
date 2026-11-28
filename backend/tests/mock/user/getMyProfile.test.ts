@@ -8,31 +8,6 @@ cleanUpAfterTests();
 
 // Interface GET /api/users/me
 describe('Mocked: GET /api/users/me', () => {
-  // Mocked behavior: the sign in check's lookup, findUserById, returns player 2
-  // Input: player 2 asks for their profile
-  // Expected status code: 200
-  // Expected behavior: the profile comes from the sign in check, nothing else is read
-  // Expected output: { msg: "success", user } with player 2's details
-  test('Returns the signed in user\'s profile', async () => {
-    const player = testPlayer();
-    const token = signIn(player);
-
-    const response = await api.get('/api/users/me').set(withToken(token));
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      msg: 'success',
-      user: {
-        user_id: player.userId,
-        email: player.email,
-        f_name: player.firstName,
-        l_name: player.lastName,
-        birthYear: player.birthYear,
-        created_at: player.createdAt.toISOString(),
-      },
-    });
-  });
-
   // Mocked behavior: findUserById throws as if the database were down
   // Input: player 2 asks for their profile
   // Expected status code: 500

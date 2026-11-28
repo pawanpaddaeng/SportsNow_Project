@@ -7,10 +7,8 @@ import { verifyAuthToken } from './jwt';
 // reads the JWT from "Authorization: Bearer <token>", or from jwt_token in the json body
 function readToken(req: Request): string | null {
   const header = req.get('authorization');
-  if (header?.startsWith('Bearer ')) {
-    const token = header.slice('Bearer '.length).trim();
-    if (token) return token;
-  }
+  const headerToken = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+  if (headerToken) return headerToken;
   const bodyToken: unknown = req.body?.jwt_token;
   return typeof bodyToken === 'string' && bodyToken !== '' ? bodyToken : null;
 }

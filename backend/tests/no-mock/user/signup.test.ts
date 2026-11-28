@@ -35,6 +35,29 @@ describe('Unmocked: POST /api/auth/signup', () => {
     expect(await countUsersWithEmail(email)).toBe(0);
   });
 
+  // Input: every field filled in, with a birth year for someone over 100
+  // Expected status code: 400
+  // Expected behavior: the profile is checked before Google is asked, so no user is saved
+  // Expected output: { msg: "invalid_request", error: "Birth Year must be between ..." }
+  test('Rejects a sign up with a birth year out of range', async () => {
+    const email = 'no-mock-signup-old@example.com';
+
+    const response = await api.post('/api/auth/signup').send({
+      id_token: 'some-token',
+      email,
+      f_name: 'Alice',
+      l_name: 'Tester',
+      birthYear: new Date().getFullYear() - 101,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      msg: 'invalid_request',
+      error: expect.stringContaining('Birth Year must be between') as unknown,
+    });
+    expect(await countUsersWithEmail(email)).toBe(0);
+  });
+
   // Input: every field filled in, with an id_token Google didn't sign
   // Expected status code: 401
   // Expected behavior: Google's check fails, so no user is saved

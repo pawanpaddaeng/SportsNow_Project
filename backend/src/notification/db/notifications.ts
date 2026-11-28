@@ -29,9 +29,8 @@ export interface SavedNotification extends NewNotification {
   isRead: boolean;
 }
 
-// saves one notification for each user, unread
+// saves one notification for each user, unread. userIds must not be empty, notifyUsers checks that first
 export async function saveNotifications(userIds: number[], notification: NewNotification): Promise<void> {
-  if (userIds.length === 0) return;
   // one row per user, each with the same 5 values
   const rows = userIds.map(() => '(?, ?, ?, ?, ?)').join(', ');
   const values = userIds.flatMap((userId) =>
@@ -81,7 +80,8 @@ export async function countUnreadNotifications(userId: number): Promise<number> 
     'SELECT COUNT(*) AS unread FROM notifications WHERE user_id = ? AND read_at IS NULL',
     [userId],
   );
-  return Number(rows.at(0)?.unread ?? 0);
+  // COUNT(*) always returns exactly one row, so this is that row's count
+  return rows.reduce((total, row) => total + Number(row.unread), 0);
 }
 
 // marks all the user's notifications as seen, returns how many were unread
