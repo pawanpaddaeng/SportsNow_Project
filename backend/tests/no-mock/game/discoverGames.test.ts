@@ -147,19 +147,21 @@ describe('Unmocked: GET /api/games/discover', () => {
     expect(response.body.games[0].join_request_status).toBe('pending');
   });
 
-  // Input: a signed in user's request with lat=95&lng=0, lat can't be over 90
+  // Input: a signed in user's request with lat=95&lng=0, lat can't be over 90, then
+  //   lat=49&lng=200, lng can't be over 180
   // Expected status code: 400
   // Expected behavior: the request is rejected, nothing changes
   // Expected output: { msg: "invalid_request", error: "lat (-90 to 90) and lng (-180 to 180) are required numbers" }
   test('Location out of range', async () => {
-    const response = await api.get('/api/games/discover').set(asUser(userId))
-      .query({ lat: 95, lng: 0 });
+    for (const query of [{ lat: 95, lng: 0 }, { lat: 49, lng: 200 }]) {
+      const response = await api.get('/api/games/discover').set(asUser(userId)).query(query);
 
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({
-      msg: 'invalid_request',
-      error: 'lat (-90 to 90) and lng (-180 to 180) are required numbers',
-    });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        msg: 'invalid_request',
+        error: 'lat (-90 to 90) and lng (-180 to 180) are required numbers',
+      });
+    }
   });
 
   // Input: a signed in user's request with lng but no lat in the query

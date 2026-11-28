@@ -31,6 +31,7 @@
 | Nov 27, 2026 | 2.1 | Added the unmocked tests "A query of only an accent mark matches nobody" for `GET /api/users/search` and "A reminder a minute before the start says 1 minute" for the game start reminders, cases only the unit tests reached before. |
 | Nov 27, 2026 | 2.1 | Added unmocked error tests for completing, leaving, editing, inviting to and removing players from games, and a viewer who never asked to join. |
 | Nov 27, 2026 | 2.1 | Added game route tests: bad ids and leaving a completed game without mocks, and with mocks a game gone after cancelling, a failed notify lookup, an edit changing every detail, and an unknown problem. |
+| Nov 27, 2026 | 2.1 | Added unmocked tests for each bad field when creating a game, a missing skill level, an out of range Discover longitude and a join request with no body. |
 
 ---
 
@@ -247,6 +248,8 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Organizer creates a game | All fields, starting tomorrow | 201 | The game is saved. The user is its organizer and first player, and its chat is opened. Returns the game with `player_count` 1 and `status` "scheduled" |
 | No mocks | Invalid body never reaches the database | A game without `title` | 400 | No game is saved for the user. Returns `{ msg: "invalid_request", error: "title is required (max 100 characters)" }` |
+| No mocks | Rejects a game with a bad field | One bad field at a time: no body; a `title` that isn't text or is over 100 characters; a `sport` that isn't text; a `description` that isn't text or is over 1000 characters; a missing, unreadable, past or over a year away `starts_at`; an unreadable `ends_at` or one not after the start; a missing `location_name`; a blank `address`; a `latitude` over 90 or a `longitude` that isn't a number; `max_players` as text, not whole, below 2 or over 100; an unknown `skill_level` or one that isn't text | 400 | No game is saved. Returns `{ msg: "invalid_request" }` with the error for that field |
+| No mocks | A game without skill_level is for any level | A valid game with no `skill_level` | 201 | The game is saved with `skill_level` "any" |
 | No mocks | A body that is not valid JSON is turned down | The body `{bad`, sent as `application/json` | 400 | The body can't be read, so Express turns the request down before the route runs, not as a server error. No game is saved |
 | With mocks | Database fails while saving | `createGame` throws | 500 | Returns `{ msg: "server_error" }`. The game is never read back |
 
@@ -266,7 +269,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Full game still shows | A nearby game with no spots left | 200 | The game is in the list, with `player_count` equal to `max_players` |
 | No mocks | Games that should not show | The user's own game, a game they joined, a cancelled game, a past game, and a game 60 km away | 200 | Returns `{ msg: "no_games" }` |
 | No mocks | Request status | The user has a pending request for a nearby game | 200 | That game has `join_request_status: "pending"` |
-| No mocks | Location out of range | `lat=95&lng=0` | 400 | Returns `{ msg: "invalid_request" }` |
+| No mocks | Location out of range | `lat=95&lng=0`, then `lat=49&lng=200` | 400 | Returns `{ msg: "invalid_request" }` both times |
 | No mocks | No location | No `lat` in the query | 400 | Returns `{ msg: "invalid_request" }` |
 | With mocks | Database fails | `getDiscoverGames` throws | 500 | Returns `{ msg: "server_error" }` |
 
@@ -366,7 +369,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Valid request | `skill_level`, `play_frequency` and `message` for another user's game | 201 | A pending request is saved with the answers, and the organizer has a saved `join_request` notification, "Rae wants to join Evening Basketball", for the game |
 | No mocks | Only skill level | `{ skill_level: "beginner" }` | 201 | Saved, with `play_frequency` and `message` empty |
 | No mocks | Ask again | The user's earlier request was declined | 201 | The same request goes back to pending, with the new answers |
-| No mocks | Bad answers | No `skill_level`; an unknown `play_frequency`; a message of 201 characters | 400 | Nothing is saved. The error names the bad field |
+| No mocks | Bad answers | No body; no `skill_level`; an unknown `play_frequency`; a message of 201 characters | 400 | Nothing is saved. The error names the bad field |
 | No mocks | Already asked | A second request while the first is still pending | 409 | Returns `{ msg: "already_requested" }` |
 | No mocks | Already a player | The user is already in the game | 409 | Returns `{ msg: "already_player" }` |
 | No mocks | Asking to join a cancelled or started game | A cancelled game, and a game that already started | 409 | Returns `{ msg: "game_cancelled" }` and `{ msg: "game_started" }` |

@@ -129,11 +129,12 @@ describe('Unmocked: POST /api/games/{gameId}/join-requests', () => {
     }]);
   });
 
-  // Input: no skill_level, an unknown play_frequency, or a message of 201 characters
+  // Input: no body at all, no skill_level, an unknown play_frequency, or a message of 201 characters
   // Expected status code: 400
   // Expected behavior: nothing is saved
   // Expected output: { msg: "invalid_request", error } naming the bad field
   test.each([
+    ['no body', undefined, 'skill_level must be one of: beginner, intermediate, advanced, competitive'],
     ['no skill_level', {}, 'skill_level must be one of: beginner, intermediate, advanced, competitive'],
     [
       'an unknown play_frequency',
