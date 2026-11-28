@@ -77,20 +77,6 @@ describe('Unmocked: POST /api/games', () => {
     expect(chats).toHaveLength(1);
   });
 
-  // Input: a valid game without its title, from a signed in user
-  // Expected status code: 400
-  // Expected behavior: the request is rejected before anything is saved
-  // Expected output: { msg: "invalid_request", error: "title is required (max 100 characters)" }
-  test('Invalid body never reaches the database', async () => {
-    const response = await api.post('/api/games').set(withToken(token))
-      .send(validGameBody({ title: undefined }));
-
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({ msg: 'invalid_request', error: 'title is required (max 100 characters)' });
-    const games = await selectRows<{ game_id: number }>('SELECT game_id FROM games WHERE organizer_id = ?', [organizerId]);
-    expect(games).toEqual([]);
-  });
-
   // Input: a game with one bad field at a time, or no body at all
   // Expected status code: 400
   // Expected behavior: nothing is saved

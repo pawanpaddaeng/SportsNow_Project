@@ -32,6 +32,7 @@
 | Nov 27, 2026 | 2.1 | Added unmocked error tests for completing, leaving, editing, inviting to and removing players from games, and a viewer who never asked to join. |
 | Nov 27, 2026 | 2.1 | Added game route tests: bad ids and leaving a completed game without mocks, and with mocks a game gone after cancelling, a failed notify lookup, an edit changing every detail, and an unknown problem. |
 | Nov 27, 2026 | 2.1 | Added unmocked tests for each bad field when creating a game, a missing skill level, an out of range Discover longitude and a join request with no body. |
+| Nov 28, 2026 | 2.1 | Removed mocked tests that repeated other tests, moved "Organizer not in players list" to the unmocked game details tests, and merged the two mocked edit notification tests. |
 
 ---
 
@@ -78,7 +79,7 @@ Each test has comments that say its input, the status code we expect, what shoul
 | **POST /api/register_notif** | [`backend/tests/no-mock/user/registerNotif.test.ts#L20`](../backend/tests/no-mock/user/registerNotif.test.ts#L20) | [`backend/tests/mock/user/registerNotif.test.ts#L10`](../backend/tests/mock/user/registerNotif.test.ts#L10) | Device Tokens DB |
 | **GET /api/users/me** | [`backend/tests/no-mock/user/getMyProfile.test.ts#L25`](../backend/tests/no-mock/user/getMyProfile.test.ts#L25) | [`backend/tests/mock/user/getMyProfile.test.ts#L10`](../backend/tests/mock/user/getMyProfile.test.ts#L10) | Users DB |
 | **PUT /api/users/me** | [`backend/tests/no-mock/user/updateMyProfile.test.ts#L23`](../backend/tests/no-mock/user/updateMyProfile.test.ts#L23) | [`backend/tests/mock/user/updateMyProfile.test.ts#L12`](../backend/tests/mock/user/updateMyProfile.test.ts#L12) | Users DB |
-| **DELETE /api/users/me** | [`backend/tests/no-mock/user/deleteAccount.test.ts#L38`](../backend/tests/no-mock/user/deleteAccount.test.ts#L38) | [`backend/tests/mock/user/deleteAccount.test.ts#L45`](../backend/tests/mock/user/deleteAccount.test.ts#L45) | Users DB, Games DB, Firebase push |
+| **DELETE /api/users/me** | [`backend/tests/no-mock/user/deleteAccount.test.ts#L38`](../backend/tests/no-mock/user/deleteAccount.test.ts#L38) | [`backend/tests/mock/user/deleteAccount.test.ts#L44`](../backend/tests/mock/user/deleteAccount.test.ts#L44) | Users DB, Games DB, Firebase push |
 | **GET /api/users/{userId}** | [`backend/tests/no-mock/user/publicProfile.test.ts#L19`](../backend/tests/no-mock/user/publicProfile.test.ts#L19) | [`backend/tests/mock/user/publicProfile.test.ts#L13`](../backend/tests/mock/user/publicProfile.test.ts#L13) | Users DB, Friends DB, Badges DB, Reputation DB |
 
 The unmocked User tests share their setup helpers in [`backend/tests/no-mock/user/userHelpers.ts`](../backend/tests/no-mock/user/userHelpers.ts), and check a call needs a signed in user with `expectSignInRequired` in [`backend/tests/no-mock/helpers.ts`](../backend/tests/no-mock/helpers.ts). The mocked sign up and login tests replace Google's check with [`backend/tests/mock/user/googleHelpers.ts`](../backend/tests/mock/user/googleHelpers.ts).
@@ -90,7 +91,7 @@ The unmocked User tests share their setup helpers in [`backend/tests/no-mock/use
 | **POST /api/games** | [`backend/tests/no-mock/game/createGame.test.ts#L18`](../backend/tests/no-mock/game/createGame.test.ts#L18) | [`backend/tests/mock/game/createGame.test.ts#L10`](../backend/tests/mock/game/createGame.test.ts#L10) | Games DB |
 | **GET /api/games/mine** | [`backend/tests/no-mock/game/getMyGames.test.ts#L14`](../backend/tests/no-mock/game/getMyGames.test.ts#L14) | [`backend/tests/mock/game/getMyGames.test.ts#L10`](../backend/tests/mock/game/getMyGames.test.ts#L10) | Games DB |
 | **GET /api/games/discover** | [`backend/tests/no-mock/game/discoverGames.test.ts#L41`](../backend/tests/no-mock/game/discoverGames.test.ts#L41) | [`backend/tests/mock/game/discoverGames.test.ts#L13`](../backend/tests/mock/game/discoverGames.test.ts#L13) | Games DB |
-| **GET /api/games/{gameId}** | [`backend/tests/no-mock/game/getGameDetails.test.ts#L27`](../backend/tests/no-mock/game/getGameDetails.test.ts#L27) | [`backend/tests/mock/game/getGameDetails.test.ts#L21`](../backend/tests/mock/game/getGameDetails.test.ts#L21) | Games DB, Join Requests DB, MySQL queries |
+| **GET /api/games/{gameId}** | [`backend/tests/no-mock/game/getGameDetails.test.ts#L29`](../backend/tests/no-mock/game/getGameDetails.test.ts#L29) | [`backend/tests/mock/game/getGameDetails.test.ts#L20`](../backend/tests/mock/game/getGameDetails.test.ts#L20) | Games DB, Join Requests DB, MySQL queries |
 | **PUT /api/games/{gameId}** | [`backend/tests/no-mock/game/updateGame.test.ts#L29`](../backend/tests/no-mock/game/updateGame.test.ts#L29) | [`backend/tests/mock/game/updateGame.test.ts#L22`](../backend/tests/mock/game/updateGame.test.ts#L22) | Games DB, Firebase push |
 | **POST /api/games/{gameId}/cancel** | [`backend/tests/no-mock/game/cancelGame.test.ts#L26`](../backend/tests/no-mock/game/cancelGame.test.ts#L26) | [`backend/tests/mock/game/cancelGame.test.ts#L20`](../backend/tests/mock/game/cancelGame.test.ts#L20) | Games DB, Firebase push |
 | **POST /api/games/{gameId}/complete** | [`backend/tests/no-mock/game/completeGame.test.ts#L15`](../backend/tests/no-mock/game/completeGame.test.ts#L15) | None | None |
@@ -124,7 +125,7 @@ The unmocked Friend tests share their setup helpers in [`backend/tests/no-mock/f
 | **GET /api/games/{gameId}/ratings** | [`backend/tests/no-mock/review/listPlayersToRate.test.ts#L54`](../backend/tests/no-mock/review/listPlayersToRate.test.ts#L54) | [`backend/tests/mock/review/listPlayersToRate.test.ts#L11`](../backend/tests/mock/review/listPlayersToRate.test.ts#L11) | Games DB, Ratings DB |
 | **POST /api/games/{gameId}/ratings** | [`backend/tests/no-mock/review/ratePlayer.test.ts#L40`](../backend/tests/no-mock/review/ratePlayer.test.ts#L40) | [`backend/tests/mock/review/ratePlayer.test.ts#L27`](../backend/tests/mock/review/ratePlayer.test.ts#L27) | Ratings DB |
 | **GET /api/users/me/stats** | [`backend/tests/no-mock/review/getMyStats.test.ts#L25`](../backend/tests/no-mock/review/getMyStats.test.ts#L25) | [`backend/tests/mock/review/getMyStats.test.ts#L10`](../backend/tests/mock/review/getMyStats.test.ts#L10) | Reputation DB |
-| **Rating reminders** (the server's check every minute) | [`backend/tests/no-mock/review/ratingReminders.test.ts#L44`](../backend/tests/no-mock/review/ratingReminders.test.ts#L44) | [`backend/tests/mock/review/ratingReminders.test.ts#L20`](../backend/tests/mock/review/ratingReminders.test.ts#L20) | Rating Reminders DB, Firebase push, Logger, timers |
+| **Rating reminders** (the server's check every minute) | [`backend/tests/no-mock/review/ratingReminders.test.ts#L44`](../backend/tests/no-mock/review/ratingReminders.test.ts#L44) | [`backend/tests/mock/review/ratingReminders.test.ts#L16`](../backend/tests/mock/review/ratingReminders.test.ts#L16) | Rating Reminders DB, Firebase push, Logger, timers |
 
 The unmocked Review tests share their setup helpers in [`backend/tests/no-mock/review/reviewHelpers.ts`](../backend/tests/no-mock/review/reviewHelpers.ts). The rules that work out a reputation score have no database code, so they also have unit tests, in [`backend/tests/unit/review/reputation.test.ts#L22`](../backend/tests/unit/review/reputation.test.ts#L22).
 
@@ -224,7 +225,6 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Rejects a call that is not signed in | See "Signing in" above | 400, then 401 | No account is deleted |
 | No mocks | Deletes the account and the games the user organizes | Olivia organizes an upcoming game Ben plays in, and plays in Ben's upcoming game. She deletes her account, then uses her old token again | 200, then 401 | Olivia's account and her game are deleted. She is no longer in Ben's game, which stays, and Ben's account stays. Ben is told her game was cancelled (`game_cancelled`) and that she left his (`player_left`). Returns `{ msg: "success" }`, then `{ msg: "no_user" }` for her old token |
-| With mocks | Players of the user's games are told | `getActiveGamesOfUser` returns the organizer's game and a game of user 2 they joined, `getUsersToNotify` returns users 2 and 3, `deleteUser` and `sendPushToUsers` replaced | 200 | `deleteUser` gets the organizer's id. Users 2 and 3 get `game_cancelled` ("... was cancelled, the organizer deleted their account"), and user 2 gets `player_left` ("Olivia left ...") |
 | With mocks | Database fails while deleting the account | `deleteUser` throws, `sendPushToUsers` watched | 500 | Nobody is notified. Returns `{ msg: "server_error", error: "Could not delete account, try again later" }` |
 
 **GET /api/users/{userId}** (another player's public profile)
@@ -247,7 +247,6 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | **Group** | **Test** | **Input** | **Expected status** | **What should happen** |
 | --------- | -------- | --------- | ------------------- | ---------------------- |
 | No mocks | Organizer creates a game | All fields, starting tomorrow | 201 | The game is saved. The user is its organizer and first player, and its chat is opened. Returns the game with `player_count` 1 and `status` "scheduled" |
-| No mocks | Invalid body never reaches the database | A game without `title` | 400 | No game is saved for the user. Returns `{ msg: "invalid_request", error: "title is required (max 100 characters)" }` |
 | No mocks | Rejects a game with a bad field | One bad field at a time: no body; a `title` that isn't text or is over 100 characters; a `sport` that isn't text; a `description` that isn't text or is over 1000 characters; a missing, unreadable, past or over a year away `starts_at`; an unreadable `ends_at` or one not after the start; a missing `location_name`; a blank `address`; a `latitude` over 90 or a `longitude` that isn't a number; `max_players` as text, not whole, below 2 or over 100; an unknown `skill_level` or one that isn't text | 400 | No game is saved. Returns `{ msg: "invalid_request" }` with the error for that field |
 | No mocks | A game without skill_level is for any level | A valid game with no `skill_level` | 201 | The game is saved with `skill_level` "any" |
 | No mocks | A body that is not valid JSON is turned down | The body `{bad`, sent as `application/json` | 400 | The body can't be read, so Express turns the request down before the route runs, not as a server error. No game is saved |
@@ -280,10 +279,10 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Organizer | The organizer opens their game, which has two pending requests | 200 | `viewer_role` is "organizer" and `pending_requests` is 2 |
 | No mocks | Player | A user opens a game they joined | 200 | `viewer_role` is "player" |
 | No mocks | Viewer | A user opens a game they asked to join | 200 | `viewer_role` is "viewer" and `join_request_status` is "pending" |
+| No mocks | Organizer who left a completed game is still shown | The organizer leaves their completed game, then a player still in it opens it | 200 | The organizer is looked up by their account, since they're no longer a player. Returns `organizer` with their id and name, and only the player in `players` |
 | No mocks | Viewer who never asked to join | A user opens a game they never asked to join | 200 | `viewer_role` is "viewer" and `join_request_status` is `null` |
 | No mocks | Bad id | `/api/games/abc` | 400 | Returns `{ msg: "invalid_request" }` |
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
-| With mocks | Organizer not in players list | `getGamePlayers` doesn't return the organizer, the user lookup in `findOrganizer` does | 200 | `organizer` comes from the user lookup |
 | With mocks | Organizer not found | Neither lookup finds the organizer | 500 | Returns `{ msg: "server_error" }` |
 | With mocks | Game has no chat | Player 2 opens a game with its organizer and player 2. The database query (`selectRows`) finds no chat for it, which the real database never allows, since a game's chat is saved with it | 200 | The details are still sent. Returns `viewer_role: "player"` and `chat_id: null` |
 | With mocks | Database fails | `getGameById` throws | 500 | Returns `{ msg: "server_error" }` |
@@ -301,8 +300,7 @@ The tests without mocks use real users the test adds, named Alice, Ben and Olivi
 | No mocks | Game doesn't exist | An id with no game | 404 | Returns `{ msg: "not_found" }` |
 | No mocks | Moving the start past the kept end time | A game from tomorrow 6 to 8 PM, edited without `ends_at` and with a start the day after | 400 | The game doesn't change. Returns `{ msg: "invalid_request", error: "starts_at must be before the game ends" }` |
 | No mocks | An edit can set the end time | A game with no end time, edited with an `ends_at` 2 hours after its start | 200 | The new end time is saved and returned |
-| With mocks | Players are told | Valid edit, `sendPushToUsers` replaced | 200 | Players and people with pending requests (not the organizer) get a `game_updated` notification that says what changed |
-| With mocks | Players are told every detail that changed | The game read back after the edit has a new sport, longitude, max players, skill level and description. `sendPushToUsers` replaced | 200 | The notification says "…changed the sport, location, max players, skill level, description", and a moved pin counts as a new location |
+| With mocks | Players are told every detail that changed | The game read back after the edit has a new title, sport, longitude, max players, skill level and description. `sendPushToUsers` replaced | 200 | Players and people with pending requests (not the organizer) get one `game_updated` notification saying "…changed the title, sport, location, max players, skill level, description". A moved pin counts as a new location |
 | With mocks | Nothing changed | Same values as before, `sendPushToUsers` replaced | 200 | No notification is sent |
 | With mocks | Database fails | `updateGame` throws | 500 | Returns `{ msg: "server_error" }` |
 
@@ -482,7 +480,6 @@ The tests without mocks start each game 30 seconds past the minute they name (e.
 | No mocks | Sends a request | A user with no friendship or request with the sender | 201 | A pending request is saved. Returns `{ request: { request_id, user_id, status: "pending" } }` |
 | No mocks | Asks again after being declined | The other user declined the sender's earlier request | 201 | The earlier request is pending again, no second one is saved. Returns the earlier `request_id` |
 | With mocks | Database fails | `sendFriendRequest` throws | 500 | Nobody is notified. Returns `{ msg: "server_error" }` |
-| With mocks | Receiver is told | A request that saves, `sendPushToUser` replaced | 201 | The receiver gets a `friend_request` notification naming the sender |
 | With mocks | Notification fails | A request that saves, `sendPushToUser` throws | 201 | The request is still sent and the failed notification is logged |
 | With mocks | Receiver's devices get the push and a dead token is removed | The database query finds two devices for the receiver. Firebase is replaced: it hasn't started, and it answers one success and one "registration-token-not-registered" | 201 | Firebase is started once, the push goes to both devices with the request's title, body and data, and only the dead token is deleted |
 | With mocks | Firebase fails to send the push | The receiver has one device. Firebase is replaced: it has already started, and the send throws | 201 | Firebase isn't started again. The failure is logged as "Sending push notification to user 2 failed:", and the request is still sent |
@@ -567,7 +564,6 @@ The tests without mocks use a completed game with the organizer (Olivia) and pla
 | No mocks | Each player can rate each other player once | Ben already rated Alice. Alice rates Ben, and the organizer rates Ben | 201 | All three ratings are saved |
 | No mocks | A player who left after the game was completed can still rate and be rated | Ben leaves, then Ben rates Alice and Alice rates Ben | 201 | Both ratings are saved |
 | No mocks | The rater is always the signed in user | Alice sends a rating with `rater_id` set to the organizer | 201 | The rating is saved as Alice's |
-| With mocks | Each problem a rating can have | `createRating` returns `not_allowed`, `rating_closed`, `self`, `player_not_found` and `already_rated` | 403, 403, 409, 404, 409 | Returns `{ msg }` of `forbidden`, `rating_closed`, `rated_self`, `player_not_found` and `already_rated` |
 | With mocks | Database fails | `createRating` throws | 500 | Returns `{ msg: "server_error", error: "Could not submit your rating, try again later" }` |
 
 **GET /api/users/me/stats** (the user's own reputation score)
@@ -593,8 +589,6 @@ Each expected score follows the formula in Requirements and Design, section 4.1:
 | No mocks | Players with someone left to rate are reminded once | A game completed 23.5 hours ago. Alice rated everyone, the organizer and Ben haven't, Ned didn't show up. The check runs twice | The organizer and Ben get one "Rating closes soon" reminder that opens the game. Alice and Ned get none. The game is marked reminded, so the second check sends nothing |
 | No mocks | Games outside the last hour of rating are not reminded | A game completed 30 minutes ago, and one completed 24 hours 1 minute ago | Nobody is reminded, and neither game is marked reminded |
 | No mocks | Nobody is reminded when everyone already rated | A game completed 23.5 hours ago where both players rated each other | The game is marked reminded, and nobody is notified |
-| With mocks | Players with someone left to rate are reminded | `claimDueRatingReminders` returns two games, `getPlayersWithRatingsLeft` and `sendPushToUsers` replaced | Each game's players with someone left to rate get one reminder. Returns 2 |
-| With mocks | Nothing is sent when no reminder is due | `claimDueRatingReminders` returns no games | Nobody is notified. Returns 0 |
 | With mocks | The server checks every minute until it is stopped | Fake timers: two minutes pass, the reminders stop, two more minutes pass | 2 checks, none after stopping |
 | With mocks | A failed check is logged and the next one still runs | Fake timers: `claimDueRatingReminders` throws once, then two minutes pass | The failure is logged as "Sending rating reminders failed:", and the next check still runs |
 

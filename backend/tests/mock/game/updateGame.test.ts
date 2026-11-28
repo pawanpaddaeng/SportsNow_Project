@@ -20,63 +20,26 @@ cleanUpAfterTests();
 
 // Interface PUT /api/games/{gameId}
 describe('Mocked: PUT /api/games/{gameId}', () => {
-  // Mocked behavior: the games database is replaced: getGameById returns the game before and
-  //   after the edit, updateGame reports a change, and getUsersToNotify returns users 2 and 3.
-  //   sendPushToUsers is replaced to check who is told. Sign in is mocked only so the route can run
-  // Input: the organizer changes their game's title
+  // Mocked behavior: the games database is replaced: getGameById returns the game before the
+  //   edit, then after it with a new title, sport, longitude, max players, skill level and
+  //   description, and the same time, place name, address and latitude. updateGame reports a
+  //   change and getUsersToNotify returns users 2 and 3. sendPushToUsers is replaced to check
+  //   who is told and what. Sign in is mocked only so the route can run
+  // Input: the organizer edits those details of their game
   // Expected status code: 200
-  // Expected behavior: the users to notify get a game_updated notification saying what changed
+  // Expected behavior: the players and pending requesters (not the organizer) get a
+  //   game_updated notification naming every detail that changed, the moved pin counting as a
+  //   new location
   // Expected output: { msg: "success", game } with the new title
-  test('Players are told', async () => {
+  test('Players are told every detail that changed', async () => {
     // 1. sign in as the organizer (not what this test checks)
     const organizer = testOrganizer();
     const token = signIn(organizer);
 
-    // 2. a game whose title changes from the edit
+    // 2. a game whose title, sport, pin, spots, skill level and description change
     const before = testGame({ title: 'Old Title' });
-    const after = testGame({ title: 'New Title' });
-    jest.spyOn(gamesDb, 'getGameById').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
-    jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: true });
-    const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
-    const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
-
-    // 3. edit it through the interface
-    const response = await api.put(`/api/games/${GAME_ID}`).set(withToken(token))
-      .send(validGameBody());
-
-    // 4. let any notifications finish
-
-    await letNotificationsFinish();
-
-    // 5. check the reply and the notification
-    expect(response.status).toBe(200);
-    expect(response.body.game.title).toBe('New Title');
-    expect(getUsersToNotify).toHaveBeenCalledWith(GAME_ID, organizer.userId);
-    expect(sendPushToUsers).toHaveBeenCalledTimes(1);
-    expect(sendPushToUsers).toHaveBeenCalledWith([2, 3], {
-      title: 'Game updated',
-      body: 'New Title: the organizer changed the title',
-      data: { type: 'game_updated', gameId: String(GAME_ID) },
-    });
-  });
-
-  // Mocked behavior: the games database is replaced: getGameById returns the game before the
-  //   edit, then after it with a new sport, longitude, max players, skill level and
-  //   description, and the same title, time, place name, address and latitude. updateGame
-  //   reports a change and getUsersToNotify returns users 2 and 3. sendPushToUsers is replaced
-  //   to check what they're told. Sign in is mocked only so the route can run
-  // Input: the organizer edits those details of their game
-  // Expected status code: 200
-  // Expected behavior: the notification names every detail that changed, the moved pin counts
-  //   as a new location
-  // Expected output: { msg: "success", game }
-  test('Players are told every detail that changed', async () => {
-    // 1. sign in as the organizer (not what this test checks)
-    const token = signIn(testOrganizer());
-
-    // 2. a game whose sport, pin, spots, skill level and description change
-    const before = testGame();
     const after = testGame({
+      title: 'New Title',
       sport: 'basketball',
       longitude: -123.2,
       maxPlayers: 12,
@@ -85,7 +48,7 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
     });
     jest.spyOn(gamesDb, 'getGameById').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
     jest.spyOn(gamesDb, 'updateGame').mockResolvedValue({ ok: true, changed: true });
-    jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
+    const getUsersToNotify = jest.spyOn(gamesDb, 'getUsersToNotify').mockResolvedValue([2, 3]);
     const sendPushToUsers = jest.spyOn(push, 'sendPushToUsers').mockResolvedValue(2);
 
     // 3. edit it through the interface, and let the notifications finish
@@ -95,9 +58,14 @@ describe('Mocked: PUT /api/games/{gameId}', () => {
 
     // 4. check the reply and that the notification names each change
     expect(response.status).toBe(200);
-    expect(sendPushToUsers).toHaveBeenCalledWith([2, 3], expect.objectContaining({
-      body: `${after.title}: the organizer changed the sport, location, max players, skill level, description`,
-    }));
+    expect(response.body.game.title).toBe('New Title');
+    expect(getUsersToNotify).toHaveBeenCalledWith(GAME_ID, organizer.userId);
+    expect(sendPushToUsers).toHaveBeenCalledTimes(1);
+    expect(sendPushToUsers).toHaveBeenCalledWith([2, 3], {
+      title: 'Game updated',
+      body: 'New Title: the organizer changed the title, sport, location, max players, skill level, description',
+      data: { type: 'game_updated', gameId: String(GAME_ID) },
+    });
   });
 
   // Mocked behavior: the games database is replaced: getGameById returns the same game before

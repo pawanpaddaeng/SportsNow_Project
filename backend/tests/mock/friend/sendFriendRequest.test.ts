@@ -57,39 +57,6 @@ describe('Mocked: POST /api/friends/requests', () => {
   });
 
   // Mocked behavior: sendFriendRequest saves nothing and reports a new request 7.
-  //   sendPushToUser is replaced to check who is told. Sign in is mocked only so the route can run
-  // Input: Olivia sends a request to Paul ({ user_id: 2 })
-  // Expected status code: 201
-  // Expected behavior: Paul gets a friend_request notification naming Olivia
-  // Expected output: { msg: "success", request: { request_id: 7, user_id: 2, status: "pending" } }
-  test('Receiver is told', async () => {
-    // 1. sign in as the sender (not what this test checks)
-    const sender = testOrganizer();
-    const token = signIn(sender);
-    const receiver = testPlayer();
-
-    // 2. a request that saves successfully
-    jest.spyOn(friendsDb, 'sendFriendRequest').mockResolvedValue({ ok: true, requestId: REQUEST_ID });
-    const sendPushToUser = jest.spyOn(push, 'sendPushToUser').mockResolvedValue(1);
-
-    // 3. send the request through the interface
-    const response = await api.post('/api/friends/requests').set(withToken(token)).send({ user_id: receiver.userId });
-
-    // 4. check the reply and the notification
-    expect(response.status).toBe(201);
-    expect(response.body).toEqual({
-      msg: 'success',
-      request: { request_id: REQUEST_ID, user_id: receiver.userId, status: 'pending' },
-    });
-    expect(sendPushToUser).toHaveBeenCalledTimes(1);
-    expect(sendPushToUser).toHaveBeenCalledWith(receiver.userId, {
-      title: 'New friend request',
-      body: `${sender.firstName} sent you a friend request`,
-      data: { type: 'friend_request' },
-    });
-  });
-
-  // Mocked behavior: sendFriendRequest saves nothing and reports a new request 7.
   //   sendPushToUser fails, as if Firebase were down. logError is watched to check the
   //   failure is logged. Sign in is mocked only so the route can run
   // Input: Olivia sends a request to Paul ({ user_id: 2 })
@@ -151,6 +118,10 @@ describe('Mocked: POST /api/friends/requests', () => {
 
     // 4. check the reply, the push, and that only the dead token was deleted
     expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      msg: 'success',
+      request: { request_id: REQUEST_ID, user_id: receiver.userId, status: 'pending' },
+    });
     expect(selectRows).toHaveBeenCalledWith('SELECT token FROM device_tokens WHERE user_id = ?', [receiver.userId]);
     expect(fakeFirebase.initializeApp).toHaveBeenCalledTimes(1);
     expect(fakeFirebase.initializeApp).toHaveBeenCalledWith({ credential: 'default-credential' });

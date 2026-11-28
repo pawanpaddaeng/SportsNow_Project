@@ -25,27 +25,6 @@ async function postRating(token: string, rating: object): Promise<ApiReply> {
 
 // Interface POST /api/games/{gameId}/ratings
 describe('Mocked: POST /api/games/{gameId}/ratings', () => {
-  // Mocked behavior: createRating reports each problem a rating can have
-  // Input: a valid rating
-  // Expected status code: the status of each problem
-  // Expected behavior: nothing else happens
-  // Expected output: the problem's msg
-  test.each([
-    ['not_allowed', 403, 'forbidden'],
-    ['rating_closed', 403, 'rating_closed'],
-    ['self', 409, 'rated_self'],
-    ['player_not_found', 404, 'player_not_found'],
-    ['already_rated', 409, 'already_rated'],
-  ] as const)('Each problem a rating can have: %s', async (problem, status, msg) => {
-    const token = signIn(testPlayer());
-    jest.spyOn(ratingsDb, 'createRating').mockResolvedValue({ ok: false, problem });
-
-    const response = await postRating(token, VALID_RATING);
-
-    expect(response.status).toBe(status);
-    expect(response.body.msg).toBe(msg);
-  });
-
   // Mocked behavior: createRating throws, as when the database is down
   // Input: a valid rating
   // Expected status code: 500
