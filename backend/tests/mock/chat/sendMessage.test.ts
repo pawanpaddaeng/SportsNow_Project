@@ -4,6 +4,7 @@ import { type ChatAccess, type ChatMessage } from '../../../src/chat/db/chats';
 import { startChatSocket } from '../../../src/chat/socket/chatSocket';
 import * as mysqlDb from '../../../src/core/db/mysql';
 import * as logger from '../../../src/core/logger';
+import * as deviceTokens from '../../../src/core/notifications/deviceTokens';
 import * as push from '../../../src/core/notifications/push';
 import { createAuthToken } from '../../../src/user/auth/jwt';
 import * as usersDb from '../../../src/user/db/users';
@@ -14,10 +15,14 @@ import {
   waitForChatServer,
   waitUntil,
 } from '../../chatSocketClient';
+import { fakeFirebase } from '../fakeFirebase';
+import type * as FakeFirebase from '../fakeFirebase';
 import type * as MockEnv from '../mockEnv';
 import { cleanUpAfterTests, testOrganizer, testPlayer } from '../helpers';
 
 jest.mock('../../../src/core/config/env', () => jest.requireActual<typeof MockEnv>('../mockEnv'));
+jest.mock('firebase-admin/app', () => jest.requireActual<typeof FakeFirebase>('../fakeFirebase'));
+jest.mock('firebase-admin/messaging', () => jest.requireActual<typeof FakeFirebase>('../fakeFirebase'));
 
 // this file's own ports, test files run at the same time
 const PORT = 18102;
@@ -194,6 +199,36 @@ describe('Mocked: WebSocket send_message', () => {
       title: 'Paul',
       body: `${'😀'.repeat(100)}...`,
     }));
+  });
+
+  // Mocked behavior: chat 7 is a friend chat of Olivia and Paul, createChatMessage saves the
+  //   message, and Olivia has one device (getDeviceTokens). Firebase is replaced and answers
+  //   the send with a success, so our push code runs for real
+  // Input: Paul sends "Hi" with client_id "t-1" while Olivia doesn't have the chat open
+  // Expected status code: none, it's a WebSocket reply
+  // Expected behavior: the push to Olivia's device carries the Android tag friend-2, so Paul's
+  //   messages replace each other instead of piling up. No token is deleted
+  // Expected output: new_message to Paul
+  test('Friend message push is tagged by its sender', async () => {
+    fakeFirebase.reset();
+    const { playerToken } = signInBoth();
+    allowChat(FRIEND_CHAT);
+    jest.spyOn(chatsDb, 'createChatMessage').mockResolvedValue(savedMessage('Hi'));
+    jest.spyOn(deviceTokens, 'getDeviceTokens').mockResolvedValue(['olivia-phone']);
+    const executeWrite = jest.spyOn(mysqlDb, 'executeWrite');
+    fakeFirebase.sendEachForMulticast.mockResolvedValue({ successCount: 1, responses: [{ success: true }] });
+    const player = await connectToChat(PORT, CHAT_ID, playerToken);
+
+    player.sendMessage(CHAT_ID, 'Hi', 't-1');
+
+    expect(await player.nextReply()).toMatchObject({ type: 'new_message', client_id: 't-1' });
+    await waitUntil(() => fakeFirebase.sendEachForMulticast.mock.calls.length === 1);
+    expect(fakeFirebase.sendEachForMulticast).toHaveBeenCalledWith(expect.objectContaining({
+      tokens: ['olivia-phone'],
+      notification: { title: 'Paul', body: 'Hi' },
+      android: { notification: { tag: 'friend-2' } },
+    }));
+    expect(executeWrite).not.toHaveBeenCalled();
   });
 
   // Mocked behavior: chat 7 is a friend chat, createChatMessage saves the message,
